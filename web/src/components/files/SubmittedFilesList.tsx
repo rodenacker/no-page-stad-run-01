@@ -2,9 +2,10 @@
 
 /**
  * Every expense file that has been submitted, as the transactions service reports
- * it — the screen both the Finance Uploader and the Approver watch (brief R3, R9).
+ * it — the screen both the Finance Uploader and the Approver watch (brief R3, R9) —
+ * keeping itself current while any of those files is still being processed.
  *
- * Three things about this component are deliberate and easy to break:
+ * Five things about this component are deliberate and easy to break:
  *
  * - **Everything on screen is the service's own value** (brief BR5). The status, the
  *   most recent activity and the record count are printed as they arrived, and so is
@@ -15,12 +16,24 @@
  *   policed" stance).
  * - **The read happens in the BROWSER**, through the shared API client at the app's
  *   own same-origin address (`lib/api/files.ts`). That is what lets the session
- *   cookie travel by itself, and what makes the three states below this component's
- *   own business rather than a server render's.
+ *   cookie travel by itself, what makes the three states below this component's
+ *   own business rather than a server render's, and what makes keeping the rows
+ *   current possible at all.
  * - **All three non-data states are answered** (project.md NFR-base-5): a busy state
  *   that is announced and not merely drawn, a plain sentence when nothing has been
  *   submitted yet, and — when the list cannot be loaded — the service's own wording
  *   plus one action that asks for it again. A failed load is never a blank screen.
+ * - **The rows keep themselves up to date, and only while that is worth doing**
+ *   (brief Feature NFR "List currency", R10/BR2). While any listed file is still
+ *   working (`Uploaded` / `Validating`) the SAME list call is re-read on a timer and
+ *   the rows catch up in place; once nothing is in progress the timer stops and the
+ *   screen goes quiet. There is one timer at most, and it is cleared when this
+ *   component goes away.
+ * - **A re-read that fails changes nothing on screen.** The failed-load state above
+ *   belongs to a read that left the user with nothing; a screen already showing real
+ *   values keeps them rather than losing them to one unanswered request (story 3
+ *   AC-5). Every re-read — the timer's and the one a submission asks for — behaves
+ *   that way.
  *
  * The status chip pairs an intent colour with the status TEXT and an icon, never
  * colour alone (brief §Feature NFRs, source UI-21). Every colour is a token from
@@ -35,7 +48,7 @@ import {
   LoaderCircle,
   TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +63,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useToast } from '@/contexts/ToastContext';
 import { serviceMessageOf } from '@/lib/api/errors';
 import { fetchSubmittedFiles } from '@/lib/api/files';
 import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
@@ -59,6 +73,7 @@ import {
   FILE_STATUS_UPLOADED,
   FILE_STATUS_VALIDATING,
   FILE_STATUS_VALIDATION_FAILED,
+  isFileInProgress,
   isKnownFileStatus,
 } from '@/types/files';
 
@@ -86,6 +101,27 @@ const FAILED_TITLE = 'Could not load the submitted files';
  */
 const FAILED_MESSAGE =
   'The submitted files could not be loaded. Please try again.';
+
+/**
+ * How long the screen waits before asking the service again while a file is still
+ * being processed.
+ *
+ * Short enough that a file finishing is news rather than history, long enough that a
+ * screen left open all afternoon is not a load on the service — and it only ever runs
+ * while something is actually in progress. Anything up to a minute satisfies this
+ * story's tests; the value itself is nobody's contract.
+ */
+const REFRESH_INTERVAL_MS = 15_000;
+
+/** Said when a submitted file has finished importing (brief R10). */
+const IMPORTED_TITLE = 'File imported';
+
+/**
+ * What the user is told when a file finishes: the file's own name and the record
+ * count the SERVICE reported, both verbatim (brief BR5) — the screen counts nothing.
+ */
+const importedMessage = (file: FileLog): string =>
+  `${file.CurrentFileName} finished importing. Records imported: ${file.RecordCount}.`;
 
 /** How each recognised status is shown: an intent colour and an icon, beside its text. */
 interface StatusPresentation {
@@ -163,33 +199,136 @@ export function SubmittedFilesList() {
   const [state, setState] = useState<ListState>(LOADING);
   /** Bumped by Try again; asking for the list again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
+  /** The app's one notification surface, in the root layout (brief R10). */
+  const { showToast } = useToast();
+
+  /**
+   * What status each listed file was last seen in, by file id. This is a record of
+   * what the user has already been told — not something rendered — so it lives in a
+   * ref, and it is what makes a file ARRIVING at `Imported` tellable from a file that
+   * was already imported when the screen opened: only the first is news.
+   */
+  const statusesAlreadySeen = useRef<Map<number, string>>(new Map());
+
+  /**
+   * Tells the user about every file that has just finished importing, and remembers
+   * what each listed file is now.
+   *
+   * A file resolving to `Validation failed` is deliberately NOT announced: what to
+   * tell the uploader about invalid rows is the `file-validation-and-retry` epic's
+   * requirement (R91), and saying something vague here would pre-empt it. The row
+   * shows the status either way.
+   */
+  const announceFinishedImports = useCallback(
+    (files: FileLog[]): void => {
+      const seen = statusesAlreadySeen.current;
+
+      files.forEach((file) => {
+        const previousStatus = seen.get(file.Id);
+        seen.set(file.Id, file.CurrentStatus);
+
+        const justImported =
+          previousStatus !== undefined &&
+          previousStatus !== FILE_STATUS_IMPORTED &&
+          file.CurrentStatus === FILE_STATUS_IMPORTED;
+
+        if (justImported) {
+          showToast({
+            variant: 'success',
+            title: IMPORTED_TITLE,
+            message: importedMessage(file),
+          });
+        }
+      });
+    },
+    [showToast],
+  );
+
+  /**
+   * Reads the list and puts what came back on screen.
+   *
+   * A failure is only ever reported as the failed-load state when there is nothing on
+   * screen to lose (a first read, or a Try again, which puts the screen back into its
+   * busy state first). When real rows are already showing, a failed read is left
+   * unmentioned and those rows stay exactly as they were — a background refresh must
+   * not blank the list or replace it with an error (story 3 AC-5).
+   *
+   * `stillWatching` is how a caller says its read no longer matters: this component
+   * has gone away, or the screen has moved on.
+   */
+  const readList = useCallback(
+    (stillWatching: () => boolean): Promise<void> =>
+      fetchSubmittedFiles()
+        .then((body) => {
+          if (!stillWatching()) {
+            return;
+          }
+          const files = filesIn(body);
+          announceFinishedImports(files);
+          setState({ phase: 'loaded', files });
+        })
+        .catch((error: unknown) => {
+          if (!stillWatching()) {
+            return;
+          }
+          setState((current) =>
+            current.phase === 'loaded'
+              ? current
+              : {
+                  phase: 'failed',
+                  // The service's own wording when it sent one; never the API
+                  // client's internal placeholder (`serviceMessageOf` draws that
+                  // line).
+                  message: serviceMessageOf(error) ?? FAILED_MESSAGE,
+                },
+          );
+        }),
+    [announceFinishedImports],
+  );
 
   useEffect(() => {
     // A read that is still in flight when this component goes away — or when the
     // user asks for the list again — must not land on a screen that has moved on.
     let watching = true;
 
-    void fetchSubmittedFiles()
-      .then((body) => {
-        if (watching) {
-          setState({ phase: 'loaded', files: filesIn(body) });
-        }
-      })
-      .catch((error: unknown) => {
-        if (watching) {
-          // The service's own wording when it sent one; never the API client's
-          // internal placeholder (`serviceMessageOf` draws that line).
-          setState({
-            phase: 'failed',
-            message: serviceMessageOf(error) ?? FAILED_MESSAGE,
-          });
-        }
-      });
+    void readList(() => watching);
 
     return () => {
       watching = false;
     };
-  }, [readsRequested]);
+  }, [readsRequested, readList]);
+
+  /**
+   * Whether any listed file is still working, which is the only reason to keep asking
+   * the service anything. Read straight off what is on screen, so it cannot disagree
+   * with the rows the user is looking at.
+   */
+  const somethingIsInProgress =
+    state.phase === 'loaded' &&
+    state.files.some((file) => isFileInProgress(file.CurrentStatus));
+
+  /**
+   * While something is in progress, the same list call is re-read on a timer and the
+   * rows catch up in place (brief Feature NFR "List currency"). Once nothing is in
+   * progress this effect stops running, which clears the timer: the screen goes quiet
+   * rather than asking a settled question forever. One timer at most — it is tied to
+   * that single fact, not to every render — and it goes away with the component.
+   */
+  useEffect(() => {
+    if (!somethingIsInProgress) {
+      return;
+    }
+
+    let watching = true;
+    const refresh = setInterval(() => {
+      void readList(() => watching);
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      watching = false;
+      clearInterval(refresh);
+    };
+  }, [somethingIsInProgress, readList]);
 
   /**
    * A file submitted elsewhere on this screen is not in this list yet, and the

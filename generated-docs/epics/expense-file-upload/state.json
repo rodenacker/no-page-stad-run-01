@@ -12,6 +12,8 @@
       "Verify the status wording the service actually uses: the screen assumes a submitted file's status reads as Uploaded, Validating, Validation failed, Imported or Cancelled. Those five come from the requirements document, not from the API specification (which types the status as free text with no fixed list). If the real service words them differently, statuses will show up unstyled and the 'finished importing' notification may never fire.",
       "Verify a file you have just submitted appears in the list: the upload call answers with a generic acknowledgement and no file identifier, so the screen finds your new file by re-reading the active file list. If the service does not list a freshly submitted file straight away, you would get a successful confirmation but see nothing appear.",
       "Verify a real CSV is accepted by the real service: the upload sends the setting, the setting name and the file name in the address and the file's raw bytes as the request body, exactly as the API specification describes. If the running service actually expects a form-style upload instead, every automated test still passes while real uploads are refused.",
+      "The list asks the service again every 15 seconds while a file is being processed. Neither the requirements nor the brief name a cadence — if finance expects a file's status to move faster, or wants less traffic on the service, this is the single number to change.",
+      "The 'file imported' notification is shown to anyone watching the screen, including an Approver, because the list cannot tell who is looking at it. Requirement R10 names only the Finance Uploader — so this is broader than asked, not narrower. If the notification must be the uploader's alone, say so and the list will be told the current role.",
       "A refused upload's reason is read out of the 500 response's Messages[] (what the transactions spec documents). If the live service refuses with some other status, or an empty body, the user gets the app's own wording — 'The file could not be submitted. Please try again.' — rather than a specific reason. Worth confirming against the real service.",
       "'The file name must identify a CSV' is implemented as: the name ends in .csv, any capitalisation. So 'expenses.csv.txt' is refused and 'EXPENSES.CSV' is accepted — confirm that is the intent.",
       "The setting picker offers each setting by NAME only; the chosen setting's source and file type appear on a line beneath it rather than inside the options, so the option list stays unambiguous. Confirm that reads well for you.",
@@ -39,11 +41,11 @@
       "completedAt": "2026-08-03T16:49:00.000Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-03T16:51:00.000Z",
+      "completedAt": "2026-08-03T17:02:00.000Z"
     }
   },
   "halt": null,
