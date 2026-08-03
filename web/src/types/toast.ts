@@ -81,30 +81,35 @@ export const TOAST_DEFAULTS = {
 /**
  * Toast variant configuration
  * Maps variants to their visual properties
+ *
+ * Token-based, like every other colour in the app: a tinted surface is the status
+ * token at low opacity and the text is the token itself, so each variant follows the
+ * app into its dark version instead of staying stuck in light-mode greens and reds
+ * (styling-centralisation.md rules 1-5).
  */
 export const TOAST_VARIANT_CONFIG = {
   success: {
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
-    textColor: 'text-green-900',
-    iconColor: 'text-green-600',
+    bgColor: 'bg-success/10',
+    borderColor: 'border-success/40',
+    textColor: 'text-foreground',
+    iconColor: 'text-success',
   },
   error: {
-    bgColor: 'bg-red-50',
-    borderColor: 'border-red-200',
-    textColor: 'text-red-900',
-    iconColor: 'text-red-600',
+    bgColor: 'bg-destructive/10',
+    borderColor: 'border-destructive/40',
+    textColor: 'text-foreground',
+    iconColor: 'text-destructive',
   },
   info: {
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    textColor: 'text-blue-900',
-    iconColor: 'text-blue-600',
+    bgColor: 'bg-info/10',
+    borderColor: 'border-info/40',
+    textColor: 'text-foreground',
+    iconColor: 'text-info',
   },
   warning: {
-    bgColor: 'bg-amber-50',
-    borderColor: 'border-amber-200',
-    textColor: 'text-amber-900',
-    iconColor: 'text-amber-600',
+    bgColor: 'bg-warning/10',
+    borderColor: 'border-warning/40',
+    textColor: 'text-foreground',
+    iconColor: 'text-warning',
   },
 } as const;

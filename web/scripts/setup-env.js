@@ -33,7 +33,13 @@ function setupEnvironment() {
       envCreated = true;
       log('✅ Created .env.local from .env.example');
     } else {
-      const basicEnv = `NEXT_PUBLIC_API_BASE_URL=http://localhost:8042\n`;
+      // Fallback only (no .env.example present): the two backend addresses this
+      // project talks to — see generated-docs/project.md §Data Source.
+      const basicEnv = [
+        'NEXT_PUBLIC_AUTH_API_BASE_URL=http://localhost:4424',
+        'NEXT_PUBLIC_TRANSACTIONS_API_BASE_URL=http://localhost:4423/transactions-api',
+        '',
+      ].join('\n');
       fs.writeFileSync(ENV_LOCAL_PATH, basicEnv);
       envCreated = true;
       log('✅ Created .env.local');

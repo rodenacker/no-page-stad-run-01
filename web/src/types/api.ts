@@ -17,6 +17,17 @@ export interface DefaultResponse {
 }
 
 /**
+ * ErrorResponse - how this project's services describe a rejected request
+ * (`documentation/auth-api.yaml` → `components.schemas.ErrorResponse`).
+ * `Error` is a machine-readable code (e.g. `INVALID_REQUEST`); `Message` is the
+ * human-readable wording, and is what the user is shown.
+ */
+export interface ErrorResponse {
+  Error: string;
+  Message: string;
+}
+
+/**
  * APIError - Standardized error object for API failures
  * Used throughout the application for consistent error handling
  */
@@ -40,11 +51,12 @@ export type QueryParams = Record<
 export interface APIRequestConfig extends RequestInit {
   params?: QueryParams;
   /**
-   * When true, the client injects an auth header from getAuthHeader() (env-var
-   * driven, populated by api-connectivity-agent during INTAKE Step 4b). Caller-
-   * supplied headers always win — set headers explicitly to override.
+   * Overrides the default same-origin API base path with an absolute service
+   * address. Needed only by server-side callers: the Next.js server process
+   * cannot fetch a relative path, whereas browser calls are same-origin and are
+   * routed to the right backend by the proxy route handlers under `src/app/`.
    */
-  requiresAuth?: boolean;
+  baseUrl?: string;
   lastChangedUser?: string; // For audit trails - remove if not needed
   isBinaryResponse?: boolean; // Flag to indicate response should be treated as binary data
 }

@@ -1,0 +1,71 @@
+/**
+ * The server-side gate every screen other than the sign-in screen sits behind.
+ *
+ * A protected layout `await`s this before rendering anything, so a request with
+ * no valid session is redirected to the sign-in screen BEFORE any protected
+ * content reaches the browser — there is no client-side-only gate and no flash of
+ * protected content (brief BR1). Identity and roles are re-resolved from the auth
+ * service on each server-rendered navigation rather than cached (brief BR3).
+ *
+ * What it returns is the auth service's own identity body: name, email and the
+ * role set. It contains no session value, so nothing a component receives — and
+ * therefore nothing that reaches browser-side code — carries a credential
+ * (brief BR2).
+ */
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { cache } from 'react';
+
+import { SIGN_IN_ROUTE, SIGN_IN_TIMED_OUT_ROUTE } from '@/lib/utils/constants';
+
+import { fetchUserInfo } from './authApi';
+import { SESSION_COOKIE_NAME } from './sessionCookie';
+
+import type { UserInfoRead } from '@/types/auth';
+
+/**
+ * Where a caller without a valid session is sent. Declared in
+ * `lib/utils/constants.ts` so browser-side code (sign-out) can use the same value
+ * without importing this server-only module, and re-exported here because this is
+ * where the redirect happens.
+ */
+export { SIGN_IN_ROUTE };
+
+/**
+ * Who this session belongs to, resolved ONCE per server request.
+ *
+ * Both the protected layout and the page inside it need the identity, and a layout
+ * cannot hand props to its page — so the gate is called twice while rendering one
+ * screen. `cache` makes the second call reuse the first call's answer for the
+ * duration of that one request, so a screen still costs the auth service a single
+ * `GET /v1/auth/userinfo`. It caches nothing BETWEEN requests: the next navigation
+ * resolves identity and roles fresh (brief BR3, NFR4).
+ */
+const resolveSession = cache(
+  async (sessionValue: string): Promise<UserInfoRead | null> =>
+    fetchUserInfo(sessionValue),
+);
+
+/**
+ * The signed-in identity for the current request, or a redirect to the sign-in
+ * screen. Never returns for an unauthenticated caller.
+ */
+export async function requireSession(): Promise<UserInfoRead> {
+  const cookieStore = await cookies();
+  const sessionValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionValue) {
+    redirect(SIGN_IN_ROUTE);
+  }
+
+  const session = await resolveSession(sessionValue);
+  if (!session) {
+    // The browser had a session but the auth service says it is gone — it enforces its
+    // own absolute cap, this app asserts no session lifetime of its own (brief R17). So
+    // this navigation is the moment the user finds out, and they are told the same plain
+    // thing the idle warning would have told them, rather than meeting an empty form or a
+    // raw error.
+    redirect(SIGN_IN_TIMED_OUT_ROUTE);
+  }
+
+  return session;
+}

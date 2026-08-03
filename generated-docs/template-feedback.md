@@ -1,0 +1,35 @@
+# Template Feedback
+
+Append-only. One entry per template-level bug found while building this project.
+
+## [template] Starter template hardcodes a single stale API base URL and a client-held-token auth path, in five places
+
+- Symptom: the scaffold assumes one backend at `http://localhost:8042` and a `NEXT_PUBLIC_API_TOKEN` auth header. This project has two backend services and cookie-session auth (the template's own encouraged `bff` option), so five files had to be corrected in the first story of the first epic: `web/src/lib/utils/constants.ts` (`API_BASE_URL` default), `web/src/lib/api/client.ts` (`getAuthHeader()` / `requiresAuth`), `web/src/types/api.ts` (`requiresAuth` flag), `web/README.md`, and `web/scripts/setup-env.js` (fallback `.env.local` contents). Removing the stale constant also broke `tsc` (`TS2305` at `client.ts:16`) and the shipped `web/src/__tests__/integration/api-client.test.ts`, whose `requiresAuth flag` block asserted the browser-held-token behaviour that `authentication-intake.md` Rule 10 forbids for cookie-session projects — a shipped test asserting a forbidden path.
+- Workaround applied: rewired the constants to same-origin API paths, replaced the client's `requiresAuth` token path with an optional `baseUrl` override for server-side calls, and rewrote the template test block to assert the cookie-session contract.
+- Suggested fix: ship the API base URL as configuration-only with no literal default, and make the token/auth-header path opt-in scaffolding (or generated per auth method during INTAKE) rather than baked into `client.ts` + its shipped test. At minimum, keep the stale URL in one place instead of five.
+- Affected: `web/src/lib/utils/constants.ts`, `web/src/lib/api/client.ts`, `web/src/types/api.ts`, `web/src/__tests__/integration/api-client.test.ts`, `web/README.md`, `web/scripts/setup-env.js`
+
+## [template] The `E2E_PROD=1` Playwright mode cannot point browser-side backend calls at a stub, so specs that pass in dev fail at the epic-end run
+
+- Symptom: `playwright.config.ts` sets `webServer.env` (`AUTH_API_BASE_URL` / `NEXT_PUBLIC_AUTH_API_BASE_URL` → the mocked auth service) and its comment states this "points the app's auth base URL at the mocked auth service for this run". That is true for `next dev` but NOT for `E2E_PROD=1`, which serves a pre-built app with `npm run start`: Next resolves `next.config.ts` `rewrites()` during `next build` and writes the literal destination into `.next/routes-manifest.json` (verified: the manifest contains `"destination": "http://localhost:4424/v1/auth/:path*"`). `next start` serves that manifest, so a runtime env var cannot redirect a browser-side call — it reaches the REAL backend, which rejects the test's mock session. Result: two Story 3 specs (`after signing out, the browser Back button…`, `the signed-in shell is fully keyboard operable…`) pass in dev mode and fail under `E2E_PROD=1` — the mode the epic-end batched run uses — with the sign-out never navigating. Rebuilding with the stub URL set (`AUTH_API_BASE_URL=http://127.0.0.1:4599 npm run build`) makes all 10 specs pass, which isolates the cause.
+- Impact beyond the harness: the same build-time baking means one built artifact cannot be promoted across environments (dev → staging → prod) — the backend address is compiled in. That contradicts the `bff-auth-pattern.md` same-origin-rewrite recommendation the template gives for "existing or multiple backends", which reads as if the destination were runtime configuration.
+- Workaround applied: RESOLVED in this project by Story 7 (option (a) below) — both `rewrites()` entries were removed and replaced with proxy route handlers at `app/v1/auth/[...path]/route.ts` and `app/transactions-api/[...path]/route.ts`, which resolve the service address per request. `.next/routes-manifest.json` now declares no rewrite at all, and all 10 live specs pass under `E2E_PROD=1` against a production build with no change to `playwright.config.ts`. Story 1's committed spec was updated to assert the request-time forwarding instead of the rewrite rules (same intent, stricter check). Still worth fixing in the template, since every new project starts from the same recommendation.
+- Suggested fix (template): (a) recommend a request-time proxy route handler instead of `rewrites()` in `bff-auth-pattern.md` §"Existing or multiple backends", so the running server reads the env var — this is what was done here, and it fixes the deployment problem as well as the harness; (b) alternatively, make the `E2E_PROD` webServer build with its own env (`command: 'npm run build && npm run start …'`), which only fixes the harness. Also worth stating in the policy that the server-only env name must be PREFERRED over the `NEXT_PUBLIC_*` one, since `next build` inlines every `NEXT_PUBLIC_*` read as a literal (in the server bundle too) and reading it first re-bakes the address.
+- Affected: `web/playwright.config.ts`, `web/next.config.ts`, `.claude/policies/bff-auth-pattern.md`
+
+## `.dockerignore` excludes `web/e2e` but not `web/playwright.config.ts`
+
+**What happened.** The `Build & boot image` CI job failed on `next build` inside Docker:
+
+```
+./playwright.config.ts:3:35
+Type error: Cannot find module './e2e/support/auth-api-stub' or its corresponding type declarations.
+```
+
+**Why.** The template's `.dockerignore` excludes `web/e2e` (correct — test code should not ship in a production image) but leaves `web/playwright.config.ts` in the build context. `web/tsconfig.json` includes `**/*.ts`, so `next build` type-checks that config inside the image, and any import it makes from `web/e2e` is unresolvable there.
+
+**Why it will recur.** A Playwright config importing a shared constant from `e2e/` is a natural and correct thing to do — a stub server's port or URL wants one source of truth shared between the config's `webServer.env` and the stub itself. The template's own quality gates, local `npm run build`, and `npm run typecheck` all pass, because they run outside the Docker context. The failure only appears in the Docker job, i.e. at PR time, after everything else is green.
+
+**Fix applied in this project.** Added `web/playwright.config.ts` to `.dockerignore` beside `web/e2e`, with a comment explaining the coupling.
+
+**Suggested template change.** Ship `web/playwright.config.ts` in `.dockerignore` by default, next to `web/e2e`, with that comment. It costs nothing when the config has no `e2e/` imports and prevents a late, confusing CI-only failure when it does.

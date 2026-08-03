@@ -15,6 +15,11 @@ web/.env.*
 
 # Tests, tooling, and caches not needed for a production build
 web/e2e
+# Excluded alongside web/e2e, not just as tidiness: tsconfig includes **/*.ts, so
+# `next build` type-checks this config inside the image. If it imports anything from
+# web/e2e (which is excluded above) the build fails on an unresolvable module. A
+# production image has no reason to carry the Playwright config.
+web/playwright.config.ts
 web/playwright-report
 web/test-results
 web/coverage

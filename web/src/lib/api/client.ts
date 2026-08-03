@@ -8,16 +8,28 @@
  * - Type-safe API responses
  *
  * USAGE:
- * 1. Update API_BASE_URL in constants.ts or environment variables
+ * 1. Address endpoints by their same-origin path (see the API path constants in
+ *    constants.ts); a route handler (`app/v1/auth/[...path]`,
+ *    `app/transactions-api/[...path]`) forwards each path to the service that owns
+ *    it. Server-side callers, which cannot fetch a relative path, pass an explicit
+ *    `baseUrl`.
  * 2. Define your API endpoints as functions that call apiClient
  * 3. Customize error handling and logging as needed
+ *
+ * AUTHENTICATION: this project is cookie-session only. The browser attaches the
+ * HttpOnly `session` cookie to same-origin calls by itself, and the frontend holds
+ * no token or static credential of any kind — so this client sends no auth header
+ * (project.md §Authentication, epic brief BR2). A server-side caller forwards the
+ * incoming session explicitly via a `Cookie` header.
  */
 
-import { API_BASE_URL } from '@/lib/utils/constants';
+import { CLIENT_FALLBACK_MESSAGES } from '@/lib/api/errors';
+import { API_BASE_PATH } from '@/lib/utils/constants';
 import type {
   APIError,
   APIRequestConfig,
   DefaultResponse,
+  ErrorResponse,
   HTTPStatusCode,
   QueryParams,
 } from '@/types/api';
@@ -34,16 +46,11 @@ export async function apiClient<T = unknown>(
   endpoint: string,
   config: APIRequestConfig = {},
 ): Promise<T> {
-  const {
-    params,
-    lastChangedUser,
-    isBinaryResponse,
-    requiresAuth,
-    ...fetchConfig
-  } = config;
+  const { params, lastChangedUser, isBinaryResponse, baseUrl, ...fetchConfig } =
+    config;
 
   // Build full URL with query parameters
-  const url = buildUrl(endpoint, params);
+  const url = buildUrl(endpoint, params, baseUrl);
 
   // Build headers
   const headers = buildHeaders(
@@ -51,7 +58,6 @@ export async function apiClient<T = unknown>(
     lastChangedUser,
     fetchConfig.headers,
     fetchConfig.body ?? undefined,
-    requiresAuth,
   );
 
   // Log request in development
@@ -78,7 +84,7 @@ export async function apiClient<T = unknown>(
     // Handle network errors or other unexpected errors
     if (error instanceof Error && error.name === 'TypeError') {
       throw createAPIError(
-        'Network error: Unable to connect to the API server',
+        CLIENT_FALLBACK_MESSAGES.network,
         0,
         ['Please check your internet connection and try again.'],
         url,
@@ -93,6 +99,10 @@ export async function apiClient<T = unknown>(
 /**
  * Builds the full URL with query parameters.
  *
+ * `baseUrl` defaults to the same-origin `API_BASE_PATH`, which is what browser
+ * calls use. A server-side caller passes the target service's address explicitly,
+ * because a relative path cannot be fetched from the Next.js server process.
+ *
  * Array values serialize as repeated params (`['a','b']` → `?k=a&k=b`); for
  * `explode: false` APIs, join at the endpoint-function layer. Empty arrays and
  * `undefined` values drop the key entirely (the "clear all filters" path). An
@@ -100,11 +110,15 @@ export async function apiClient<T = unknown>(
  * items that are empty strings are dropped, since an array of empty strings is
  * never a meaningful filter selection.
  */
-function buildUrl(endpoint: string, params?: QueryParams): string {
-  const baseUrl = `${API_BASE_URL}${endpoint}`;
+function buildUrl(
+  endpoint: string,
+  params?: QueryParams,
+  baseUrl?: string,
+): string {
+  const requestUrl = `${baseUrl ?? API_BASE_PATH}${endpoint}`;
 
   if (!params) {
-    return baseUrl;
+    return requestUrl;
   }
 
   const queryParams = new URLSearchParams();
@@ -122,21 +136,21 @@ function buildUrl(endpoint: string, params?: QueryParams): string {
   });
 
   const queryString = queryParams.toString();
-  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+  return queryString ? `${requestUrl}?${queryString}` : requestUrl;
 }
 
 /**
  * Builds request headers
  * Only sets Content-Type when there's a request body
- * Injects auth header from getAuthHeader() when requiresAuth is true and an
- * explicit override isn't already present in customHeaders
+ * Sends no credential header: authentication travels in the browser-managed
+ * `session` cookie, or — for a server-side call — in a `Cookie` header the caller
+ * supplies explicitly (project.md §Authentication, epic brief BR2)
  */
 function buildHeaders(
   method?: string,
   lastChangedUser?: string,
   customHeaders?: HeadersInit,
   body?: BodyInit,
-  requiresAuth?: boolean,
 ): Record<string, string> {
   const baseHeaders: Record<string, string> = {};
 
@@ -170,48 +184,39 @@ function buildHeaders(
     baseHeaders['LastChangedUser'] = lastChangedUser;
   }
 
-  // Inject auth header when the caller asked for it and the header is configured
-  // via env vars captured during INTAKE Step 4b. Caller-provided headers win.
-  if (requiresAuth) {
-    const authHeader = getAuthHeader();
-    if (authHeader && !(authHeader.name in baseHeaders)) {
-      baseHeaders[authHeader.name] = authHeader.value;
-    }
-  }
-
   return baseHeaders;
 }
 
 /**
- * Reads auth-header configuration from env vars captured by api-connectivity-agent
- * during INTAKE Step 4b. Returns null when no token is configured (the request
- * proceeds without an Authorization header — useful in mock mode and on public
- * endpoints).
+ * The human-readable message a failed response carries, if any.
  *
- * Env var contract:
- * - NEXT_PUBLIC_API_AUTH_HEADER (default: "Authorization")
- * - NEXT_PUBLIC_API_AUTH_VALUE_PREFIX (default: "Bearer ", trailing space optional)
- * - NEXT_PUBLIC_API_TOKEN (the credential value)
- *
- * NEXT_PUBLIC_* vars are baked into the browser bundle. For production apps that
- * call a real backend with sensitive tokens, prefer a BFF or Next.js API route
- * proxy so tokens stay server-side. This helper is intended for local dev against
- * a dev backend where the convenience outweighs the exposure.
+ * Two body shapes are in play across this project's services, and BOTH have to be
+ * read: the `DefaultResponse` envelope (`Messages[]`) and the `ErrorResponse`
+ * shape (`{ Error, Message }`) that `documentation/auth-api.yaml` returns on a
+ * rejected call. Reading only the envelope is how the service's own wording gets
+ * thrown away and the user is shown a bare status line instead (epic
+ * `sign-in-and-app-shell` AC-5).
  */
-export function getAuthHeader(): { name: string; value: string } | null {
-  const token = process.env.NEXT_PUBLIC_API_TOKEN;
-  if (!token) return null;
+function readableMessagesOf(body: unknown): string[] {
+  if (typeof body !== 'object' || body === null) {
+    return [];
+  }
+  const { Messages, Message } = body as Partial<DefaultResponse> &
+    Partial<ErrorResponse>;
 
-  const name = process.env.NEXT_PUBLIC_API_AUTH_HEADER || 'Authorization';
-  const rawPrefix = process.env.NEXT_PUBLIC_API_AUTH_VALUE_PREFIX;
-  const prefix =
-    rawPrefix === undefined
-      ? 'Bearer '
-      : rawPrefix.length > 0 && !rawPrefix.endsWith(' ')
-        ? `${rawPrefix} `
-        : rawPrefix;
-
-  return { name, value: `${prefix}${token}` };
+  if (Array.isArray(Messages)) {
+    const messages = Messages.filter(
+      (message): message is string =>
+        typeof message === 'string' && message.trim() !== '',
+    );
+    if (messages.length > 0) {
+      return messages;
+    }
+  }
+  if (typeof Message === 'string' && Message.trim() !== '') {
+    return [Message];
+  }
+  return [];
 }
 
 /**
@@ -231,12 +236,14 @@ async function handleErrorResponse(
   try {
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      const errorData = (await response.json()) as DefaultResponse;
+      const errorData = (await response.json()) as
+        | (Partial<DefaultResponse> & Partial<ErrorResponse>)
+        | null;
 
-      if (errorData.Messages && errorData.Messages.length > 0) {
-        errorMessages = errorData.Messages;
+      errorMessages = readableMessagesOf(errorData);
+      if (errorMessages.length > 0) {
         defaultMessage = errorMessages[0];
-      } else if (errorData.MessageType) {
+      } else if (errorData?.MessageType) {
         defaultMessage = `${errorData.MessageType}: ${defaultMessage}`;
       }
     }
@@ -247,9 +254,14 @@ async function handleErrorResponse(
   // Handle specific status codes
   // Customize these messages based on your application's needs
   switch (statusCode) {
+    // A rejected sign-in arrives here, and the auth service's own reason for the
+    // refusal — a temporary lockout and when it can be retried, say — is the whole
+    // point of the response, so it is preferred over the generic line below.
     case 401:
       throw createAPIError(
-        'Unauthorized: Please log in to continue',
+        errorMessages.length > 0
+          ? errorMessages[0]
+          : CLIENT_FALLBACK_MESSAGES.unauthorized,
         statusCode,
         errorMessages.length > 0
           ? errorMessages
@@ -259,7 +271,7 @@ async function handleErrorResponse(
 
     case 403:
       throw createAPIError(
-        'Forbidden: You do not have permission to perform this action',
+        CLIENT_FALLBACK_MESSAGES.forbidden,
         statusCode,
         errorMessages.length > 0 ? errorMessages : ['Access denied.'],
         url,
@@ -267,7 +279,7 @@ async function handleErrorResponse(
 
     case 404:
       throw createAPIError(
-        'Not Found: The requested resource does not exist',
+        CLIENT_FALLBACK_MESSAGES.notFound,
         statusCode,
         errorMessages.length > 0 ? errorMessages : ['Resource not found.'],
         url,
@@ -275,7 +287,7 @@ async function handleErrorResponse(
 
     case 500:
       throw createAPIError(
-        'Internal Server Error: Something went wrong on the server',
+        CLIENT_FALLBACK_MESSAGES.serverError,
         statusCode,
         errorMessages.length > 0
           ? errorMessages
@@ -420,23 +432,14 @@ function logResponse(response: Response): void {
   }
 }
 
-interface ClientCallOptions {
-  requiresAuth?: boolean;
-}
-
 /**
  * Convenience method for GET requests
  */
 export async function get<T>(
   endpoint: string,
   params?: QueryParams,
-  options?: ClientCallOptions,
 ): Promise<T> {
-  return apiClient<T>(endpoint, {
-    method: 'GET',
-    params,
-    requiresAuth: options?.requiresAuth,
-  });
+  return apiClient<T>(endpoint, { method: 'GET', params });
 }
 
 /**
@@ -446,13 +449,11 @@ export async function post<T>(
   endpoint: string,
   body?: unknown,
   lastChangedUser?: string,
-  options?: ClientCallOptions,
 ): Promise<T> {
   return apiClient<T>(endpoint, {
     method: 'POST',
     body: JSON.stringify(body),
     lastChangedUser,
-    requiresAuth: options?.requiresAuth,
   });
 }
 
@@ -463,13 +464,11 @@ export async function put<T>(
   endpoint: string,
   body?: unknown,
   lastChangedUser?: string,
-  options?: ClientCallOptions,
 ): Promise<T> {
   return apiClient<T>(endpoint, {
     method: 'PUT',
     body: JSON.stringify(body),
     lastChangedUser,
-    requiresAuth: options?.requiresAuth,
   });
 }
 
@@ -479,11 +478,6 @@ export async function put<T>(
 export async function del<T>(
   endpoint: string,
   lastChangedUser?: string,
-  options?: ClientCallOptions,
 ): Promise<T> {
-  return apiClient<T>(endpoint, {
-    method: 'DELETE',
-    lastChangedUser,
-    requiresAuth: options?.requiresAuth,
-  });
+  return apiClient<T>(endpoint, { method: 'DELETE', lastChangedUser });
 }

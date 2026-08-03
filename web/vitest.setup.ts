@@ -29,6 +29,26 @@ if (typeof (globalThis as { jest?: unknown }).jest === 'undefined') {
   };
 }
 
+// jsdom implements no `window.matchMedia`, so any component that asks the browser a
+// question about the environment — the header's theme switch asks for the computer's
+// light/dark setting — throws the moment it mounts, in every test that happens to
+// render it. This supplies the API with nothing matching (so a media query the test
+// has not set up reads as "not applied", i.e. the light theme), matching the other
+// browser-API polyfills below. A test that cares about a specific query stubs
+// `matchMedia` itself for the duration of that test.
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
 // Polyfill for Web APIs needed by Next.js
 // These are required for testing files that import from 'next/server'
 if (typeof Request === 'undefined') {

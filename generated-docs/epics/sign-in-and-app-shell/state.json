@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "sign-in-and-app-shell",
+    "name": "Sign in and the signed-in app shell",
+    "createdAt": "2026-08-03T09:38:46.094Z",
+    "dependsOn": [],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [
+      "Verify the role names the service actually returns for your two accounts: the app decides what you are offered by matching your account's role to exactly \"Finance Uploader\" or \"Approver\". The sign-in service's own documentation shows a different example role (\"Viewer\"), and the source material flags that naming inconsistency. If the real names differ in wording or spelling, a signed-in user could be offered nothing at all, or be offered actions that are not theirs.",
+      "Verify how the sign-in service handles time and repeated failures: the app assumes that staying active keeps your session alive, warns you about a minute before it would drop you, and assumes the service itself reports a temporarily locked account after repeated wrong passwords. If the service uses a different session length, does not extend it while you work, or does not track failed attempts, you may be signed out with no warning, or never see a lockout message — the app cannot count attempts or hold a session open on its own.",
+      "Verify one real sign-in in a browser, end to end: the app is built so the browser only ever calls the app's own address, which forwards on to the two backend services — that is what sidesteps the cross-origin permission header neither service currently returns. If any call reaches a service directly, sign-in will fail in the browser with nothing on screen to explain why, even though every automated test passes.",
+      "When the auth service is unreachable or returns a 500, a signed-in person sees an error rather than being returned to the sign-in screen. Only an expired/rejected session sends them to sign-in. Confirm that is the behaviour you want when a backend is down.",
+      "The /transactions-api/* forwarding rule is set up but nothing in this epic calls the transactions service, so the forwarded address shape is unverified against the live service. The first story that reads transaction data will prove it.",
+      "The session cookie is treated as Secure everywhere except when BFF_INSECURE_COOKIE=1 is set for local plain-HTTP development. Confirm the deployed environments are HTTPS.",
+      "Wording for the two sign-in failures the API contract doesn't specify: a refusal with no explanation from the service shows 'Sign-in failed. Check your details and try again.', and an unreachable/broken auth service shows 'Sign-in is unavailable right now. Please try again in a moment.' Confirm both read the way you want them to.",
+      "The sign-in screen's copy: heading 'Sign in', helper line 'Sign in with your username and password to reach the expense screens.', required-field legend '* indicates a required field', and the button label 'Sign in'. No prototype or design source specified this screen's copy.",
+      "A successful sign-in always lands on / (the app's main signed-in screen). There is no 'return to where you were trying to go' behaviour yet — if a bookmarked deep link should be honoured after signing in, that's a change to make.",
+      "Identity is presented as the person's full name with their role beneath it, inside a header menu button, and Sign out lives in that menu rather than as a standalone header button. The requirement only says 'display the signed-in user's identity' (R3) — confirm this is the shape you want, since the theme switch sits beside it.",
+      "The header's app name reads 'Employee Expenses' and the landing screen's heading/intro wording was written during the build — no source document specifies either.",
+      "The three canonical addresses were chosen during the build, not taken from your documents: / (both roles), /upload (Finance Uploader), /requests (Approver). Later epics attach their screens to these exact addresses — confirm they read sensibly, since changing one later means changing every link to it.",
+      "The permission message names the missing permission using the wording from requirements §6.5 — e.g. \"Upload an expense file\". This assumes that is the wording whoever grants access would recognise. If your account holder uses different names, say so.",
+      "How to request access is worded as \"Request the missing access from the account holder\". There is no named person, email address or request form behind it, because none is documented — confirm whether it should point somewhere specific.",
+      "A signed-in person whose roles this project does not recognise sees \"Nothing has been made available to your account yet\" rather than an empty screen. Nothing in the source documents covers that case.",
+      "As agreed (register-now), a permitted user who follows the upload or review entry point today reaches a not-found page, because those screens ship in later epics. Confirm that is acceptable to see during manual testing of this epic.",
+      "The theme choice is remembered per browser, not per signed-in account. Two people sharing one browser profile would share one theme choice, and a choice made on one machine does not follow the person to another. Storing it against the account would need a backend field to hold it — confirm which you want.",
+      "The header theme switch only exists once you are signed in, so on the sign-in screen you get your remembered choice if you have one, otherwise your computer's setting, with no way to change it from that screen.",
+      "The 30-minute idle timeout and 60-second warning are inferred defaults, not stated requirements — confirm they suit, or name different numbers. They are now a settings change, not a code change.",
+      "Wording of the one sentence the user is given: 'Your session timed out and you have been signed out, so please sign in again to carry on.' Used both when the idle time runs out and when the service reports the session already gone.",
+      "When the idle period runs out the app also tells the auth service to end the session, without waiting for its reply before returning the user to sign-in. If the service treats a logout for an already-ended session as an error, that call may be logged as a failure server-side — harmless to the user, but worth confirming with the service owners.",
+      "A page the user has never touched is treated as having been idle since it arrived, rather than since the app finished starting up. Confirm this reads right for a page left open unattended in a background tab: the next click returns them to sign-in with the timed-out explanation.",
+      "The transactions proxy forwards to <TRANSACTIONS_API_BASE_URL>/<path> — the /transactions-api mount prefix is dropped, because project.md records the configured base URL as already ending in /transactions-api. No transactions call is exercised in a browser yet, so the first transactions screen in a later epic is the first real confirmation that the assembled address is right.",
+      "The transactions proxy accepts GET/POST/PUT/DELETE and no PATCH, taken from documentation/transactions-api.yaml. If the service in fact accepts a verb the spec omits, that verb will be refused at the app rather than forwarded."
+    ],
+    "manualTestResults": [
+      {
+        "story": "all",
+        "test": "Full epic manual checklist incl. the 24-item unverified-assumptions ledger",
+        "passed": true,
+        "comment": "User confirmed all good in chat at the manual-test approval.",
+        "recordedAt": "2026-08-03T14:46:35.848Z"
+      }
+    ],
+    "designChoices": {
+      "roleDenialRegistration": "register-now"
+    }
+  },
+  "phase": "COMPLETE-ON-BRANCH",
+  "stories": {
+    "1": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "not-applicable",
+      "startedAt": "2026-08-03T10:31:11.005Z",
+      "completedAt": "2026-08-03T10:50:25.417Z"
+    },
+    "2": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T10:51:45.605Z",
+      "completedAt": "2026-08-03T11:08:48.268Z"
+    },
+    "3": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T11:09:58.219Z",
+      "completedAt": "2026-08-03T11:30:52.872Z"
+    },
+    "4": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T11:32:03.777Z",
+      "completedAt": "2026-08-03T11:47:15.394Z"
+    },
+    "5": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T11:50:28.748Z",
+      "completedAt": "2026-08-03T12:13:29.760Z"
+    },
+    "6": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T12:14:35.681Z",
+      "completedAt": "2026-08-03T13:05:12.042Z"
+    },
+    "7": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "not-applicable",
+      "startedAt": "2026-08-03T13:10:45.272Z",
+      "completedAt": "2026-08-03T14:12:42.488Z"
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-03T14:46:35.848Z"
+}
