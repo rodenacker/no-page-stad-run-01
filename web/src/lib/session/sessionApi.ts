@@ -5,8 +5,8 @@
  * already uses to resolve who is signed in, so a successful answer IS confirmation the
  * session is alive, and a 401 IS the service reporting it gone (epic
  * `sign-in-and-app-shell` R17). Made from the browser, through the shared API client,
- * at the app's own address — the `next.config` rewrite forwards it and the browser
- * attaches the session cookie itself (CLAUDE.md §2, brief BR2).
+ * at the app's own address — `app/v1/auth/[...path]/route.ts` forwards it and the
+ * browser attaches the session cookie itself (CLAUDE.md §2, brief BR2).
  */
 import { get } from '@/lib/api/client';
 import { AUTH_ENDPOINTS } from '@/lib/utils/constants';

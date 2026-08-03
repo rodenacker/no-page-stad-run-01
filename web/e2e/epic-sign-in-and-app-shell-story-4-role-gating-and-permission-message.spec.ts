@@ -22,7 +22,7 @@
  *   2. Browser boundary → `page.route()` below, for the identity call in case a
  *      client component reads it, plus a defensive login intercept. The globs are
  *      origin-agnostic, so an auth call is mocked whether the browser sends it
- *      same-origin (through the next.config rewrite story 1 adds) or straight to
+ *      same-origin (through the forwarding story 1 adds) or straight to
  *      the auth service's own origin.
  * - Sign-in is faked with the mock `session` cookie the stub recognises for a role
  *   (`sessionTokenFor(role)`), seeded via `context.addCookies()` rather than by

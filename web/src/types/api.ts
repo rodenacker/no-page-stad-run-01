@@ -54,7 +54,7 @@ export interface APIRequestConfig extends RequestInit {
    * Overrides the default same-origin API base path with an absolute service
    * address. Needed only by server-side callers: the Next.js server process
    * cannot fetch a relative path, whereas browser calls are same-origin and are
-   * routed to the right backend by the `next.config.ts` rewrites.
+   * routed to the right backend by the proxy route handlers under `src/app/`.
    */
   baseUrl?: string;
   lastChangedUser?: string; // For audit trails - remove if not needed

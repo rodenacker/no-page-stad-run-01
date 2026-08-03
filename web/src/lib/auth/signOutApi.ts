@@ -4,8 +4,8 @@
  * Like signing in, this call has to be made BY THE BROWSER: the auth service ends
  * the session and answers with a `Set-Cookie` that clears it, and only a
  * browser-made request lets the browser act on that. It goes to the app's own
- * address (`/v1/auth/logout`), which `next.config.ts` forwards to the auth service
- * (project.md §Authentication, epic brief BR2).
+ * address (`/v1/auth/logout`), which `app/v1/auth/[...path]/route.ts` forwards to
+ * the auth service (project.md §Authentication, epic brief BR2).
  *
  * It rejects when the auth service did not confirm the sign-out, which is what lets
  * the caller keep the user where they are instead of pretending it worked

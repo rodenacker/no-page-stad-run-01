@@ -60,8 +60,8 @@
  *   asserts), which opens a menu containing a `Sign out` item. The story's
  *   implementation notes prescribe the Shadcn `dropdown-menu` for this user/theme
  *   menu, and story 5 adds the theme control to the same header.
- * - Sign-out calls the auth service same-origin (through the `next.config`
- *   rewrite, so the response's `Set-Cookie` reaches the browser) and, only on
+ * - Sign-out calls the auth service same-origin (forwarded by the app, so the
+ *   response's `Set-Cookie` reaches the browser) and, only on
  *   success, leaves for `/sign-in` (brief BR4). Whether the cookie is cleared by
  *   that forwarded `Set-Cookie` or by the app deleting it server-side, it must be
  *   gone afterwards — AC-4 depends on the session really being over.

@@ -9,8 +9,10 @@
  *
  * This project talks to two backend services (auth-api and transactions-api),
  * and the browser addresses neither of them directly: it calls the app's own
- * address, and the rewrites in `next.config.ts` forward the call to the right
- * service. So there is no base URL to prepend to a browser-side call — the path
+ * address, and a route handler (`app/v1/auth/[...path]`,
+ * `app/transactions-api/[...path]`) forwards the call to the right service, at the
+ * address configured for that request. So there is no base URL to prepend to a
+ * browser-side call — the path
  * already carries the service prefix. That is why this is deliberately an empty
  * string rather than absent: `apiClient` has one documented place to look, and a
  * server-side caller (which cannot use a relative path) overrides it explicitly
@@ -21,12 +23,13 @@
  */
 export const API_BASE_PATH = '';
 
-/** Same-origin prefix for auth-api calls; rewritten to the auth service. */
+/** Same-origin prefix for auth-api calls; forwarded to the auth service. */
 export const AUTH_API_BASE_PATH = '/v1/auth';
 
 /**
- * Same-origin prefix for transactions-api calls; rewritten to the transactions
- * service (whose configured base URL already ends in `/transactions-api`).
+ * Same-origin prefix for transactions-api calls; forwarded to the transactions
+ * service (whose configured base URL already ends in `/transactions-api`, so the
+ * prefix is the mount point here and is dropped on the way out).
  */
 export const TRANSACTIONS_API_BASE_PATH = '/transactions-api';
 

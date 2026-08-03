@@ -28,7 +28,9 @@
       "The 30-minute idle timeout and 60-second warning are inferred defaults, not stated requirements — confirm they suit, or name different numbers. They are now a settings change, not a code change.",
       "Wording of the one sentence the user is given: 'Your session timed out and you have been signed out, so please sign in again to carry on.' Used both when the idle time runs out and when the service reports the session already gone.",
       "When the idle period runs out the app also tells the auth service to end the session, without waiting for its reply before returning the user to sign-in. If the service treats a logout for an already-ended session as an error, that call may be logged as a failure server-side — harmless to the user, but worth confirming with the service owners.",
-      "A page the user has never touched is treated as having been idle since it arrived, rather than since the app finished starting up. Confirm this reads right for a page left open unattended in a background tab: the next click returns them to sign-in with the timed-out explanation."
+      "A page the user has never touched is treated as having been idle since it arrived, rather than since the app finished starting up. Confirm this reads right for a page left open unattended in a background tab: the next click returns them to sign-in with the timed-out explanation.",
+      "The transactions proxy forwards to <TRANSACTIONS_API_BASE_URL>/<path> — the /transactions-api mount prefix is dropped, because project.md records the configured base URL as already ending in /transactions-api. No transactions call is exercised in a browser yet, so the first transactions screen in a later epic is the first real confirmation that the assembled address is right.",
+      "The transactions proxy accepts GET/POST/PUT/DELETE and no PATCH, taken from documentation/transactions-api.yaml. If the service in fact accepts a verb the spec omits, that verb will be refused at the app rather than forwarded."
     ],
     "manualTestResults": [],
     "designChoices": {
@@ -78,8 +80,15 @@
       "e2eStatus": "deferred",
       "startedAt": "2026-08-03T12:14:35.681Z",
       "completedAt": "2026-08-03T13:05:12.042Z"
+    },
+    "7": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": "2026-08-03T13:10:45.272Z",
+      "completedAt": "2026-08-03T14:12:42.488Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-03T13:05:12.042Z"
+  "lastUpdated": "2026-08-03T14:12:42.488Z"
 }

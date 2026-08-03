@@ -21,7 +21,7 @@
  *
  * 1. Browser boundary → `page.route()` (below). The sign-in form's
  *    `POST /v1/auth/login` must be a BROWSER-side fetch through the shared API
- *    client to the same-origin path `/v1/auth/login` (the `next.config` rewrite —
+ *    client to the same-origin path `/v1/auth/login` (forwarded by the app —
  *    epic brief §Notes & Caveats). NOT a Server Action and not a bare `fetch()`:
  *    `page.route()` cannot see Server Action requests. The interceptor answers with
  *    `loginSuccessResponse()` plus the session cookie the auth service would set,

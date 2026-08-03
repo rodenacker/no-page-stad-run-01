@@ -24,7 +24,7 @@
  *    component leaves `page.tsx` free to stay a server component.
  * 2. The login call goes through the shared API client (`post` from
  *    `@/lib/api/client`, CLAUDE.md Rule 2) to the same-origin auth path
- *    `/v1/auth/login` (epic brief § Notes & Caveats — `next.config` rewrite, so
+ *    `/v1/auth/login` (epic brief § Notes & Caveats — forwarded by the app, so
  *    the browser never crosses origins and the auth service's `Set-Cookie`
  *    reaches the browser on a browser-side fetch). Never a bare `fetch()`, and
  *    not a Server Action — the Playwright layer intercepts this call with

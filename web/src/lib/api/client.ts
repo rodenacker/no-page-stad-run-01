@@ -9,7 +9,8 @@
  *
  * USAGE:
  * 1. Address endpoints by their same-origin path (see the API path constants in
- *    constants.ts); `next.config.ts` forwards each path to the service that owns
+ *    constants.ts); a route handler (`app/v1/auth/[...path]`,
+ *    `app/transactions-api/[...path]`) forwards each path to the service that owns
  *    it. Server-side callers, which cannot fetch a relative path, pass an explicit
  *    `baseUrl`.
  * 2. Define your API endpoints as functions that call apiClient

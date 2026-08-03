@@ -4,7 +4,8 @@
  * This is the one auth call that has to be made BY THE BROWSER rather than by the
  * Next.js server: the auth service answers it with a `Set-Cookie`, and only a
  * browser-made request lets the browser keep that cookie. It goes to the app's own
- * address (`/v1/auth/login`), which `next.config.ts` forwards to the auth service —
+ * address (`/v1/auth/login`), which `app/v1/auth/[...path]/route.ts` forwards to
+ * the auth service —
  * so no origin is crossed, no CORS negotiation is involved, and the frontend never
  * holds a credential of its own (project.md §Authentication, epic brief BR2).
  *

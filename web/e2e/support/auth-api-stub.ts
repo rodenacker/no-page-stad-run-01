@@ -23,9 +23,11 @@
  *
  * Wiring (see `playwright.config.ts`): `globalSetup` starts this stub, and the
  * app server is launched with `NEXT_PUBLIC_AUTH_API_BASE_URL` /
- * `AUTH_API_BASE_URL` pointing at it — so the `next.config` rewrite of
- * `/v1/auth/*` and any server-side auth call resolve here instead of
- * `http://localhost:4424`. The real service is left untouched.
+ * `AUTH_API_BASE_URL` pointing at it — so the app's forwarding of `/v1/auth/*`
+ * and any server-side auth call resolve here instead of `http://localhost:4424`.
+ * The real service is left untouched. That works in the production-build mode
+ * (`E2E_PROD=1`) as well as in dev, because the address is resolved per request
+ * rather than compiled into the build (story 7).
  *
  * Contract mirrored from `documentation/auth-api.yaml` exactly: PascalCase
  * `LoginRequest` body, `DefaultResponse` envelopes, `UserInfoRead` on userinfo,
