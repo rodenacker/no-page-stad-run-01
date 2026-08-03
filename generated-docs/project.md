@@ -18,6 +18,9 @@ A central finance person uploads batches of ad-hoc employee expense payment requ
 | Permission | Finance Uploader | Approver |
 |---|---|---|
 | View main dashboard | ✓ | ✓ |
+| Upload an expense file | ✓ | |
+| Review and decide on a transaction | | ✓ |
+| Bulk-approve transactions | | ✓ |
 
 > Permissions extend during BUILD as new stories surface new actions — see [agent-autonomy.md](.claude/shared/agent-autonomy.md). Additions land here via a project-change PR (§6.1 of the epic-branch plan). Permission removals or role-set changes halt for user review.
 >
