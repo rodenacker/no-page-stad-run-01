@@ -16,7 +16,7 @@
  * there, nothing of the frontend's own is added to the call.
  */
 import { transactionsApiBaseUrl } from '@/lib/api/serviceBaseUrl';
-import { forwardToService } from '@/lib/api/serviceProxy';
+import { forwardPathToService } from '@/lib/api/serviceProxy';
 
 import type { NextRequest } from 'next/server';
 
@@ -27,17 +27,18 @@ interface TransactionsProxyContext {
   params: Promise<{ path: string[] }>;
 }
 
+/**
+ * As on the auth route, the path the caller asked for is carried by
+ * `forwardPathToService`, which keeps it inside the configured base URL — the
+ * segments arrive decoded, so no address is assembled from them by concatenation.
+ */
 const forward = async (
   request: NextRequest,
   context: TransactionsProxyContext,
 ): Promise<Response> => {
   const { path } = await context.params;
-  const { search } = new URL(request.url);
 
-  return forwardToService(
-    request,
-    `${transactionsApiBaseUrl()}/${path.join('/')}${search}`,
-  );
+  return forwardPathToService(request, transactionsApiBaseUrl(), path);
 };
 
 /**

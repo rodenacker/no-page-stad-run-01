@@ -17,7 +17,7 @@
  * is what fixes both.
  */
 import { authApiBaseUrl } from '@/lib/api/serviceBaseUrl';
-import { forwardToService } from '@/lib/api/serviceProxy';
+import { forwardPathToService } from '@/lib/api/serviceProxy';
 import { AUTH_API_BASE_PATH } from '@/lib/utils/constants';
 
 import type { NextRequest } from 'next/server';
@@ -38,17 +38,21 @@ interface AuthProxyContext {
  * browser uses, so the constant application code calls with is reused here rather
  * than the prefix being retyped (`AUTH_API_BASE_PATH`, and this folder, are the
  * same address).
+ *
+ * The path the caller asked for is carried by `forwardPathToService`, which keeps it
+ * inside that prefix — the segments arrive decoded, so an address is never assembled
+ * from them by concatenation here.
  */
 const forward = async (
   request: NextRequest,
   context: AuthProxyContext,
 ): Promise<Response> => {
   const { path } = await context.params;
-  const { search } = new URL(request.url);
 
-  return forwardToService(
+  return forwardPathToService(
     request,
-    `${authApiBaseUrl()}${AUTH_API_BASE_PATH}/${path.join('/')}${search}`,
+    `${authApiBaseUrl()}${AUTH_API_BASE_PATH}`,
+    path,
   );
 };
 

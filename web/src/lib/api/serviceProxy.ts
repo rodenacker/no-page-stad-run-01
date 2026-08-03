@@ -16,6 +16,9 @@
  *   connection the caller made to THIS app, not the new one being opened to the
  *   service (RFC 9110 §7.6.1). `host` and `content-length` go the same way: both
  *   describe the old hop, and the runtime sets them for the new one.
+ * - **The forwarded address cannot leave the mount point.** The caller supplies the
+ *   path, so the assembled address is normalised and checked against the prefix it
+ *   must stay under before anything is sent — see `forwardPathToService`.
  * - **`Set-Cookie` is passed back with `getSetCookie()`.** A plain
  *   `headers.get('set-cookie')` collapses several cookies into one comma-joined
  *   header, which a browser stores as a single malformed cookie — losing the
@@ -170,4 +173,62 @@ export const forwardToService = async (
     );
     return unreachable();
   }
+};
+
+/**
+ * The caller asked for a path this app does not forward. Answered by the app itself,
+ * as a plain 404: nothing is sent to any service, and the caller learns only that
+ * this is not an address the app carries anywhere.
+ */
+const notProxied = (): Response => new Response(null, { status: 404 });
+
+/**
+ * The service address for the path segments the caller asked for, or `null` when
+ * those segments do not stay inside `prefix`.
+ *
+ * This check is the reason the address is not simply concatenated. The segments come
+ * from a catch-all route, which hands them over URL-DECODED, so a caller can put
+ * anything in them that percent-encoding survives — `..`, a backslash, an extra
+ * slash. `fetch` normalises the address it is given, so a concatenated
+ * `…/v1/auth/` + `../../internal` would be sent as `/internal`: a path the browser
+ * can reach through this app that the mount point was never meant to expose, on a
+ * host that may serve more than the one service. So the address is normalised HERE,
+ * by the same URL parser, and then measured against the mount point it must sit
+ * under — origin and path both. Anything that escapes is refused rather than sent.
+ */
+const resolvedTarget = (
+  prefix: string,
+  segments: readonly string[],
+  search: string,
+): string | null => {
+  try {
+    // The trailing slash makes the prefix a directory to stay inside, so
+    // `/v1/authorise` cannot pass as a path under `/v1/auth`.
+    const mountPoint = new URL(`${prefix}/`);
+    const target = new URL(`${prefix}/${segments.join('/')}${search}`);
+
+    return target.origin === mountPoint.origin &&
+      target.pathname.startsWith(mountPoint.pathname)
+      ? target.href
+      : null;
+  } catch {
+    // A prefix that is not a URL at all is a misconfigured service address, not a
+    // request to forward.
+    return null;
+  }
+};
+
+/**
+ * Carries `request` to the service mounted at `prefix`, under the path the caller
+ * asked for — the one entry point a route handler uses, so every mount gets the same
+ * boundary check and none of them assembles an address of its own.
+ */
+export const forwardPathToService = async (
+  request: Request,
+  prefix: string,
+  segments: readonly string[],
+): Promise<Response> => {
+  const target = resolvedTarget(prefix, segments, new URL(request.url).search);
+
+  return target === null ? notProxied() : forwardToService(request, target);
 };
