@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/table';
 import { serviceMessageOf } from '@/lib/api/errors';
 import { fetchSubmittedFiles } from '@/lib/api/files';
+import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
 import {
   FILE_STATUS_CANCELLED,
   FILE_STATUS_IMPORTED,
@@ -189,6 +190,21 @@ export function SubmittedFilesList() {
       watching = false;
     };
   }, [readsRequested]);
+
+  /**
+   * A file submitted elsewhere on this screen is not in this list yet, and the
+   * upload's answer carries no file identifier — so the only way it can appear is a
+   * re-read (brief §Notes & Caveats). The rows already on screen deliberately stay
+   * put while that read is in flight: nothing about them has been invalidated, and
+   * blanking them would be a worse answer than showing them a moment out of date.
+   */
+  useEffect(
+    () =>
+      subscribeToFileSubmissions(() => {
+        setReadsRequested((reads) => reads + 1);
+      }),
+    [],
+  );
 
   const readAgain = (): void => {
     setState(LOADING);

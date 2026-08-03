@@ -11,6 +11,14 @@ Decisions and changes worth remembering from this epic, in build order.
 - The list read lives in a new `web/src/lib/api/files.ts` rather than inline in the component, so the required `IsActive=Yes` query parameter is stated once. Story 2's upload wrapper belongs in that same module.
 - `ProcessDate` and `RecordCount` are printed exactly as the service returns them — no date or number formatting anywhere — per the project's "displayed, not policed" stance for service-owned values.
 
+## Story 2 — Submit an expense file
+
+- The submit form and the file list are two separate pieces of the same screen, and neither owns the other — the list is shown to everyone, the form only to a Finance Uploader. Since the upload's reply from the service doesn't name the file it just accepted, the only way the new file can appear is for the list to read itself again. So the form announces "a file was just submitted" and the list listens for that and re-reads, keeping the rows it already has on screen while it does. Same arrangement the app already uses for the light/dark setting.
+- The project's rule is that a form reports a missing entry when you leave a field, never while you are typing. Choosing a setting from the list and picking a file are not typing — each is one finished decision — so those two are checked the moment they happen. That is what lets a non-CSV file be turned away on the spot, before anything is sent anywhere, which is what the requirements ask for.
+- **A refused upload's reason had to be read from a second place on the error.** The service describes a refusal with a 500, and the shared client puts its own "Internal Server Error" placeholder on the main message while keeping the service's real wording in the details. Added a `serviceDetailOf` reader next to the existing `serviceMessageOf` so every screen can pair them and no user is ever shown that placeholder — the same gap the sign-in screen closed in epic 1.
+- After a successful submission the form empties itself (setting and file both cleared) and the confirmation names what was sent, so it is obvious the file has gone and the form is ready for the next one. A refused submission does the opposite — both choices stay exactly as they were so the user can just press the button again.
+- The upload wrapper calls `apiClient` directly rather than the `post()` helper: `post` JSON-stringifies its body and would send `{}` in place of the file. The query parameters and the `application/octet-stream` header go through the client's own config, so nothing reaches around the shared client.
+
 ### Test infrastructure added this epic
 
 - `web/vitest.setup.ts` gained a small guarded block shimming `hasPointerCapture`, `releasePointerCapture` and `scrollIntoView`, which Radix needs under jsdom. Added for story 2's setting picker; the later request-list epic reuses it for any `select` / `dropdown-menu` / `popover`. Each shim reports jsdom's true state and swallows no errors.

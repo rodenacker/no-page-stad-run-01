@@ -1,5 +1,5 @@
 /**
- * The expense files screen: every submitted file, and how each one is getting on.
+ * The expense files screen: submit a file, and watch every submitted file get on.
  *
  * The permission check runs on the server before anything is rendered. Both roles may
  * open this screen — the Finance Uploader sends files, the Approver watches them
@@ -9,13 +9,22 @@
  * address is decided in `lib/auth/access-map.ts` and nowhere else; this page adds no
  * second gate.
  *
- * The list itself is a client component because it reads the files from the browser,
- * at the app's own address, and owns its loading / empty / failed states.
+ * WHO MAY SUBMIT is a different question from who may open the address, and it is
+ * answered here: submitting is the Finance Uploader's alone (brief R8/BR4), so for
+ * any other session the submit form is LEFT OUT of what is sent to the browser
+ * altogether — not rendered disabled (source UI-24). Because that decision is made on
+ * the server, an Approver's browser never receives the form's markup at all.
+ *
+ * Both parts are client components because each reads from the BROWSER, at the app's
+ * own address, and owns its own loading / empty / failed states.
  */
 import { PermissionDeniedMessage } from '@/components/auth/PermissionDeniedMessage';
 import { SubmittedFilesList } from '@/components/files/SubmittedFilesList';
+import { SubmitExpenseFileForm } from '@/components/upload/SubmitExpenseFileForm';
 import { UPLOAD_PATH, canAccess } from '@/lib/auth/access-map';
 import { requireSession } from '@/lib/auth/requireSession';
+import { hasRole } from '@/lib/auth/roles';
+import { ROLE_FINANCE_UPLOADER } from '@/types/auth';
 
 import type { Metadata } from 'next';
 
@@ -35,6 +44,7 @@ export default async function UploadPage() {
   return (
     <div className="grid gap-8">
       <h1 className="text-2xl font-semibold tracking-tight">Expense files</h1>
+      {hasRole(session, ROLE_FINANCE_UPLOADER) && <SubmitExpenseFileForm />}
       <SubmittedFilesList />
     </div>
   );

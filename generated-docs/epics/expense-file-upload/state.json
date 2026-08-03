@@ -12,6 +12,10 @@
       "Verify the status wording the service actually uses: the screen assumes a submitted file's status reads as Uploaded, Validating, Validation failed, Imported or Cancelled. Those five come from the requirements document, not from the API specification (which types the status as free text with no fixed list). If the real service words them differently, statuses will show up unstyled and the 'finished importing' notification may never fire.",
       "Verify a file you have just submitted appears in the list: the upload call answers with a generic acknowledgement and no file identifier, so the screen finds your new file by re-reading the active file list. If the service does not list a freshly submitted file straight away, you would get a successful confirmation but see nothing appear.",
       "Verify a real CSV is accepted by the real service: the upload sends the setting, the setting name and the file name in the address and the file's raw bytes as the request body, exactly as the API specification describes. If the running service actually expects a form-style upload instead, every automated test still passes while real uploads are refused.",
+      "A refused upload's reason is read out of the 500 response's Messages[] (what the transactions spec documents). If the live service refuses with some other status, or an empty body, the user gets the app's own wording — 'The file could not be submitted. Please try again.' — rather than a specific reason. Worth confirming against the real service.",
+      "'The file name must identify a CSV' is implemented as: the name ends in .csv, any capitalisation. So 'expenses.csv.txt' is refused and 'EXPENSES.CSV' is accepted — confirm that is the intent.",
+      "The setting picker offers each setting by NAME only; the chosen setting's source and file type appear on a line beneath it rather than inside the options, so the option list stays unambiguous. Confirm that reads well for you.",
+      "The submit form clears itself (setting and file both) after a file is accepted. If you would rather the last submission stayed on screen ready to re-send, say so.",
       "Confirm an Approver is meant to see the expense files list and be offered its entry point. This widens what epic 1 shipped — back then an Approver reaching that address got a 'you do not have permission' message. It follows from requirements §6.5 (ExpenseFile read for both roles) via this epic's R9, but it changes behaviour you have already seen working the other way.",
       "Check the landing-screen wording for the expense files screen reads correctly for an Approver who only watches files: 'Expense files' / 'See every expense file that has been sent for import and how each one is getting on. New CSV files of employee expense payment requests are submitted here too.'",
       "project.md's roles table has no row for viewing submitted expense files — the Approver's read access comes from requirements §6.5 via this epic's brief. If that table should carry the permission explicitly, say so and I'll land it as a project-level change rather than an epic edit."
@@ -28,11 +32,11 @@
       "completedAt": "2026-08-03T16:26:00.000Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-03T16:28:00.000Z",
+      "completedAt": "2026-08-03T16:49:00.000Z"
     },
     "3": {
       "status": "pending",

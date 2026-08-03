@@ -34,6 +34,23 @@ const clientFallbackMessages: readonly string[] = Object.values(
   CLIENT_FALLBACK_MESSAGES,
 );
 
+/**
+ * The detail lines `apiClient` supplies itself when a failed response carried no
+ * readable message of its own — the `details` counterpart of
+ * {@link CLIENT_FALLBACK_MESSAGES}, and the same "never put this in front of a
+ * user" set. Kept here, next to the code that has to recognise them.
+ */
+const CLIENT_FALLBACK_DETAILS: readonly string[] = [
+  'Your session may have expired. Please log in again.',
+  'Access denied.',
+  'Resource not found.',
+  'Please try again later or contact support if the problem persists.',
+  'Please check your internet connection and try again.',
+];
+
+/** The client's own "Request failed with status 503" style detail line. */
+const CLIENT_STATUS_DETAIL = /^Request failed with status \d{3}$/;
+
 /** Whether a caught value is shaped like the object `apiClient` rejects with. */
 export const isAPIError = (error: unknown): error is APIError =>
   typeof error === 'object' &&
@@ -73,4 +90,38 @@ export const serviceMessageOf = (error: unknown): string | undefined => {
     return undefined;
   }
   return message;
+};
+
+/**
+ * The message the service sent in the failure's `details`, or `undefined` when the
+ * details hold only a client-side placeholder.
+ *
+ * Why a second place has to be read: `apiClient` keeps the response's own
+ * `Messages[]` on `details` for EVERY failure, but only some status branches also
+ * promote the first of them onto `message`. A 500 does not — it puts its own
+ * `CLIENT_FALLBACK_MESSAGES.serverError` placeholder on `message` — so for a
+ * service that describes a refusal with a 500 + `DefaultResponse` body (which is
+ * what `documentation/transactions-api.yaml` documents for the file endpoints),
+ * `serviceMessageOf` alone finds nothing and the user would be shown
+ * "Internal Server Error: …" (project.md NFR-base-5).
+ *
+ * Pair the two: `serviceMessageOf(error) ?? serviceDetailOf(error) ?? <own wording>`.
+ */
+export const serviceDetailOf = (error: unknown): string | undefined => {
+  if (typeof error !== 'object' || error === null || !('details' in error)) {
+    return undefined;
+  }
+  const { details } = error as { details?: unknown };
+  if (!Array.isArray(details)) {
+    return undefined;
+  }
+  return details
+    .filter((detail): detail is string => typeof detail === 'string')
+    .map((detail) => detail.trim())
+    .find(
+      (detail) =>
+        detail !== '' &&
+        !CLIENT_FALLBACK_DETAILS.includes(detail) &&
+        !CLIENT_STATUS_DETAIL.test(detail),
+    );
 };
