@@ -62,6 +62,14 @@ export default function RootLayout({
           `lib/theme/theme.ts`, shared with the header's switch, so the two cannot
           drift apart.
         */}
+        {/*
+          THEME_INIT_SCRIPT is a module constant assembled only from three other module
+          constants (THEME_STORAGE_KEY, PREFERS_DARK_QUERY, DARK_THEME_CLASS), each embedded
+          via JSON.stringify. No user input, request data or environment value reaches it, so
+          there is nothing to sanitize — and running JavaScript through an HTML sanitizer would
+          only corrupt it. Verified against lib/theme/theme.ts.
+        */}
+        {/* // security-ignore: xss — static module constant, no user input; see lib/theme/theme.ts */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className={`${cabin.variable} font-sans antialiased`}>
