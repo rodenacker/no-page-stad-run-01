@@ -55,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { serviceMessageOf } from '@/lib/api/errors';
+import { serviceDetailOf, serviceMessageOf } from '@/lib/api/errors';
 import {
   fetchFileSettings,
   uploadExpenseFile,
@@ -181,11 +181,17 @@ export function SubmitExpenseFileForm() {
       })
       .catch((error: unknown) => {
         if (watching) {
-          // The service's own wording when it sent one; never the API client's
-          // internal placeholder.
+          // The service's own wording when it sent one, from EITHER place a failure
+          // can carry it — this service describes a failure with a 500, which leaves
+          // the client's placeholder on `message` and the service's `Messages[]` on
+          // `details` (the same pairing the refused-upload reason uses). Never the
+          // placeholder itself.
           setSettings({
             phase: 'failed',
-            message: serviceMessageOf(error) ?? SETTINGS_FAILED_MESSAGE,
+            message:
+              serviceMessageOf(error) ??
+              serviceDetailOf(error) ??
+              SETTINGS_FAILED_MESSAGE,
           });
         }
       });

@@ -38,15 +38,23 @@ const clientFallbackMessages: readonly string[] = Object.values(
  * The detail lines `apiClient` supplies itself when a failed response carried no
  * readable message of its own — the `details` counterpart of
  * {@link CLIENT_FALLBACK_MESSAGES}, and the same "never put this in front of a
- * user" set. Kept here, next to the code that has to recognise them.
+ * user" set. Kept here, next to the code that has to recognise them, and imported
+ * by the client so the two can never drift: reworded in the client alone, a
+ * placeholder would stop being recognised and would start reaching users, which is
+ * the exact leak `serviceDetailOf` exists to prevent.
  */
-const CLIENT_FALLBACK_DETAILS: readonly string[] = [
-  'Your session may have expired. Please log in again.',
-  'Access denied.',
-  'Resource not found.',
-  'Please try again later or contact support if the problem persists.',
-  'Please check your internet connection and try again.',
-];
+export const CLIENT_FALLBACK_DETAILS = {
+  unauthorized: 'Your session may have expired. Please log in again.',
+  forbidden: 'Access denied.',
+  notFound: 'Resource not found.',
+  serverError:
+    'Please try again later or contact support if the problem persists.',
+  network: 'Please check your internet connection and try again.',
+} as const;
+
+const clientFallbackDetails: readonly string[] = Object.values(
+  CLIENT_FALLBACK_DETAILS,
+);
 
 /** The client's own "Request failed with status 503" style detail line. */
 const CLIENT_STATUS_DETAIL = /^Request failed with status \d{3}$/;
@@ -121,7 +129,7 @@ export const serviceDetailOf = (error: unknown): string | undefined => {
     .find(
       (detail) =>
         detail !== '' &&
-        !CLIENT_FALLBACK_DETAILS.includes(detail) &&
+        !clientFallbackDetails.includes(detail) &&
         !CLIENT_STATUS_DETAIL.test(detail),
     );
 };

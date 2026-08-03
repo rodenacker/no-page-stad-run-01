@@ -64,7 +64,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/contexts/ToastContext';
-import { serviceMessageOf } from '@/lib/api/errors';
+import { serviceDetailOf, serviceMessageOf } from '@/lib/api/errors';
 import { fetchSubmittedFiles } from '@/lib/api/files';
 import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
 import {
@@ -276,10 +276,16 @@ export function SubmittedFilesList() {
               ? current
               : {
                   phase: 'failed',
-                  // The service's own wording when it sent one; never the API
-                  // client's internal placeholder (`serviceMessageOf` draws that
-                  // line).
-                  message: serviceMessageOf(error) ?? FAILED_MESSAGE,
+                  // The service's own wording when it sent one, from EITHER place a
+                  // failure can carry it — the transactions service describes a
+                  // failure with a 500, where the client keeps its own placeholder
+                  // on `message` and the service's `Messages[]` on `details`. Never
+                  // the placeholder itself: `serviceMessageOf` / `serviceDetailOf`
+                  // draw that line (architecture.md §Shared building blocks).
+                  message:
+                    serviceMessageOf(error) ??
+                    serviceDetailOf(error) ??
+                    FAILED_MESSAGE,
                 },
           );
         }),

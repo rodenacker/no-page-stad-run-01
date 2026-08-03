@@ -32,8 +32,17 @@
  *    process, epic 1 BR1/BR3), and `page.route()` cannot see a fetch the browser
  *    never makes. The stub answers that call from the shared identity source,
  *    keyed off the `session` cookie value seeded below.
- * 2. Browser boundary → `page.route()` (below), for this story's own read:
- *    `GET /transactions-api/v1/file-logs?IsActive=Yes`.
+ * 2. Browser boundary → `page.route()` (below), for the transactions-service reads
+ *    this screen makes: this story's own
+ *    `GET /transactions-api/v1/file-logs?IsActive=Yes`, and
+ *    `GET /transactions-api/v1/file-settings` — story 2 adds a submit form to this
+ *    SAME screen, and that form reads the named settings for itself. It is mocked
+ *    here even though this story asserts nothing about it: `/transactions-api/...`
+ *    is the app's own same-origin mount point, so an unmocked settings read is
+ *    forwarded to the live transactions service by the route handler (inside the
+ *    Next.js process, where `blockLiveBackends` cannot see it) — which would both
+ *    contact a live backend and, on any non-200, put that form's own failure
+ *    `role="alert"` on screen and fail AC-5's "no permission message" check.
  *
  * - Sign-in is faked with the mock `session` cookie the stub recognises for a role
  *   (`sessionTokenFor(role)`), seeded via `context.addCookies()` rather than by
@@ -80,6 +89,7 @@ import { expect, test } from '@playwright/test';
 
 import { sessionTokenFor } from './support/auth-api-stub';
 import { createFileLog, fileLogListResponse } from '../src/mocks/data/file-log';
+import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
 import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
 import { fullNameOf } from '../src/mocks/data/user';
@@ -137,6 +147,23 @@ const mockFileLogList = async (page: Page): Promise<void> => {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(fileLogListResponse([LISTED_FILE])),
+    }),
+  );
+};
+
+/**
+ * Answers the settings read story 2's submit form makes on this same screen, with the
+ * shared envelope factory. Mocked in every test here even though this story asserts
+ * nothing about the form: without it that read reaches the live transactions service
+ * through the app's own route handler, and its failure alert would occupy the `alert`
+ * role AC-5 requires to be empty. Same reason story 3's spec mocks it throughout.
+ */
+const mockFileSettingList = async (page: Page): Promise<void> => {
+  await page.route('**/transactions-api/v1/file-settings**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fileSettingListResponse()),
     }),
   );
 };
@@ -213,6 +240,7 @@ test.describe('Epic expense-file-upload, Story 1: the submitted expense files li
     context,
   }) => {
     await mockFileLogList(page);
+    await mockFileSettingList(page);
 
     for (const roleName of [ROLE_FINANCE_UPLOADER, ROLE_APPROVER]) {
       await seedSession(context, roleName);
@@ -271,6 +299,7 @@ test.describe('Epic expense-file-upload, Story 1: the submitted expense files li
     // is not shown" means the screen was never rendered, rather than merely that
     // there was no data to render.
     await mockFileLogList(page);
+    await mockFileSettingList(page);
     await blockLiveBackends(page);
 
     const arrival = await page.goto(UPLOAD_PATH);
