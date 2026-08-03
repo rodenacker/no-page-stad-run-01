@@ -1,0 +1,2395 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Design System (Light) — business-banking</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cabin:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fafafa;
+      --fg: #1a1a1a;
+      --muted: #5a5a5a;
+      --border: #d4d4d4;
+      --border-strong: #8a8a8a;
+      --section-bg: #ffffff;
+      --card-bg: #ffffff;
+      --code-bg: #f0f0f0;
+      --prov-extracted: #2a8a2a;
+      --prov-inferred: #b86a00;
+      --status-fail: #b81a1a;
+      --prov-extracted-bg: rgba(42,138,42,.12);
+      --prov-inferred-bg: rgba(184,106,0,.12);
+      --meta-overlay-bg: rgba(255,255,255,.85);
+      --shadow-card: 0 1px 2px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 16px;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    header.doc-header {
+      margin-bottom: 24px;
+    }
+
+    /* --- table of contents ---------------------------------------------- */
+    nav.doc-toc {
+      margin: 0 0 32px 0;
+      padding: 16px 20px;
+      background: var(--section-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow-card);
+    }
+
+    nav.doc-toc .toc-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    nav.doc-toc ol.toc-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      counter-reset: toc-counter;
+    }
+
+    nav.doc-toc ol.toc-list li {
+      counter-increment: toc-counter;
+      margin: 0;
+    }
+
+    nav.doc-toc ol.toc-list a {
+      display: inline-block;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      color: var(--fg);
+      background: var(--bg);
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+
+    nav.doc-toc ol.toc-list a::before {
+      content: counter(toc-counter) ". ";
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    nav.doc-toc ol.toc-list a:hover,
+    nav.doc-toc ol.toc-list a:focus-visible {
+      background: var(--code-bg);
+      border-color: var(--border-strong);
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin: 0 0 12px 0;
+    }
+
+    blockquote.attribution {
+      margin: 0;
+      padding: 12px 16px;
+      border-left: 3px solid var(--border-strong);
+      background: var(--section-bg);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    p.generated-at {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    section.token-section {
+      margin: 32px 0;
+      padding: 24px;
+      background: var(--section-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow-card);
+    }
+
+    section.token-section > h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    section.token-section > h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 24px 0 12px 0;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* --- colours --------------------------------------------------------- */
+    ul.swatch-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+      gap: 12px;
+    }
+
+    li.swatch-row {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      background: var(--card-bg);
+    }
+
+    .swatch {
+      width: 88px;
+      flex: 0 0 88px;
+      min-height: 88px;
+      border-right: 1px solid var(--border);
+    }
+
+    .swatch-meta {
+      flex: 1 1 auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .swatch-token {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .swatch-hex {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      color: var(--fg);
+      background: var(--code-bg);
+      padding: 1px 6px;
+      border-radius: 3px;
+      align-self: flex-start;
+    }
+
+    .swatch-source,
+    .type-source {
+      font-size: 11px;
+      color: var(--muted);
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .prov {
+      font-size: 10px;
+      font-weight: 600;
+      align-self: flex-start;
+      padding: 1px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .prov-extracted-from-url {
+      background: var(--prov-extracted-bg);
+      color: var(--prov-extracted);
+    }
+
+    .prov-inferred-from-domain {
+      background: var(--prov-inferred-bg);
+      color: var(--prov-inferred);
+    }
+
+    /* --- typography ------------------------------------------------------ */
+    /* Rendering caveat above the family specimens. This artefact loads no
+       webfont (see the self-containment note at the top of this file), so a
+       specimen only renders in its named family when that face happens to be
+       installed on the reader's machine. The note says so; the token value is
+       the contract. Unscoped on purpose — the styler emits it inside
+       {{TYPE_FAMILY_SPECIMENS}}, which has no wrapper element of its own. */
+    .type-render-note {
+      font-size: 11px;
+      color: var(--muted);
+      margin: 0 0 12px 0;
+    }
+
+    .type-specimen {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 16px;
+      align-items: baseline;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .type-specimen:last-child {
+      border-bottom: 0;
+    }
+
+    .type-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .type-meta .token-name {
+      color: var(--fg);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .type-meta .token-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: var(--fg);
+      background: var(--code-bg);
+      padding: 1px 6px;
+      border-radius: 3px;
+      align-self: flex-start;
+      word-break: break-all;
+    }
+
+    .type-meta .prov {
+      margin-top: 4px;
+    }
+
+    .type-sample {
+      color: var(--fg);
+    }
+
+    /* --- effects: shadows ----------------------------------------------- */
+    .shadow-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+      gap: 28px;
+      padding: 24px 4px 8px;
+    }
+
+    .shadow-card {
+      background: var(--card-bg);
+      border-radius: 6px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .shadow-card .token-name {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .shadow-card .token-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: var(--muted);
+      word-break: break-all;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .shadow-card .prov {
+      display: inline-block;
+    }
+
+    /* --- effects: motion ------------------------------------------------- */
+    .motion-row {
+      display: grid;
+      grid-template-columns: 200px 1fr 1fr;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .motion-row:last-child {
+      border-bottom: 0;
+    }
+
+    .motion-track {
+      position: relative;
+      height: 24px;
+      background: var(--code-bg);
+      border-radius: 12px;
+    }
+
+    .motion-dot {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--fg);
+      animation-name: motion-demo;
+      animation-iteration-count: infinite;
+      animation-direction: alternate;
+    }
+
+    @keyframes motion-demo {
+      from { left: 4px; }
+      to   { left: calc(100% - 20px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .motion-dot {
+        animation: none;
+        left: 4px;
+      }
+    }
+
+    /* --- contrast -------------------------------------------------------- */
+    .contrast-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+      gap: 16px;
+    }
+
+    .contrast-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .contrast-card .sample {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .contrast-meta {
+      margin-top: 12px;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--meta-overlay-bg);
+      color: var(--fg);
+      padding: 4px 8px;
+      border-radius: 3px;
+    }
+
+    .contrast-ratio {
+      font-weight: 600;
+    }
+
+    .status-pass {
+      color: var(--prov-extracted);
+      font-weight: 600;
+    }
+
+    .status-fail {
+      color: var(--status-fail);
+      font-weight: 600;
+    }
+
+    .contrast-adjustments {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* --- standards (appended HTML) -------------------------------------- */
+    section.standards {
+      margin-top: 48px;
+      padding: 24px;
+      background: var(--section-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow-card);
+      line-height: 1.55;
+    }
+
+    section.standards > h2 {
+      font-size: 22px;
+      margin: 0 0 12px 0;
+    }
+
+    section.standards h3 {
+      font-size: 19px;
+      margin: 32px 0 10px 0;
+      color: var(--fg);
+    }
+
+    section.standards h4 {
+      font-size: 16px;
+      margin: 24px 0 8px 0;
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    section.standards p {
+      margin: 0 0 10px 0;
+      max-width: 72ch;
+    }
+
+    section.standards ul {
+      margin: 6px 0 10px 22px;
+      max-width: 72ch;
+    }
+
+    section.standards li {
+      margin: 6px 0;
+      overflow-wrap: anywhere;
+    }
+
+    section.standards blockquote {
+      margin: 8px 0 16px 0;
+      padding: 8px 12px;
+      border-left: 3px solid var(--border-strong);
+      background: var(--bg);
+      color: var(--muted);
+      max-width: 72ch;
+      line-height: 1.6;
+    }
+
+    section.standards code,
+    section.standards kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.92em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    /* --- components section base scaffold ------------------------------- */
+    /* Per-component CSS (.cv-btn, .cv-input, etc.) is injected into
+       {{COMPONENT_STYLES}} from the catalogue. Only the section-level
+       layout lives here, mirroring .shadow-grid / .contrast-grid. */
+    section#components .components-intro {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 16px 0;
+    }
+    section#components .cv-family > h3 + p.cv-note { color: var(--muted); }
+
+    /* --- back-to-top link ----------------------------------------------- */
+    .back-to-top {
+      margin: 24px 0 0 0;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      text-align: right;
+      font-size: 12px;
+    }
+    .back-to-top a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .back-to-top a:hover,
+    .back-to-top a:focus-visible {
+      color: var(--fg);
+      text-decoration: underline;
+    }
+
+    /* --- responsive layout ---------------------------------------------- */
+    @media (max-width: 960px) {
+      main { padding: 24px 18px 56px; }
+    }
+
+    @media (max-width: 720px) {
+      main { padding: 20px 14px 48px; }
+
+      h1 { font-size: 24px; }
+
+      section.token-section,
+      section.standards { padding: 18px; margin: 24px 0; }
+
+      .type-specimen,
+      .motion-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        align-items: flex-start;
+      }
+
+      .motion-track { width: 100%; }
+
+      .cv-field { min-width: 0; width: 100%; }
+
+      .cv-row { padding: 12px; gap: 10px; }
+      .cv-state-grid { padding: 12px; }
+
+      /* Wide tables become horizontally scrollable rather than overflowing the page. */
+      section#components .cv-table {
+        display: block;
+        overflow-x: auto;
+        max-width: 100%;
+        white-space: nowrap;
+      }
+    }
+
+    @media (max-width: 480px) {
+      li.swatch-row { flex-direction: column; }
+      .swatch {
+        width: 100%;
+        flex: 0 0 56px;
+        min-height: 56px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+
+/* === Component visualisation (cv-*) ====================================
+   Brand-defining properties (colour, font, shadow, motion) reference
+   tokens via {{...}} substitution. Structural properties (padding,
+   border-radius, gap, border-width, focus-ring offset) are hardcoded
+   neutral constants — they are pattern decisions, not brand decisions.
+
+   Neutral COLOUR constants here are black-based — rgba(0,0,0,<alpha>)
+   for borders, hover/active tints, thead + zebra fills, focus rings, and
+   the switch off-state track. On a DARK render step-06 swaps every
+   rgba(0,0,0, for rgba(255,255,255, at the same alpha, on the raw buffer
+   BEFORE token substitution, so the black-with-raised-alpha dark shadow
+   tokens are not caught by it. See "Dark-render neutral swap" above.
+
+   Every live :hover / :focus / :active / :disabled / :checked rule is
+   paired with a .cv-force-{state} sibling so the static state matrix
+   renders the same visuals without user interaction.
+   ====================================================================== */
+
+/* Layout */
+.cv-family { margin: 24px 0 32px 0; }
+.cv-family:not(:last-child) {
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.cv-family > h3 {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  margin: 0 0 4px 0;
+  color: #272727;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.cv-family > p.cv-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 12px 0;
+}
+
+.cv-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  background: #FFFFFF;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+.cv-row.cv-row-col { flex-direction: column; align-items: stretch; }
+
+.cv-state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  gap: 12px;
+  padding: 16px;
+  background: #FFFFFF;
+  border-radius: 6px;
+}
+.cv-state-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: #F6F6F6;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+  min-width: 0;
+}
+.cv-state-cell .cv-input,
+.cv-state-cell .cv-textarea,
+.cv-state-cell .cv-select {
+  width: 100%;
+  max-width: 100%;
+}
+.cv-state-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #515151;
+}
+
+/* --- Buttons ----------------------------------------------------------- */
+.cv-btn {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition: filter 150ms cubic-bezier(0, 0, 0.58, 1),
+              background 150ms cubic-bezier(0, 0, 0.58, 1),
+              box-shadow 150ms cubic-bezier(0, 0, 0.58, 1);
+}
+.cv-btn:focus-visible,
+.cv-btn.cv-force-focus {
+  outline: 2px solid #00AEEF;
+  outline-offset: 2px;
+}
+.cv-btn:disabled,
+.cv-btn.cv-force-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.cv-btn-primary { background: #00AEEF; color: #F6F6F6; }
+.cv-btn-primary:hover, .cv-btn-primary.cv-force-hover { filter: brightness(0.92); }
+.cv-btn-primary:active, .cv-btn-primary.cv-force-active { filter: brightness(0.82); }
+.cv-btn-secondary { background: #006DE3; color: #F6F6F6; }
+.cv-btn-secondary:hover, .cv-btn-secondary.cv-force-hover { filter: brightness(0.92); }
+.cv-btn-secondary:active, .cv-btn-secondary.cv-force-active { filter: brightness(0.82); }
+.cv-btn-ghost {
+  background: transparent;
+  color: #272727;
+  border-color: rgba(0,0,0,0.20);
+}
+.cv-btn-ghost:hover, .cv-btn-ghost.cv-force-hover { background: rgba(0,0,0,0.04); }
+.cv-btn-ghost:active, .cv-btn-ghost.cv-force-active { background: rgba(0,0,0,0.08); }
+.cv-btn-destructive { background: #B91C1C; color: #F6F6F6; }
+.cv-btn-destructive:hover, .cv-btn-destructive.cv-force-hover { filter: brightness(0.92); }
+.cv-btn-destructive:active, .cv-btn-destructive.cv-force-active { filter: brightness(0.82); }
+
+/* --- Form inputs ------------------------------------------------------- */
+.cv-field { display: flex; flex-direction: column; gap: 4px; min-width: 220px; }
+.cv-field-label {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #272727;
+}
+.cv-field-hint {
+  font-size: 11px;
+  color: #515151;
+}
+.cv-field-error {
+  font-size: 11px;
+  color: #B91C1C;
+}
+.cv-input, .cv-textarea, .cv-select {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0,0,0,0.20);
+  border-radius: 4px;
+  background: #F6F6F6;
+  color: #272727;
+  transition: border-color 150ms cubic-bezier(0, 0, 0.58, 1),
+              box-shadow 150ms cubic-bezier(0, 0, 0.58, 1);
+}
+.cv-input:focus, .cv-input.cv-force-focus,
+.cv-textarea:focus, .cv-textarea.cv-force-focus,
+.cv-select:focus, .cv-select.cv-force-focus {
+  outline: none;
+  border-color: #00AEEF;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+}
+.cv-input.cv-error, .cv-input.cv-force-error,
+.cv-textarea.cv-error, .cv-textarea.cv-force-error {
+  border-color: #B91C1C;
+}
+.cv-input:disabled, .cv-input.cv-force-disabled,
+.cv-textarea:disabled, .cv-textarea.cv-force-disabled,
+.cv-select:disabled, .cv-select.cv-force-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #FFFFFF;
+}
+.cv-textarea { resize: vertical; min-height: 64px; }
+
+/* Native picker controls — date / datetime-local / time / month / week.
+   These inputs ship their OWN user-agent picker indicator, so they get NO
+   custom SVG icon and no icon wrapper: two glyphs on one field is the bug,
+   not the feature.
+
+   The indicator's colour is painted by the UA from the document's
+   `color-scheme`, which the template sets per mode in :root (`light` on a
+   light render, `dark` on a dark render) — see the template's DOC CHROME
+   block. Never hardcode a colour, a fill, or an invert() filter here: the
+   UA default is a black glyph, which vanishes on a dark surface, and a
+   hardcoded light glyph would then vanish on a light one. Opacity and
+   cursor are the only properties this catalogue owns. */
+.cv-input[type="date"]::-webkit-calendar-picker-indicator,
+.cv-input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.cv-input[type="time"]::-webkit-calendar-picker-indicator,
+.cv-input[type="month"]::-webkit-calendar-picker-indicator,
+.cv-input[type="week"]::-webkit-calendar-picker-indicator {
+  opacity: 0.7;
+  cursor: pointer;
+}
+.cv-input:hover::-webkit-calendar-picker-indicator,
+.cv-input:focus::-webkit-calendar-picker-indicator { opacity: 1; }
+
+/* Checkbox / Radio */
+.cv-check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cv-check-row input[type="checkbox"],
+.cv-check-row input[type="radio"] {
+  width: 16px; height: 16px;
+  accent-color: #00AEEF;
+  cursor: pointer;
+  margin: 0;
+}
+.cv-check-row span {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  color: #272727;
+}
+
+/* Toggle switch (CSS-only via :checked) */
+.cv-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex: 0 0 auto; }
+.cv-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.cv-switch .cv-switch-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.20);
+  border-radius: 11px;
+  transition: background 150ms cubic-bezier(0, 0, 0.58, 1);
+}
+.cv-switch .cv-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  background: #F6F6F6;
+  border-radius: 50%;
+  transition: transform 150ms cubic-bezier(0, 0, 0.58, 1);
+  box-shadow: 0 0 4px rgba(39, 39, 39, 0.08);
+}
+.cv-switch input:checked + .cv-switch-track { background: #00AEEF; }
+.cv-switch input:checked + .cv-switch-track::before { transform: translateX(18px); }
+.cv-switch input:focus-visible + .cv-switch-track { outline: 2px solid #00AEEF; outline-offset: 2px; }
+.cv-switch.cv-force-on .cv-switch-track { background: #00AEEF; }
+.cv-switch.cv-force-on .cv-switch-track::before { transform: translateX(18px); }
+.cv-switch.cv-force-disabled { opacity: 0.5; pointer-events: none; }
+
+/* --- Alerts ------------------------------------------------------------ */
+.cv-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  width: 100%;
+  max-width: 480px;
+}
+.cv-alert strong { font-weight: 600; }
+.cv-alert-success { background: #F6F6F6; border-left-color: #15803D; color: #272727; }
+.cv-alert-success strong { color: #15803D; }
+.cv-alert-warning { background: #F6F6F6; border-left-color: #B45309; color: #272727; }
+.cv-alert-warning strong { color: #B45309; }
+.cv-alert-error { background: #F6F6F6; border-left-color: #B91C1C; color: #272727; }
+.cv-alert-error strong { color: #B91C1C; }
+.cv-alert-info { background: #F6F6F6; border-left-color: #2563EB; color: #272727; }
+.cv-alert-info strong { color: #2563EB; }
+
+/* --- Badges ------------------------------------------------------------ */
+.cv-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+}
+.cv-badge-success { background: #15803D; color: #F6F6F6; }
+.cv-badge-warning { background: #B45309; color: #F6F6F6; }
+.cv-badge-error   { background: #B91C1C;   color: #F6F6F6; }
+.cv-badge-info    { background: #2563EB;    color: #F6F6F6; }
+.cv-badge-neutral { background: rgba(0,0,0,0.08); color: #272727; }
+
+/* --- Cards ------------------------------------------------------------- */
+.cv-card {
+  background: #F6F6F6;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 0 4px rgba(39, 39, 39, 0.08);
+  transition: box-shadow 150ms cubic-bezier(0, 0, 0.58, 1),
+              transform 150ms cubic-bezier(0, 0, 0.58, 1);
+  width: 100%;
+  max-width: 280px;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  color: #272727;
+}
+.cv-card:hover, .cv-card.cv-force-hover {
+  box-shadow: 0 0 10px rgba(39, 39, 39, 0.14);
+  transform: translateY(-1px);
+}
+.cv-card .cv-card-title {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-weight: 500;
+  font-size: 1.125rem;
+  margin: 0 0 6px 0;
+  color: #272727;
+}
+.cv-card .cv-card-body { color: #515151; margin: 0 0 12px 0; }
+.cv-card .cv-card-actions { display: flex; gap: 8px; }
+
+/* --- Data table -------------------------------------------------------- */
+.cv-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  color: #272727;
+  background: #F6F6F6;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 4px rgba(39, 39, 39, 0.08);
+}
+.cv-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  color: #515151;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: background 150ms cubic-bezier(0, 0, 0.58, 1);
+}
+.cv-table thead th:hover, .cv-table thead th.cv-force-hover {
+  background: rgba(0,0,0,0.04);
+  color: #272727;
+}
+.cv-table thead th .cv-sort-arrow { font-size: 9px; margin-left: 4px; color: #00AEEF; }
+.cv-table tbody tr { transition: background 150ms cubic-bezier(0, 0, 0.58, 1); }
+.cv-table tbody tr:nth-child(even) { background: #FFFFFF; }
+.cv-table tbody tr:hover, .cv-table tbody tr.cv-force-hover { background: rgba(0,0,0,0.04); }
+.cv-table tbody tr.cv-row-selected,
+.cv-table tbody tr.cv-force-selected {
+  background: color-mix(in srgb, #00AEEF 10%, transparent);
+  box-shadow: inset 3px 0 0 #00AEEF;
+}
+.cv-table td { padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.04); }
+.cv-table tbody tr:last-child td { border-bottom: 0; }
+
+/* --- Tabs (pure CSS via hidden radios + :checked) ---------------------- */
+.cv-tabs { width: 100%; max-width: 520px; }
+.cv-tabs input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.cv-tabs .cv-tab-strip {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+.cv-tabs .cv-tab-label {
+  padding: 8px 14px;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #515151;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 150ms cubic-bezier(0, 0, 0.58, 1),
+              border-color 150ms cubic-bezier(0, 0, 0.58, 1);
+}
+.cv-tabs .cv-tab-label:hover { color: #272727; }
+.cv-tabs .cv-tab-panel {
+  display: none;
+  padding: 16px;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 13px;
+  color: #272727;
+  background: #F6F6F6;
+  border-radius: 0 0 6px 6px;
+}
+.cv-tabs input[id="cv-tab-1"]:checked ~ .cv-tab-strip label[for="cv-tab-1"],
+.cv-tabs input[id="cv-tab-2"]:checked ~ .cv-tab-strip label[for="cv-tab-2"],
+.cv-tabs input[id="cv-tab-3"]:checked ~ .cv-tab-strip label[for="cv-tab-3"] {
+  color: #00AEEF;
+  border-bottom-color: #00AEEF;
+  font-weight: 600;
+}
+.cv-tabs input[id="cv-tab-1"]:checked ~ .cv-tab-panels .cv-tab-panel-1,
+.cv-tabs input[id="cv-tab-2"]:checked ~ .cv-tab-panels .cv-tab-panel-2,
+.cv-tabs input[id="cv-tab-3"]:checked ~ .cv-tab-panels .cv-tab-panel-3 {
+  display: block;
+}
+
+/* --- Modal / Dialog (pure CSS via <details>) --------------------------- */
+.cv-modal { font-family: 'Barclays Effra', 'Cabin', sans-serif; }
+.cv-modal summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-block;
+}
+.cv-modal summary::-webkit-details-marker { display: none; }
+.cv-modal .cv-modal-window {
+  margin-top: 12px;
+  max-width: 420px;
+  background: #F6F6F6;
+  /* Always-on edge: 1px pattern width + brand token colour. text_muted is
+     guaranteed to contrast with surface (contrast-validation), so the modal
+     edge stays visible even when surface == background (e.g. inside the
+     surface-backed states-matrix cell). Shadow is retained as a second,
+     independent separation mechanism. */
+  border: 1px solid #515151;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 0 20px rgba(39, 39, 39, 0.2);
+  color: #272727;
+}
+.cv-modal .cv-modal-title {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-weight: 500;
+  font-size: 1.125rem;
+  margin: 0 0 8px 0;
+}
+.cv-modal .cv-modal-body {
+  font-size: 13px;
+  color: #515151;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+.cv-modal .cv-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.cv-modal .cv-modal-window { position: relative; }
+.cv-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: 0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #515151;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.cv-modal-close:hover { color: #272727; background: rgba(0,0,0,0.04); }
+
+/* --- Icons (inline SVG, inherits currentColor) ------------------------- */
+.cv-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  flex: 0 0 auto;
+}
+.cv-btn .cv-icon { margin-right: 6px; }
+
+/* --- Button loading state --------------------------------------------- */
+.cv-btn-loading { pointer-events: none; }
+.cv-btn-loading::before {
+  content: "";
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  vertical-align: -1px;
+  margin-right: 8px;
+  animation: cv-spin 720ms linear infinite;
+}
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cv-btn-loading::before { animation: none; }
+}
+
+/* --- Form: required indicator ----------------------------------------- */
+.cv-required {
+  color: #B91C1C;
+  margin-left: 2px;
+  font-weight: 600;
+}
+.cv-field-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Alerts: icon + dismiss ------------------------------------------ */
+.cv-alert { align-items: center; }
+.cv-alert .cv-alert-icon { flex: 0 0 auto; width: 16px; height: 16px; vertical-align: 0; }
+.cv-alert-success .cv-alert-icon { color: #15803D; }
+.cv-alert-warning .cv-alert-icon { color: #B45309; }
+.cv-alert-error .cv-alert-icon { color: #B91C1C; }
+.cv-alert-info .cv-alert-icon { color: #2563EB; }
+.cv-alert-body { flex: 1 1 auto; min-width: 0; }
+.cv-alert-dismiss {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: #515151;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.cv-alert-dismiss:hover { color: #272727; background: rgba(0,0,0,0.04); }
+
+/* --- Data table: numeric alignment, actions column, pagination, states */
+.cv-table th.cv-cell-num,
+.cv-table td.cv-cell-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cv-table th.cv-cell-actions,
+.cv-table td.cv-cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.cv-table .cv-cell-actions .cv-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin-left: 4px;
+}
+.cv-table th[aria-sort="ascending"],
+.cv-table th[aria-sort="descending"] {
+  color: #272727;
+}
+.cv-table th[aria-sort="ascending"] .cv-sort-arrow,
+.cv-table th[aria-sort="descending"] .cv-sort-arrow {
+  color: #00AEEF;
+  opacity: 1;
+}
+.cv-sort-arrow.cv-sort-inactive {
+  color: #515151;
+  opacity: 0.5;
+}
+.cv-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #F6F6F6;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 12px;
+  color: #515151;
+  margin-top: -1px;
+}
+.cv-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cv-pagination .cv-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.cv-pagesize {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cv-pagesize select {
+  font-family: 'Barclays Effra', 'Cabin', sans-serif;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid rgba(0,0,0,0.20);
+  border-radius: 3px;
+  background: #F6F6F6;
+  color: #272727;
+}
+.cv-table-state {
+  padding: 24px 12px;
+  text-align: center;
+  color: #515151;
+  font-size: 12px;
+  background: #F6F6F6;
+  border-radius: 6px;
+  width: 100%;
+}
+.cv-table-state strong {
+  color: #272727;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+  </style>
+</head>
+<body>
+
+<script type="application/json" id="design-tokens">
+{
+  "meta": {
+    "domain": "business-banking",
+    "domain_provenance": "suggested-from-url-accepted",
+    "reference_url": "https://www.barclays.co.uk/business-banking/",
+    "extraction_date": "2026-08-03",
+    "extraction_status": "success",
+    "css_source_type": "browser-aggregate",
+    "css_source_url": "https://www.barclays.co.uk/business-banking/",
+    "mode": "light",
+    "mode_choice": "both",
+    "hue_source": "extracted-light",
+    "primary": true,
+    "brand_fonts": {
+      "families": [
+        {
+          "role": "heading",
+          "brand": "Barclays Effra",
+          "loadable": "Cabin",
+          "param": "Cabin",
+          "status": "substituted",
+          "evidence": "E1: self-hosted @font-face (effra-light/regular/medium/bold.woff2 under the barclays theme clientlibs), no fonts.googleapis.com href on the page; E2: font-availability-rules.md §3 humanist-sans row Effra → Cabin"
+        },
+        {
+          "role": "body",
+          "brand": "Barclays Effra",
+          "loadable": "Cabin",
+          "param": "Cabin",
+          "status": "substituted",
+          "evidence": "E1: self-hosted @font-face (effra-light/regular/medium/bold.woff2 under the barclays theme clientlibs), no fonts.googleapis.com href on the page; E2: font-availability-rules.md §3 humanist-sans row Effra → Cabin"
+        }
+      ],
+      "links": [
+        "https://fonts.googleapis.com/css2?family=Cabin:wght@400;500;600;700&display=swap"
+      ]
+    }
+  },
+  "colours": {
+    "primary": {
+      "hex": "#00AEEF",
+      "prov": "extracted-from-url",
+      "source": "--t-color-primary in :root (also --t-color-sacred-primary, --t-brand-logo-color)"
+    },
+    "secondary": {
+      "hex": "#006DE3",
+      "prov": "extracted-from-url",
+      "source": "--t-color-interactive in :root (a colour)"
+    },
+    "accent": {
+      "hex": "#001276",
+      "prov": "extracted-from-url",
+      "source": "--t-color-sacred-info in :root (Barclays \"sacred\" deep blue)"
+    },
+    "background": {
+      "hex": "#FFFFFF",
+      "prov": "extracted-from-url",
+      "source": "--t-color-0 in :root (body background-color computes to rgba(0,0,0,0))"
+    },
+    "surface": {
+      "hex": "#F6F6F6",
+      "prov": "extracted-from-url",
+      "source": "--t-color-30 in :root (button background-color)"
+    },
+    "text": {
+      "hex": "#272727",
+      "prov": "extracted-from-url",
+      "source": "--t-type-heading-color in :root (h2 color); body carries no theme colour"
+    },
+    "text_muted": {
+      "hex": "#515151",
+      "prov": "extracted-from-url",
+      "source": "--t-type-color in :root (h3 color, --t-color-neutral)"
+    },
+    "success": {
+      "hex": "#15803D",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking)"
+    },
+    "warning": {
+      "hex": "#B45309",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking)"
+    },
+    "error": {
+      "hex": "#B91C1C",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking)"
+    },
+    "info": {
+      "hex": "#2563EB",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking)"
+    }
+  },
+  "typography": {
+    "heading_family": {
+      "value": "'Barclays Effra', 'Cabin', sans-serif",
+      "prov": "extracted-from-url",
+      "source": "h1 font-family (--t-type-heading-font-family in :root)"
+    },
+    "heading_weight": {
+      "value": 500,
+      "prov": "extracted-from-url",
+      "source": "h1 font-weight (--t-type-font-weight-medium in :root)"
+    },
+    "body_family": {
+      "value": "'Barclays Effra', 'Cabin', sans-serif",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-family in :root (body element carries no theme styling; its computed font is the UA default)"
+    },
+    "body_weight": {
+      "value": 400,
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-weight in :root"
+    },
+    "size_xs": {
+      "value": "0.75rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size-xs in :root"
+    },
+    "size_sm": {
+      "value": "0.875rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size-sm in :root"
+    },
+    "size_base": {
+      "value": "1rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size in :root (body font-size 16px)"
+    },
+    "size_lg": {
+      "value": "1.125rem",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking) — the extracted scale has no 1.0625–1.25rem rung"
+    },
+    "size_xl": {
+      "value": "1.25rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size-md in :root"
+    },
+    "size_2xl": {
+      "value": "1.5rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size-lg in :root"
+    },
+    "size_3xl": {
+      "value": "2rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size-xl in :root (h2 font-size 32px)"
+    },
+    "size_4xl": {
+      "value": "3rem",
+      "prov": "extracted-from-url",
+      "source": "--t-type-font-size-2xl in :root (h1 font-size 48px)"
+    },
+    "lh_tight": {
+      "value": 1.2083,
+      "prov": "extracted-from-url",
+      "source": "h1 line-height 58px / font-size 48px"
+    },
+    "lh_base": {
+      "value": 1.5,
+      "prov": "extracted-from-url",
+      "source": "--t-type-line-height (1.5rem) / --t-type-font-size (1rem)"
+    },
+    "lh_loose": {
+      "value": 1.75,
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking) — no line-height ratio ≥ 1.7 declared in the CSS"
+    }
+  },
+  "effects": {
+    "shadow_sm": {
+      "value": "0 0 4px rgba(39, 39, 39, 0.08)",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking) — laddered to the extracted ambient shadow_lg"
+    },
+    "shadow_md": {
+      "value": "0 0 10px rgba(39, 39, 39, 0.14)",
+      "prov": "inferred-from-domain",
+      "source": "domain-inference (business-banking) — laddered to the extracted ambient shadow_lg"
+    },
+    "shadow_lg": {
+      "value": "0 0 20px rgba(39, 39, 39, 0.2)",
+      "prov": "extracted-from-url",
+      "source": "--t-raised-box-shadow in :root"
+    },
+    "transition_fast": {
+      "value": "120ms",
+      "prov": "extracted-from-url",
+      "source": "--t-transition-duration-fast in :root"
+    },
+    "transition_base": {
+      "value": "150ms",
+      "prov": "extracted-from-url",
+      "source": "--t-transition-duration-medium in :root (the only duration the page actually transitions on)"
+    },
+    "transition_slow": {
+      "value": "300ms",
+      "prov": "extracted-from-url",
+      "source": "--t-transition-duration-slow in :root"
+    },
+    "easing_standard": {
+      "value": "cubic-bezier(0, 0, 0.58, 1)",
+      "prov": "extracted-from-url",
+      "source": "transition: transform var(--t-transition-duration-medium) ease-out — ease-out translated per shadow-motion-rules.md §F"
+    }
+  },
+  "contrast": {
+    "text_on_background": {
+      "ratio": 14.9,
+      "status": "Pass"
+    },
+    "text_on_surface": {
+      "ratio": 13.8,
+      "status": "Pass"
+    },
+    "text_muted_on_background": {
+      "ratio": 7.9,
+      "status": "Pass"
+    },
+    "text_muted_on_surface": {
+      "ratio": 7.3,
+      "status": "Pass"
+    },
+    "adjustments": "none"
+  }
+}
+</script>
+
+<main>
+
+  <header class="doc-header">
+    <h1 id="top">Design System (Light) — business-banking</h1>
+    <blockquote class="attribution">Tokens extracted from <a href="https://www.barclays.co.uk/business-banking/">https://www.barclays.co.uk/business-banking/</a>. Status colours and any unset tokens are inferred per-run from the <code>business-banking</code> string.<br><br>This is the <strong>light</strong> variant, and it is the hue source for this run — its palette is the one grounded in the source above. The <a href="design-system-dark.html">dark variant</a> is derived from these same brand hues.<br><br>Every token below carries a provenance marker — <code>extracted-from-url</code> if the value was found in the fetched CSS, <code>inferred-from-domain</code> if it was inferred per-run from the <code>business-banking</code> string or derived from the other mode. Review before proceeding.</blockquote>
+    <p class="generated-at">Generated: 2026-08-03</p>
+  </header>
+
+  <nav class="doc-toc" aria-label="Table of contents">
+    <h2 class="toc-title">Contents</h2>
+    <ol class="toc-list">
+      <li><a href="#colours">Colours</a></li>
+      <li><a href="#components">Components</a></li>
+      <li><a href="#typography">Typography</a></li>
+      <li><a href="#effects">Effects</a></li>
+      <li><a href="#contrast">Contrast validation</a></li>
+      <li><a href="#standards">Design System Standards</a></li>
+    </ol>
+  </nav>
+
+  <section id="colours" class="token-section">
+    <h2>Colours</h2>
+    <ul class="swatch-list">
+<li class="swatch-row swatch-primary">
+        <div class="swatch" style="background:#00AEEF" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">primary</strong>
+          <code class="swatch-hex">#00AEEF</code>
+          <span class="swatch-source">--t-color-primary in :root (also --t-color-sacred-primary, --t-brand-logo-color)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-secondary">
+        <div class="swatch" style="background:#006DE3" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">secondary</strong>
+          <code class="swatch-hex">#006DE3</code>
+          <span class="swatch-source">--t-color-interactive in :root (a colour)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-accent">
+        <div class="swatch" style="background:#001276" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">accent</strong>
+          <code class="swatch-hex">#001276</code>
+          <span class="swatch-source">--t-color-sacred-info in :root (Barclays "sacred" deep blue)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-background">
+        <div class="swatch" style="background:#FFFFFF" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">background</strong>
+          <code class="swatch-hex">#FFFFFF</code>
+          <span class="swatch-source">--t-color-0 in :root (body background-color computes to rgba(0,0,0,0))</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-surface">
+        <div class="swatch" style="background:#F6F6F6" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">surface</strong>
+          <code class="swatch-hex">#F6F6F6</code>
+          <span class="swatch-source">--t-color-30 in :root (button background-color)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-text">
+        <div class="swatch" style="background:#272727" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">text</strong>
+          <code class="swatch-hex">#272727</code>
+          <span class="swatch-source">--t-type-heading-color in :root (h2 color); body carries no theme colour</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-text-muted">
+        <div class="swatch" style="background:#515151" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">text-muted</strong>
+          <code class="swatch-hex">#515151</code>
+          <span class="swatch-source">--t-type-color in :root (h3 color, --t-color-neutral)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-success">
+        <div class="swatch" style="background:#15803D" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">success</strong>
+          <code class="swatch-hex">#15803D</code>
+          <span class="swatch-source">domain-inference (business-banking)</span>
+          <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-warning">
+        <div class="swatch" style="background:#B45309" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">warning</strong>
+          <code class="swatch-hex">#B45309</code>
+          <span class="swatch-source">domain-inference (business-banking)</span>
+          <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-error">
+        <div class="swatch" style="background:#B91C1C" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">error</strong>
+          <code class="swatch-hex">#B91C1C</code>
+          <span class="swatch-source">domain-inference (business-banking)</span>
+          <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+        </div>
+      </li>
+      <li class="swatch-row swatch-info">
+        <div class="swatch" style="background:#2563EB" aria-hidden="true"></div>
+        <div class="swatch-meta">
+          <strong class="swatch-token">info</strong>
+          <code class="swatch-hex">#2563EB</code>
+          <span class="swatch-source">domain-inference (business-banking)</span>
+          <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+        </div>
+      </li>
+    </ul>
+    <p class="back-to-top"><a href="#top">Back to top ↑</a></p>
+  </section>
+
+  <section id="components" class="token-section">
+    <h2>Components</h2>
+    <p class="components-intro">Common UI patterns rendered with the brand's tokens. The <strong>live demo</strong> for each family reacts to real <code>:hover</code>, <code>:focus</code>, <code>:active</code>, <code>:disabled</code>, and <code>:checked</code> in your browser. The <strong>states matrix</strong> below each demo shows every state side-by-side using forced-state classes — useful for screenshots and PDF export. Tabs use hidden radio buttons + <code>:checked</code>; the modal uses native <code>&lt;details&gt;</code>. No JavaScript. Edit <code>framework/agents/design-system-styler/data/component-catalogue.md</code> to add, remove, or tweak families.</p>
+<div class="cv-family"><h3>Buttons</h3><p class="cv-note">Live demo</p><div class="cv-row">
+  <button type="button" class="cv-btn cv-btn-primary">Save changes</button>
+  <button type="button" class="cv-btn cv-btn-secondary">Cancel</button>
+  <button type="button" class="cv-btn cv-btn-ghost">Archive</button>
+  <button type="button" class="cv-btn cv-btn-destructive">
+    <svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5zm2 1v7h1V6H7zm2 0v7h1V6H9z"/></svg>
+    Delete record
+  </button>
+  <button type="button" class="cv-btn cv-btn-primary cv-btn-loading">Saving…</button>
+  <button type="button" class="cv-btn cv-btn-primary" disabled>Disabled</button>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Default</span><button type="button" class="cv-btn cv-btn-primary">Save</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Hover</span><button type="button" class="cv-btn cv-btn-primary cv-force-hover">Save</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Active</span><button type="button" class="cv-btn cv-btn-primary cv-force-active">Save</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Focus</span><button type="button" class="cv-btn cv-btn-primary cv-force-focus">Save</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Disabled</span><button type="button" class="cv-btn cv-btn-primary cv-force-disabled">Save</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Loading</span><button type="button" class="cv-btn cv-btn-primary cv-btn-loading">Saving…</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Default</span><button type="button" class="cv-btn cv-btn-secondary">Cancel</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Hover</span><button type="button" class="cv-btn cv-btn-secondary cv-force-hover">Cancel</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Active</span><button type="button" class="cv-btn cv-btn-secondary cv-force-active">Cancel</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Focus</span><button type="button" class="cv-btn cv-btn-secondary cv-force-focus">Cancel</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Disabled</span><button type="button" class="cv-btn cv-btn-secondary cv-force-disabled">Cancel</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Default</span><button type="button" class="cv-btn cv-btn-ghost">Archive</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Hover</span><button type="button" class="cv-btn cv-btn-ghost cv-force-hover">Archive</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Active</span><button type="button" class="cv-btn cv-btn-ghost cv-force-active">Archive</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Focus</span><button type="button" class="cv-btn cv-btn-ghost cv-force-focus">Archive</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Disabled</span><button type="button" class="cv-btn cv-btn-ghost cv-force-disabled">Archive</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Default</span><button type="button" class="cv-btn cv-btn-destructive"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Hover</span><button type="button" class="cv-btn cv-btn-destructive cv-force-hover"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Active</span><button type="button" class="cv-btn cv-btn-destructive cv-force-active"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Focus</span><button type="button" class="cv-btn cv-btn-destructive cv-force-focus"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete</button></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Disabled</span><button type="button" class="cv-btn cv-btn-destructive cv-force-disabled"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete</button></div>
+</div></div>
+    <div class="cv-family"><h3>Form Inputs</h3><p class="cv-note">Live demo</p><div class="cv-row cv-row-col">
+  <div class="cv-field">
+    <label class="cv-field-label" for="cv-demo-text">Full name<span class="cv-required" aria-hidden="true">*</span></label>
+    <input id="cv-demo-text" type="text" class="cv-input" placeholder="Jane Doe" required aria-required="true">
+    <span class="cv-field-hint">First and last as on your ID.</span>
+  </div>
+  <div class="cv-field">
+    <label class="cv-field-label" for="cv-demo-email">Work email<span class="cv-required" aria-hidden="true">*</span></label>
+    <input id="cv-demo-email" type="email" class="cv-input" placeholder="name@company.com" required aria-required="true">
+  </div>
+  <div class="cv-field">
+    <label class="cv-field-label" for="cv-demo-date">Start date</label>
+    <input id="cv-demo-date" type="date" class="cv-input">
+    <span class="cv-field-hint">Native calendar picker — typed dates parsed per locale.</span>
+  </div>
+  <div class="cv-field">
+    <label class="cv-field-label" for="cv-demo-textarea">Notes</label>
+    <textarea id="cv-demo-textarea" class="cv-textarea" placeholder="Optional context…"></textarea>
+  </div>
+  <div class="cv-field">
+    <label class="cv-field-label" for="cv-demo-select">Country</label>
+    <select id="cv-demo-select" class="cv-select">
+      <option>United Kingdom</option>
+      <option>United States</option>
+      <option>South Africa</option>
+    </select>
+  </div>
+  <label class="cv-check-row"><input type="checkbox" checked><span>Email me product updates</span></label>
+  <label class="cv-check-row"><input type="radio" name="cv-demo-radio" checked><span>Standard delivery</span></label>
+  <label class="cv-check-row"><input type="radio" name="cv-demo-radio"><span>Express delivery</span></label>
+  <div class="cv-check-row">
+    <label class="cv-switch">
+      <input type="checkbox" checked>
+      <span class="cv-switch-track"></span>
+    </label>
+    <span>Two-factor authentication</span>
+  </div>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Default</span><input type="text" class="cv-input" value="Jane Doe"></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Focus</span><input type="text" class="cv-input cv-force-focus" value="Jane Doe"></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Error</span>
+    <input type="text" class="cv-input cv-force-error" value="" aria-invalid="true" aria-describedby="cv-demo-err">
+    <span id="cv-demo-err" class="cv-field-error">
+      <svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.9 3.5h1.8L8.7 9.5H7.3l-.2-5zM8 11.2a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+      Full name is required
+    </span>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Disabled</span><input type="text" class="cv-input cv-force-disabled" value="Jane Doe" disabled></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Date</span><input type="date" class="cv-input"></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Switch off</span><label class="cv-switch"><input type="checkbox"><span class="cv-switch-track"></span></label></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Switch on</span><span class="cv-switch cv-force-on"><span class="cv-switch-track"></span></span></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Switch disabled</span><span class="cv-switch cv-force-disabled"><span class="cv-switch-track"></span></span></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Checkbox</span><label class="cv-check-row"><input type="checkbox" checked><span>Subscribe</span></label></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Radio</span><label class="cv-check-row"><input type="radio" checked><span>Choose me</span></label></div>
+</div></div>
+    <div class="cv-family"><h3>Alerts</h3><p class="cv-note">Live demo</p><div class="cv-row cv-row-col">
+  <div class="cv-alert cv-alert-success" role="status">
+    <svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 4.7-4 5.3a.7.7 0 0 1-1 .1L4 8.5l1-1 1.9 2 3.4-4.5 1.2.7z"/></svg>
+    <div class="cv-alert-body"><strong>Saved.</strong> Your changes were saved.</div>
+    <button type="button" class="cv-alert-dismiss" aria-label="Dismiss">×</button>
+  </div>
+  <div class="cv-alert cv-alert-warning" role="status">
+    <svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M7.1 1.7a1 1 0 0 1 1.8 0l6 11A1 1 0 0 1 14 14H2a1 1 0 0 1-.9-1.3l6-11zM8 5v4h1V5H8zm0 5.5a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z"/></svg>
+    <div class="cv-alert-body"><strong>Heads up.</strong> Your session expires in 5 minutes.</div>
+    <button type="button" class="cv-alert-dismiss" aria-label="Dismiss">×</button>
+  </div>
+  <div class="cv-alert cv-alert-error" role="alert">
+    <svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM5.6 5l2.4 2.4L10.4 5l1 1L9 8.4l2.4 2.5-1 1L8 9.4 5.6 12l-1-1 2.4-2.5L4.6 6l1-1z"/></svg>
+    <div class="cv-alert-body"><strong>Couldn't reach the server.</strong> Check your connection and try again.</div>
+  </div>
+  <div class="cv-alert cv-alert-info" role="status">
+    <svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM8 4.2a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zM7.2 7h1.6v4.8h.9V13H6.3v-1.2h.9V8.2h-.9V7h.9z"/></svg>
+    <div class="cv-alert-body"><strong>FYI.</strong> A new version of the dashboard is available.</div>
+    <button type="button" class="cv-alert-dismiss" aria-label="Dismiss">×</button>
+  </div>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Success</span><div class="cv-alert cv-alert-success"><svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 4.7-4 5.3a.7.7 0 0 1-1 .1L4 8.5l1-1 1.9 2 3.4-4.5 1.2.7z"/></svg><div class="cv-alert-body"><strong>Saved.</strong></div></div></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Warning</span><div class="cv-alert cv-alert-warning"><svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M7.1 1.7a1 1 0 0 1 1.8 0l6 11A1 1 0 0 1 14 14H2a1 1 0 0 1-.9-1.3l6-11zM8 5v4h1V5H8zm0 5.5a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z"/></svg><div class="cv-alert-body"><strong>Heads up.</strong></div></div></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Error</span><div class="cv-alert cv-alert-error"><svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM5.6 5l2.4 2.4L10.4 5l1 1L9 8.4l2.4 2.5-1 1L8 9.4 5.6 12l-1-1 2.4-2.5L4.6 6l1-1z"/></svg><div class="cv-alert-body"><strong>Error.</strong></div></div></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Info</span><div class="cv-alert cv-alert-info"><svg class="cv-icon cv-alert-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM8 4.2a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zM7.2 7h1.6v4.8h.9V13H6.3v-1.2h.9V8.2h-.9V7h.9z"/></svg><div class="cv-alert-body"><strong>FYI.</strong></div></div></div>
+</div></div>
+    <div class="cv-family"><h3>Badges</h3><p class="cv-note">Live demo</p><div class="cv-row">
+  <span class="cv-badge cv-badge-success">Active</span>
+  <span class="cv-badge cv-badge-warning">Pending</span>
+  <span class="cv-badge cv-badge-error">Failed</span>
+  <span class="cv-badge cv-badge-info">Beta</span>
+  <span class="cv-badge cv-badge-neutral">Draft</span>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Success</span><span class="cv-badge cv-badge-success">Active</span></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Warning</span><span class="cv-badge cv-badge-warning">Pending</span></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Error</span><span class="cv-badge cv-badge-error">Failed</span></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Info</span><span class="cv-badge cv-badge-info">Beta</span></div>
+  <div class="cv-state-cell"><span class="cv-state-label">Neutral</span><span class="cv-badge cv-badge-neutral">Draft</span></div>
+</div></div>
+    <div class="cv-family"><h3>Cards</h3><p class="cv-note">Live demo</p><div class="cv-row">
+  <div class="cv-card">
+    <div class="cv-card-title">Customer record</div>
+    <div class="cv-card-body">Hover this card to see the elevation animate from <code>shadow-sm</code> to <code>shadow-md</code> using the brand's transition timing.</div>
+    <div class="cv-card-actions">
+      <button type="button" class="cv-btn cv-btn-primary">Open</button>
+      <button type="button" class="cv-btn cv-btn-ghost">Archive</button>
+    </div>
+  </div>
+  <div class="cv-card">
+    <div class="cv-card-title">Order #4821</div>
+    <div class="cv-card-body">Shipped 2 hours ago. Expected delivery tomorrow.</div>
+    <div class="cv-card-actions">
+      <button type="button" class="cv-btn cv-btn-secondary">Track</button>
+    </div>
+  </div>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Resting</span>
+    <div class="cv-card">
+      <div class="cv-card-title">Resting</div>
+      <div class="cv-card-body">shadow-sm</div>
+    </div>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Hover</span>
+    <div class="cv-card cv-force-hover">
+      <div class="cv-card-title">Hover</div>
+      <div class="cv-card-body">shadow-md</div>
+    </div>
+  </div>
+</div></div>
+    <div class="cv-family"><h3>Data Table</h3><p class="cv-note">Live demo</p><div class="cv-row cv-row-col">
+  <table class="cv-table" aria-label="Customer records">
+    <thead>
+      <tr>
+        <th aria-sort="ascending">Name <span class="cv-sort-arrow">▲</span></th>
+        <th aria-sort="none">Status <span class="cv-sort-arrow cv-sort-inactive">⇅</span></th>
+        <th aria-sort="none">Updated <span class="cv-sort-arrow cv-sort-inactive">⇅</span></th>
+        <th aria-sort="none">Owner <span class="cv-sort-arrow cv-sort-inactive">⇅</span></th>
+        <th aria-sort="none" class="cv-cell-num">Value <span class="cv-sort-arrow cv-sort-inactive">⇅</span></th>
+        <th class="cv-cell-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Acme Corp.</td>
+        <td><span class="cv-badge cv-badge-success">Active</span></td>
+        <td>2 hours ago</td>
+        <td>J. Doe</td>
+        <td class="cv-cell-num">£12,480</td>
+        <td class="cv-cell-actions">
+          <button type="button" class="cv-btn cv-btn-ghost">View</button>
+          <button type="button" class="cv-btn cv-btn-ghost">Edit</button>
+        </td>
+      </tr>
+      <tr class="cv-row-selected">
+        <td>Globex Ltd.</td>
+        <td><span class="cv-badge cv-badge-warning">Pending</span></td>
+        <td>1 day ago</td>
+        <td>A. Smith</td>
+        <td class="cv-cell-num">£8,120</td>
+        <td class="cv-cell-actions">
+          <button type="button" class="cv-btn cv-btn-ghost">View</button>
+          <button type="button" class="cv-btn cv-btn-ghost">Edit</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Initech</td>
+        <td><span class="cv-badge cv-badge-error">Failed</span></td>
+        <td>3 days ago</td>
+        <td>M. Mole</td>
+        <td class="cv-cell-num">£430</td>
+        <td class="cv-cell-actions">
+          <button type="button" class="cv-btn cv-btn-ghost">View</button>
+          <button type="button" class="cv-btn cv-btn-ghost">Edit</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Umbrella plc.</td>
+        <td><span class="cv-badge cv-badge-info">Beta</span></td>
+        <td>5 days ago</td>
+        <td>R. Park</td>
+        <td class="cv-cell-num">£24,900</td>
+        <td class="cv-cell-actions">
+          <button type="button" class="cv-btn cv-btn-ghost">View</button>
+          <button type="button" class="cv-btn cv-btn-ghost">Edit</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="cv-table-footer">
+    <span>Showing 1–4 of 240 records</span>
+    <div class="cv-pagination" role="navigation" aria-label="Pagination">
+      <button type="button" class="cv-btn cv-btn-ghost">‹ Back</button>
+      <span>Page 1 of 12</span>
+      <button type="button" class="cv-btn cv-btn-ghost">Next ›</button>
+    </div>
+    <label class="cv-pagesize">
+      <span>Rows per page</span>
+      <select aria-label="Rows per page">
+        <option>5</option>
+        <option>10</option>
+        <option selected>20</option>
+        <option>50</option>
+      </select>
+    </label>
+  </div>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Header hover</span>
+    <table class="cv-table"><thead><tr><th class="cv-force-hover">Name <span class="cv-sort-arrow">▲</span></th></tr></thead></table>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Sort inactive</span>
+    <table class="cv-table"><thead><tr><th>Owner <span class="cv-sort-arrow cv-sort-inactive">⇅</span></th></tr></thead></table>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Row hover</span>
+    <table class="cv-table"><tbody><tr class="cv-force-hover"><td>Hovered row</td></tr></tbody></table>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Row selected</span>
+    <table class="cv-table"><tbody><tr class="cv-force-selected"><td>Selected row</td></tr></tbody></table>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Zebra row</span>
+    <table class="cv-table"><tbody><tr><td>Odd row</td></tr><tr><td>Even row</td></tr></tbody></table>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Empty</span>
+    <div class="cv-table-state"><strong>No records yet</strong>Add your first customer to get started.</div>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Loading</span>
+    <div class="cv-table-state"><strong>Loading…</strong>Fetching records.</div>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Error</span>
+    <div class="cv-table-state"><strong>Couldn't load records</strong>Check your connection and try again.</div>
+  </div>
+</div></div>
+    <div class="cv-family"><h3>Tabs</h3><p class="cv-note">Live demo</p><div class="cv-row cv-row-col">
+  <div class="cv-tabs">
+    <input type="radio" name="cv-tabs-demo" id="cv-tab-1" checked>
+    <input type="radio" name="cv-tabs-demo" id="cv-tab-2">
+    <input type="radio" name="cv-tabs-demo" id="cv-tab-3">
+    <div class="cv-tab-strip">
+      <label for="cv-tab-1" class="cv-tab-label">Overview</label>
+      <label for="cv-tab-2" class="cv-tab-label">Activity</label>
+      <label for="cv-tab-3" class="cv-tab-label">Settings</label>
+    </div>
+    <div class="cv-tab-panels">
+      <div class="cv-tab-panel cv-tab-panel-1">The overview panel. Click another tab — the panel switches without any JavaScript.</div>
+      <div class="cv-tab-panel cv-tab-panel-2">Recent activity for this record would appear here.</div>
+      <div class="cv-tab-panel cv-tab-panel-3">Per-record settings and permissions live in this panel.</div>
+    </div>
+  </div>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Inactive tab</span>
+    <span class="cv-tab-label">Overview</span>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Active tab</span>
+    <span class="cv-tab-label" style="color: #00AEEF; border-bottom: 2px solid #00AEEF; font-weight: 600;">Overview</span>
+  </div>
+</div></div>
+    <div class="cv-family"><h3>Modal</h3><p class="cv-note">Live demo</p><div class="cv-row cv-row-col">
+  <details class="cv-modal">
+    <summary><span class="cv-btn cv-btn-destructive">
+      <svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5zm2 1v7h1V6H7zm2 0v7h1V6H9z"/></svg>
+      Delete invoice
+    </span></summary>
+    <div class="cv-modal-window" role="dialog" aria-modal="true" aria-labelledby="cv-modal-title">
+      <button type="button" class="cv-modal-close" aria-label="Close dialog">×</button>
+      <div class="cv-modal-title" id="cv-modal-title">Delete invoice INV-1042?</div>
+      <div class="cv-modal-body">Invoice <strong>INV-1042</strong> for Acme Corp. (£12,480) will be permanently removed. This action cannot be undone.</div>
+      <div class="cv-modal-actions">
+        <button type="button" class="cv-btn cv-btn-ghost">Cancel</button>
+        <button type="button" class="cv-btn cv-btn-destructive">
+          <svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>
+          Delete invoice
+        </button>
+      </div>
+    </div>
+  </details>
+</div><p class="cv-note">States matrix</p><div class="cv-state-grid">
+  <div class="cv-state-cell"><span class="cv-state-label">Closed</span>
+    <span class="cv-btn cv-btn-destructive"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete invoice</span>
+  </div>
+  <div class="cv-state-cell"><span class="cv-state-label">Open</span>
+    <div class="cv-modal-window" role="dialog" aria-modal="true" aria-labelledby="cv-modal-title-static">
+      <button type="button" class="cv-modal-close" aria-label="Close dialog">×</button>
+      <div class="cv-modal-title" id="cv-modal-title-static">Delete invoice INV-1042?</div>
+      <div class="cv-modal-body">Invoice <strong>INV-1042</strong> for Acme Corp. will be permanently removed.</div>
+      <div class="cv-modal-actions">
+        <button type="button" class="cv-btn cv-btn-ghost">Cancel</button>
+        <button type="button" class="cv-btn cv-btn-destructive"><svg class="cv-icon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M6 2h4v1h3v1H3V3h3V2zm-1 3h6l-.5 8.5a1.5 1.5 0 0 1-1.5 1.4H7a1.5 1.5 0 0 1-1.5-1.4L5 5z"/></svg>Delete</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+    <p class="back-to-top"><a href="#top">Back to top ↑</a></p>
+  </section>
+
+  <section id="typography" class="token-section">
+    <h2>Typography</h2>
+
+    <h3>Families</h3>
+<p class="type-render-note">The brand families below are loaded from Google Fonts, so these samples show the real letterforms. Open this file without a network connection and each sample falls back to your system font instead — the token value is always the contract.</p>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">heading-family</span>
+          <span class="token-value">'Barclays Effra', 'Cabin', sans-serif</span>
+          <span class="type-source">h1 font-family (--t-type-heading-font-family in :root)</span>
+          <span class="type-source">Barclays Effra is licensed and not on Google Fonts — rendering in Cabin</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-family: 'Barclays Effra', 'Cabin', sans-serif; font-weight: 500;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">body-family</span>
+          <span class="token-value">'Barclays Effra', 'Cabin', sans-serif</span>
+          <span class="type-source">--t-type-font-family in :root (body element carries no theme styling; its computed font is the UA default)</span>
+          <span class="type-source">Barclays Effra is licensed and not on Google Fonts — rendering in Cabin</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-family: 'Barclays Effra', 'Cabin', sans-serif; font-weight: 400;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+
+    <h3>Sizes</h3>
+<div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-xs</span>
+          <span class="token-value">0.75rem</span>
+          <span class="type-source">--t-type-font-size-xs in :root</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 0.75rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-sm</span>
+          <span class="token-value">0.875rem</span>
+          <span class="type-source">--t-type-font-size-sm in :root</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 0.875rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-base</span>
+          <span class="token-value">1rem</span>
+          <span class="type-source">--t-type-font-size in :root (body font-size 16px)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 1rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-lg</span>
+          <span class="token-value">1.125rem</span>
+          <span class="type-source">domain-inference (business-banking) — the extracted scale has no 1.0625–1.25rem rung</span>
+          <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+        </div>
+        <div class="type-sample" style="font-size: 1.125rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-xl</span>
+          <span class="token-value">1.25rem</span>
+          <span class="type-source">--t-type-font-size-md in :root</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 1.25rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-2xl</span>
+          <span class="token-value">1.5rem</span>
+          <span class="type-source">--t-type-font-size-lg in :root</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 1.5rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-3xl</span>
+          <span class="token-value">2rem</span>
+          <span class="type-source">--t-type-font-size-xl in :root (h2 font-size 32px)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 2rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">text-4xl</span>
+          <span class="token-value">3rem</span>
+          <span class="type-source">--t-type-font-size-2xl in :root (h1 font-size 48px)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="font-size: 3rem;">
+          The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+
+    <h3>Line heights</h3>
+<div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">line-height-tight</span>
+          <span class="token-value">1.2083</span>
+          <span class="type-source">h1 line-height 58px / font-size 48px</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="line-height: 1.2083;">
+          The quick brown fox jumps over the lazy dog 1234567890<br>The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">line-height-base</span>
+          <span class="token-value">1.5</span>
+          <span class="type-source">--t-type-line-height (1.5rem) / --t-type-font-size (1rem)</span>
+          <span class="prov prov-extracted-from-url">extracted-from-url</span>
+        </div>
+        <div class="type-sample" style="line-height: 1.5;">
+          The quick brown fox jumps over the lazy dog 1234567890<br>The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <div class="type-specimen">
+        <div class="type-meta">
+          <span class="token-name">line-height-loose</span>
+          <span class="token-value">1.75</span>
+          <span class="type-source">domain-inference (business-banking) — no line-height ratio ≥ 1.7 declared in the CSS</span>
+          <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+        </div>
+        <div class="type-sample" style="line-height: 1.75;">
+          The quick brown fox jumps over the lazy dog 1234567890<br>The quick brown fox jumps over the lazy dog 1234567890
+        </div>
+      </div>
+    <p class="back-to-top"><a href="#top">Back to top ↑</a></p>
+  </section>
+
+  <section id="effects" class="token-section">
+    <h2>Effects</h2>
+
+    <h3>Shadows</h3>
+    <div class="shadow-grid">
+<div class="shadow-card" style="box-shadow: 0 0 4px rgba(39, 39, 39, 0.08);">
+        <div class="token-name">shadow-sm</div>
+        <code class="token-value">0 0 4px rgba(39, 39, 39, 0.08)</code>
+        <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+      </div>
+      <div class="shadow-card" style="box-shadow: 0 0 10px rgba(39, 39, 39, 0.14);">
+        <div class="token-name">shadow-md</div>
+        <code class="token-value">0 0 10px rgba(39, 39, 39, 0.14)</code>
+        <span class="prov prov-inferred-from-domain">inferred-from-domain</span>
+      </div>
+      <div class="shadow-card" style="box-shadow: 0 0 20px rgba(39, 39, 39, 0.2);">
+        <div class="token-name">shadow-lg</div>
+        <code class="token-value">0 0 20px rgba(39, 39, 39, 0.2)</code>
+        <span class="prov prov-extracted-from-url">extracted-from-url</span>
+      </div>
+    </div>
+
+    <h3>Motion</h3>
+<div class="motion-row">
+      <div class="type-meta">
+        <span class="token-name">transition-fast</span>
+        <span class="token-value">120ms</span>
+        <span class="prov prov-extracted-from-url">extracted-from-url</span>
+      </div>
+      <div class="motion-track" aria-hidden="true">
+        <div class="motion-dot" style="animation-duration: 120ms; animation-timing-function: cubic-bezier(0, 0, 0.58, 1);"></div>
+      </div>
+      <div class="type-source">--t-transition-duration-fast in :root</div>
+    </div>
+    <div class="motion-row">
+      <div class="type-meta">
+        <span class="token-name">transition-base</span>
+        <span class="token-value">150ms</span>
+        <span class="prov prov-extracted-from-url">extracted-from-url</span>
+      </div>
+      <div class="motion-track" aria-hidden="true">
+        <div class="motion-dot" style="animation-duration: 150ms; animation-timing-function: cubic-bezier(0, 0, 0.58, 1);"></div>
+      </div>
+      <div class="type-source">--t-transition-duration-medium in :root (the only duration the page actually transitions on)</div>
+    </div>
+    <div class="motion-row">
+      <div class="type-meta">
+        <span class="token-name">transition-slow</span>
+        <span class="token-value">300ms</span>
+        <span class="prov prov-extracted-from-url">extracted-from-url</span>
+      </div>
+      <div class="motion-track" aria-hidden="true">
+        <div class="motion-dot" style="animation-duration: 300ms; animation-timing-function: cubic-bezier(0, 0, 0.58, 1);"></div>
+      </div>
+      <div class="type-source">--t-transition-duration-slow in :root</div>
+    </div>
+    <div class="motion-row">
+      <div class="type-meta">
+        <span class="token-name">easing-standard</span>
+        <span class="token-value">cubic-bezier(0, 0, 0.58, 1)</span>
+        <span class="prov prov-extracted-from-url">extracted-from-url</span>
+      </div>
+      <div class="motion-track" aria-hidden="true">
+        <div class="motion-dot" style="animation-duration: 2s; animation-timing-function: cubic-bezier(0, 0, 0.58, 1);"></div>
+      </div>
+      <div class="type-source">transition: transform var(--t-transition-duration-medium) ease-out — ease-out translated per shadow-motion-rules.md §F</div>
+    </div>
+    <p class="back-to-top"><a href="#top">Back to top ↑</a></p>
+  </section>
+
+  <section id="contrast" class="token-section">
+    <h2>Contrast validation</h2>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 16px 0;">WCAG AA validation for the four required text/background pairs (minimum 4.5:1 for normal body text). Auto-adjustment runs against the <code>text</code> and <code>text-muted</code> tokens until each pair passes.</p>
+    <div class="contrast-grid">
+<div class="contrast-card" style="background: #FFFFFF; color: #272727;">
+        <p class="sample">text on background: The quick brown fox jumps over the lazy dog</p>
+        <div class="contrast-meta">
+          <span class="contrast-ratio">14.9:1</span>
+          <span class="status-pass">Pass</span>
+        </div>
+      </div>
+      <div class="contrast-card" style="background: #F6F6F6; color: #272727;">
+        <p class="sample">text on surface: The quick brown fox jumps over the lazy dog</p>
+        <div class="contrast-meta">
+          <span class="contrast-ratio">13.8:1</span>
+          <span class="status-pass">Pass</span>
+        </div>
+      </div>
+      <div class="contrast-card" style="background: #FFFFFF; color: #515151;">
+        <p class="sample">text-muted on background: The quick brown fox jumps over the lazy dog</p>
+        <div class="contrast-meta">
+          <span class="contrast-ratio">7.9:1</span>
+          <span class="status-pass">Pass</span>
+        </div>
+      </div>
+      <div class="contrast-card" style="background: #F6F6F6; color: #515151;">
+        <p class="sample">text-muted on surface: The quick brown fox jumps over the lazy dog</p>
+        <div class="contrast-meta">
+          <span class="contrast-ratio">7.3:1</span>
+          <span class="status-pass">Pass</span>
+        </div>
+      </div>
+    </div>
+    <p class="contrast-adjustments"><strong>Adjustments:</strong> none</p>
+    <p class="back-to-top"><a href="#top">Back to top ↑</a></p>
+  </section>
+
+  <!--
+  ROLE: asset (static appendix). Appended verbatim to every generated design-system
+  doc by `framework/agents/design-system-styler/steps/step-06-artifact-generation.md`.
+  No `{{placeholders}}`, no domain-specific content — these rules are identical in
+  every output.
+
+  This file is the HTML rendering of `design-system-standards.md`. Keep both files
+  in sync: any edit to the rules must be applied to both `.md` and `.html` siblings.
+  The styler reads only the `.html` for verbatim appending.
+
+  Section order is contractual — do not reorder:
+    1. Component Library (Minimum-Feature Contracts) — Tables, Date fields,
+       Buttons, Inputs / form controls, Navigation elements, Feedback components.
+    2. Animation Policy.
+    3. Interaction Behaviour Standards.
+    4. Accessibility Standards.
+    5. Content & Microcopy Guidelines.
+    6. Pattern Usage Rules.
+    7. Application Notes.
+-->
+
+<hr>
+
+<section id="standards" class="standards">
+  <h2>Design System Standards</h2>
+
+  <blockquote>
+    Universal rules for productivity / data-management applications generated by this framework. Tokens above describe the brand's surface; the standards below describe how components, motion, content, and interactions behave on top of those tokens. These rules are static — identical in every generated design-system doc.
+    <br><br>
+    <strong>How to read this section.</strong> The Component Library defines <em>minimum features</em> per component, not a required roster. A prototype uses whichever components its scope demands; whatever it uses must meet the minimums here.
+  </blockquote>
+
+  <h3>1. Component Library (Minimum-Feature Contracts)</h3>
+
+  <p>The visible part everyone expects — but it's only one layer.</p>
+
+  <p>This is a <strong>baseline contract</strong>, not an inventory. A prototype may use a larger or smaller set of components depending on its scope. Whatever it uses must satisfy the minimums below. Components not listed here still inherit the universal rules in sections 2–5 (animation, interaction, accessibility, content).</p>
+
+  <p>For each component:</p>
+  <ul>
+    <li><strong>Purpose</strong> (when to use / not to use)</li>
+    <li><strong>Variants</strong> (states, sizes, types)</li>
+    <li><strong>Behaviour</strong> (interaction rules and minimum features)</li>
+    <li><strong>Accessibility requirements</strong></li>
+    <li><strong>Do's and don'ts</strong></li>
+  </ul>
+
+  <p>If you only show visuals and skip behaviour, devs will guess.</p>
+
+  <h4>Tables</h4>
+  <ul>
+    <li><strong>Purpose.</strong> Display rows of comparable records for scanning, sorting, and acting upon. The default container for data-management views. Do not use for marketing layouts, dashboards-with-tiles, or visual records where the image carries the meaning (use a card grid).</li>
+    <li><strong>Variants.</strong> Compact / comfortable density; striped / unstriped; with / without selection; with / without inline filters; with / without grouped headers.</li>
+    <li>
+      <strong>Behaviour — minimum features:</strong>
+      <ul>
+        <li>Every column is sortable. Sort state is visible on the active column header (asc / desc / none) and persists across paginations.</li>
+        <li>The footer always contains pagination controls.</li>
+        <li>Pagination controls include explicit <strong>Next</strong> and <strong>Back</strong> navigation.</li>
+        <li>Pagination displays the current page number (e.g. "Page 3 of 12").</li>
+        <li>Pagination includes a page-size selector with options <strong>5 / 10 / 20 / 50</strong>, default <strong>20</strong>.</li>
+        <li>Empty, loading, and error states are explicit — never an absent or silent table.</li>
+        <li>Long text truncates with tooltip-on-hover; row height stays uniform across the page.</li>
+        <li><strong>Rows are NOT clickable.</strong> Row-based actions appear in a dedicated action column as explicit buttons or links — never as a whole-row click target. (Whole-row click is an invisible affordance, ambiguous against text selection, hostile to keyboard users, and conflicts with checkbox / multi-select interactions.)</li>
+        <li>Numeric columns are right-aligned; text columns are left-aligned.</li>
+      </ul>
+    </li>
+    <li><strong>Accessibility.</strong> Column headers are real <code>&lt;th&gt;</code>. Sort state is announced to assistive tech (<code>aria-sort</code>). Keyboard users can move between cells, trigger sort, change page, and activate row actions without a mouse. Pagination controls are reachable and labelled.</li>
+    <li>
+      <strong>Do's and don'ts.</strong>
+      <ul>
+        <li>Do show pagination controls even when there is only one page (consistency over cleverness).</li>
+        <li>Do let users know how many records exist in total.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>Date fields</h4>
+  <ul>
+    <li><strong>Purpose.</strong> Capture a date (or date-time) value in any form.</li>
+    <li><strong>Variants.</strong> Date only / date + time / date range; inline calendar / popover calendar / dropdown selector.</li>
+    <li>
+      <strong>Behaviour — minimum features:</strong>
+      <ul>
+        <li>All date form fields are <strong>date selectors</strong> (calendar pickers). Free-text date entry on its own is not acceptable as the only input mode.</li>
+        <li>The selector accepts keyboard entry as an accelerator (typed date is parsed and reflected in the calendar), but the visible control is the picker.</li>
+        <li>Format is locale-aware; the placeholder shows the expected format ("DD/MM/YYYY" or per locale).</li>
+        <li>Min / max constraints (where applicable) disable out-of-range dates rather than silently rejecting on submit.</li>
+        <li>The picker affordance is the control's <strong>own</strong> indicator — a native <code>&lt;input type="date"&gt;</code> already draws one, so do not add a second, hand-authored calendar icon beside it.</li>
+        <li>The indicator must stay legible against the field's background in <strong>every</strong> colour mode. Set <code>color-scheme: light</code> / <code>dark</code> on the document (or on the field) to match the mode, so the browser paints its own glyph accordingly; never hardcode a colour, <code>fill</code>, or <code>invert()</code> filter on it — a literal value can only ever be correct in one mode, and the browser's black default disappears on a dark surface.</li>
+      </ul>
+    </li>
+    <li><strong>Accessibility.</strong> The picker is fully keyboard navigable (arrow keys move days, PgUp/PgDn move months). The currently focused date is announced. The associated label is visible.</li>
+    <li>
+      <strong>Do's and don'ts.</strong>
+      <ul>
+        <li>Do prefill sensible defaults (today, last selection, business-rule default).</li>
+        <li>Don't ship a free-text date input as the primary control.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>Buttons</h4>
+  <ul>
+    <li><strong>Purpose.</strong> Trigger an action.</li>
+    <li><strong>Variants.</strong> Primary / secondary / tertiary / destructive; sizes (sm / md / lg); with / without leading icon; loading state.</li>
+    <li>
+      <strong>Behaviour — minimum features:</strong>
+      <ul>
+        <li>Label is verb-led and action-specific ("Save changes", not "OK").</li>
+        <li>Disabled and loading states are visually distinct from each other and from default.</li>
+        <li>Activatable via mouse, touch, Enter, and Space.</li>
+        <li>Destructive variants are visually distinct (colour + icon, never colour alone).</li>
+      </ul>
+    </li>
+    <li><strong>Accessibility.</strong> Real <code>&lt;button&gt;</code> elements (or <code>&lt;a&gt;</code> for navigation). Visible focus ring. Disabled state communicated to assistive tech.</li>
+    <li>
+      <strong>Do's and don'ts.</strong>
+      <ul>
+        <li>Do limit primary buttons to one per surface.</li>
+        <li>Don't use a button when the action is navigation — use a link.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>Inputs / form controls</h4>
+  <ul>
+    <li><strong>Purpose.</strong> Capture user input on a form.</li>
+    <li><strong>Variants.</strong> Text / number / email / password / search / textarea / select / checkbox / radio / toggle.</li>
+    <li>
+      <strong>Behaviour — minimum features:</strong>
+      <ul>
+        <li>Every field has a <strong>visible label</strong>. Placeholders are NOT a substitute for a label — they may complement it but never replace it.</li>
+        <li>Every field has a <strong>suitable placeholder</strong> that hints at the expected format or example value (e.g. "name@company.com", "DD/MM/YYYY", "Search by ID or name…").</li>
+        <li>The <strong>active (focused) field is visually identifiable</strong> — clearly distinct from the resting state, using more than colour alone (border weight / focus ring / token-driven outline).</li>
+        <li>Required fields are indicated visibly and programmatically.</li>
+        <li>Helper text and error text have dedicated slots; error state is communicated by colour, icon, and message text (never colour alone).</li>
+        <li>Validation runs on blur for inline feedback; on submit for the form as a whole. Don't validate aggressively on every keystroke.</li>
+      </ul>
+    </li>
+    <li><strong>Accessibility.</strong> Labels are programmatically associated (<code>&lt;label for&gt;</code> or wrapping). Errors are announced via <code>aria-describedby</code> / <code>aria-invalid</code>. Inputs are reachable via Tab in a sensible order.</li>
+    <li>
+      <strong>Do's and don'ts.</strong>
+      <ul>
+        <li>Do let users paste, autofill, and use password managers freely.</li>
+        <li>Don't disable copy / paste on any field.</li>
+        <li>Don't rely on placeholder text as the only label.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>Navigation elements</h4>
+  <ul>
+    <li><strong>Purpose.</strong> Move the user between top-level sections, sub-sections, and views; show where they are.</li>
+    <li><strong>Variants.</strong> Sidebar / top nav / breadcrumbs / tabs / segmented control.</li>
+    <li>
+      <strong>Behaviour — minimum features:</strong>
+      <ul>
+        <li>The current location is clearly indicated.</li>
+        <li>Fully keyboard navigable; Tab order matches visual order.</li>
+        <li>Supports deep-linking — the URL reflects the current view so it can be shared, bookmarked, and reloaded without losing state.</li>
+        <li>Navigation never traps users in a sub-flow; there is always a way back.</li>
+      </ul>
+    </li>
+    <li><strong>Accessibility.</strong> Landmarks (<code>&lt;nav&gt;</code>) are used. Active item is communicated to assistive tech (<code>aria-current</code>).</li>
+    <li>
+      <strong>Do's and don'ts.</strong>
+      <ul>
+        <li>Do persist navigation state (collapsed sidebar, selected tab) across reloads where it improves productivity.</li>
+        <li>Don't hide primary navigation behind a hamburger menu on desktop.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>Feedback components (alerts, toasts, banners, modals)</h4>
+  <ul>
+    <li><strong>Purpose.</strong> Communicate system state, action outcomes, errors, and confirmations.</li>
+    <li><strong>Variants.</strong> Toast (ephemeral) / banner (persistent) / inline alert (in-context) / modal (blocking).</li>
+    <li>
+      <strong>Behaviour — minimum features:</strong>
+      <ul>
+        <li>Severity is communicated by <strong>colour AND icon</strong> (never colour alone).</li>
+        <li>Toasts are dismissible; only non-critical info auto-dismisses; errors and warnings persist until acknowledged.</li>
+        <li>Banners persist until the underlying state clears.</li>
+        <li>Modals trap focus while open and close on <kbd>Esc</kbd>. Background is non-interactive while a modal is open.</li>
+        <li>Only critical, blocking interactions use modals — never use a modal for non-blocking information.</li>
+        <li><strong>Elevation &amp; edge.</strong> A modal must be visually separable from the content behind it: it carries both an elevation shadow <strong>and</strong> a 1px border, so its edge stays distinguishable even when the modal surface and the page background are the same colour.</li>
+      </ul>
+    </li>
+    <li><strong>Accessibility.</strong> Live regions (<code>role="status"</code> / <code>role="alert"</code>) announce dynamic feedback. Modals expose <code>role="dialog"</code> with a labelled title. Focus returns to the triggering element on close.</li>
+    <li>
+      <strong>Do's and don'ts.</strong>
+      <ul>
+        <li>Do tell the user what happened, why, and what they can do next.</li>
+        <li>Don't stack multiple modals.</li>
+        <li>Don't use a toast for a critical error — use a banner or modal.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>2. Animation Policy</h3>
+  <ul>
+    <li><strong>Subtle by default.</strong> Animation is a usability tool, not decoration.</li>
+    <li>Add animation <strong>only when it measurably improves usability</strong> — to clarify a state change, communicate cause-and-effect, or smooth a transition that would otherwise feel jarring. If an animation has no clear usability justification, omit it.</li>
+    <li><strong>Productivity-app bias.</strong> Prefer instant feedback over animated feedback. Avoid animations that delay task completion or sit between the user and their work.</li>
+    <li>Duration tiers map to the brand's <code>transition-fast</code> / <code>transition-base</code> / <code>transition-slow</code> tokens. Default to <code>transition-fast</code> unless there is a reason to slow down.</li>
+    <li>Easing defaults to the brand's <code>easing-standard</code> token.</li>
+    <li><strong><code>prefers-reduced-motion</code>.</strong> Honour the user agent setting. Disable all non-essential motion; keep only state-feedback indicators (e.g. focus ring transitions, spinner for in-flight requests).</li>
+    <li>No parallax, decorative scroll-driven motion, or attention-grabbing entrance animations on data-management surfaces.</li>
+  </ul>
+
+  <h3>3. Interaction Behaviour Standards</h3>
+  <ul>
+    <li>Required states for every interactive element: <strong>default, hover, focus-visible, active, disabled, loading.</strong> All six must be designed and implemented.</li>
+    <li><strong>Focus visibility is non-negotiable.</strong> Never remove the focus ring without an equivalent indicator. The focused element is always identifiable without a mouse.</li>
+    <li><strong>Loading vs. disabled</strong> are visually distinct states with different meanings — disabled means "not allowed right now", loading means "working on it".</li>
+    <li><strong>Keyboard parity.</strong> Every mouse-driven action has a keyboard equivalent. Productivity apps are operated by keyboard-heavy users; Tab order is predictable, Enter activates default actions, Esc cancels / closes.</li>
+    <li><strong>Destructive actions require confirmation.</strong> Confirmations name what is being changed ("Delete invoice INV-1042?"), never a generic "Are you sure?".</li>
+    <li><strong>Optimistic UI</strong> is acceptable for low-risk actions; high-risk actions wait for server confirmation before reflecting state.</li>
+  </ul>
+
+  <h3>4. Accessibility Standards</h3>
+  <ul>
+    <li><strong>WCAG 2.1 AA is the baseline.</strong> Text contrast is already enforced upstream by token validation; the rules below cover the rest.</li>
+    <li>Visible focus indicators on every interactive element.</li>
+    <li>Minimum <strong>44 × 44 px</strong> touch targets on touch surfaces.</li>
+    <li>All form inputs have programmatically associated labels (no placeholder-as-label).</li>
+    <li>ARIA roles only when no native semantic exists. Prefer <code>&lt;button&gt;</code>, <code>&lt;a&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;table&gt;</code> over <code>&lt;div role="..."&gt;</code>.</li>
+    <li>Live regions for async feedback (toasts, validation results, async loads).</li>
+    <li>Tables: column headers are real <code>&lt;th&gt;</code>; sort state is announced (<code>aria-sort</code>).</li>
+    <li>Forms: errors are linked to their field via <code>aria-describedby</code> and the field is marked <code>aria-invalid</code> when in error state.</li>
+    <li>Content order in the DOM matches visual order — assistive tech traverses the page the same way a sighted user does.</li>
+  </ul>
+
+  <h3>5. Content &amp; Microcopy Guidelines</h3>
+  <ul>
+    <li><strong>Voice &amp; tone.</strong> Clear, calm, second-person. Productivity-app users are working, not browsing — say what the user can do, then get out of the way.</li>
+    <li><strong>Button labels.</strong> Verb-led, sentence case, action-specific. "Save changes" beats "OK". "Delete invoice" beats "Confirm".</li>
+    <li><strong>Error messages.</strong> State <em>what happened</em> and <em>what to do</em>. Never blame the user. ("We couldn't save your changes — check your connection and try again.")</li>
+    <li><strong>Capitalisation.</strong> Sentence case for UI labels, headings, button text, navigation items. Reserve title case for proper nouns.</li>
+    <li><strong>Dates.</strong> Locale-appropriate format. Use relative for recent events ("2 minutes ago", "Yesterday"); absolute for older. Show absolute on hover when relative is the primary display.</li>
+    <li><strong>Numbers.</strong> Thousands separators. Currency with explicit symbol. Right-align numeric columns in tables.</li>
+    <li><strong>Empty states.</strong> Tell the user <em>why</em> it's empty and <em>what to do next</em>. Never ship a blank table or page.</li>
+    <li><strong>Loading copy.</strong> Brief and honest ("Loading…" not "Please wait while we prepare your experience").</li>
+  </ul>
+
+  <h3>6. Pattern Usage Rules</h3>
+  <ul>
+    <li><strong>Modal vs. drawer.</strong> Modal for blocking confirmations and irreversible decisions. Drawer for context-preserving detail or secondary editing where the underlying view is still useful.</li>
+    <li><strong>Table vs. card grid.</strong> Table for comparison and scanning across many records — the default for data-management. Card grid only when the visual record itself carries information (gallery, image library, person directory).</li>
+    <li><strong>Toast vs. banner vs. inline alert.</strong> Toast for ephemeral confirmation of an action the user just took. Banner for persistent system state ("System maintenance at 9pm UTC"). Inline alert for in-context validation or warnings tied to a specific element.</li>
+    <li><strong>Filters vs. search.</strong> Filters when the dimensions are known and finite (status, owner, date range). Search when the user knows a value (name, ID, free text).</li>
+    <li>See <code>framework/assets/pattern-catalogue/</code> for canonical pattern definitions referenced above.</li>
+  </ul>
+
+  <h3>7. Application Notes</h3>
+  <ul>
+    <li>These standards are static and domain-agnostic within the productivity / data-management application class. They do not vary by brand, domain, or generated tokens.</li>
+    <li>When a specific prototype needs an exception, document it in the design-spec (<code>framework/assets/template-design-spec.md</code>), not by editing the design-system output.</li>
+    <li>Components not covered above still inherit the universal rules in sections 2–5 (animation, interaction, accessibility, content).</li>
+    <li><strong>Where a family token names two typefaces</strong> (e.g. <code>'Gotham', 'Montserrat', sans-serif</code>), the first is the brand's own typeface and the second is a Google-Fonts stand-in that this document and the prototypes actually load — the brand face is licensed and not available as a webfont here. The substitute is chosen for the closest match in weight, width and x-height, but it is not the brand face. In production, licence and self-host the first-named typeface; the stack then renders it with no code change, and the stand-in stays as the fallback.</li>
+  </ul>
+
+  <p class="back-to-top"><a href="#top">Back to top ↑</a></p>
+
+</section>
+
+
+</main>
+
+</body>
+</html>
