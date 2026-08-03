@@ -14,6 +14,7 @@
  */
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 
 import { SIGN_IN_ROUTE } from '@/lib/utils/constants';
 
@@ -31,6 +32,21 @@ import type { UserInfoRead } from '@/types/auth';
 export { SIGN_IN_ROUTE };
 
 /**
+ * Who this session belongs to, resolved ONCE per server request.
+ *
+ * Both the protected layout and the page inside it need the identity, and a layout
+ * cannot hand props to its page — so the gate is called twice while rendering one
+ * screen. `cache` makes the second call reuse the first call's answer for the
+ * duration of that one request, so a screen still costs the auth service a single
+ * `GET /v1/auth/userinfo`. It caches nothing BETWEEN requests: the next navigation
+ * resolves identity and roles fresh (brief BR3, NFR4).
+ */
+const resolveSession = cache(
+  async (sessionValue: string): Promise<UserInfoRead | null> =>
+    fetchUserInfo(sessionValue),
+);
+
+/**
  * The signed-in identity for the current request, or a redirect to the sign-in
  * screen. Never returns for an unauthenticated caller.
  */
@@ -41,7 +57,7 @@ export async function requireSession(): Promise<UserInfoRead> {
     redirect(SIGN_IN_ROUTE);
   }
 
-  const session = await fetchUserInfo(sessionValue);
+  const session = await resolveSession(sessionValue);
   if (!session) {
     redirect(SIGN_IN_ROUTE);
   }

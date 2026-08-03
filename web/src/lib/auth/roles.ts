@@ -14,8 +14,12 @@ import { PROJECT_ROLES } from '@/types/auth';
 
 import type { ProjectRole, UserInfoRead } from '@/types/auth';
 
-/** The identity fields a role check needs — the full userinfo body satisfies it. */
-type RoleBearer = Pick<UserInfoRead, 'Roles'>;
+/**
+ * The identity fields a role check needs — the full userinfo body satisfies it.
+ * Exported so anything else deciding what a session may do (the route access map)
+ * asks for the same minimum rather than declaring its own.
+ */
+export type RoleBearer = Pick<UserInfoRead, 'Roles'>;
 
 /** Whether a role name is one this project recognises. */
 export const isProjectRole = (name: string): name is ProjectRole =>

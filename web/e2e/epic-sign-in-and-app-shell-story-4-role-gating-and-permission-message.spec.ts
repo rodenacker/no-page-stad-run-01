@@ -194,8 +194,12 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
     // The denial explains itself in place — the user is not bounced elsewhere.
     await expect(page).toHaveURL(new RegExp(`${uploadPath}$`));
 
-    // The in-page permission message (Shadcn `alert` → role="alert").
-    const permissionMessage = page.getByRole('alert');
+    // The in-page permission message (Shadcn `alert` → role="alert"), scoped to the
+    // screen's own content: Next.js renders its route announcer as a second,
+    // permanently empty `role="alert"` at body level, outside `main`, so an
+    // unscoped role query matches two elements. Scoping to `main` also pins that
+    // the denial is part of the page rather than floating chrome.
+    const permissionMessage = page.getByRole('main').getByRole('alert');
     await expect(permissionMessage).toBeVisible();
     // It names the missing permission (requirements §6.5: "Upload an expense
     // file") rather than saying only that access was denied.
