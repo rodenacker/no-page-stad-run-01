@@ -41,6 +41,13 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-destructive-foreground: var(--destructive-foreground);
+  /*
+   * The dim behind a modal. A token like everything else, so the dialog primitive needs
+   * no colour keyword of its own — and so the dim can be tuned per theme, which matters:
+   * the same veil that reads as "the page behind is inactive" on white is too weak on the
+   * dark surface.
+   */
+  --color-overlay: var(--overlay);
   /* The brand's other two blues, for surfaces that are neither primary nor status. */
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-foreground: var(--brand-accent-foreground);
@@ -124,6 +131,8 @@
   --brand-accent-foreground: #ffffff;
   --brand-tertiary: #001276;
   --brand-tertiary-foreground: #ffffff;
+  /* The design system's darkest neutral, dimmed by the utility that uses it. */
+  --overlay: #171d1f;
   --border: #dde0e1;
   --input: #8b9194;
   --ring: #006de3;
@@ -175,6 +184,8 @@
   --brand-accent-foreground: #171d1f;
   --brand-tertiary: #1e35b8;
   --brand-tertiary-foreground: #e9eced;
+  /* Black, not the dark background: on a dark surface only true black reads as a dim. */
+  --overlay: #000000;
   --border: #3a464b;
   --input: #7a8a90;
   --ring: #5ca1eb;

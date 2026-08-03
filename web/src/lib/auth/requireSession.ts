@@ -16,7 +16,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 
-import { SIGN_IN_ROUTE } from '@/lib/utils/constants';
+import { SIGN_IN_ROUTE, SIGN_IN_TIMED_OUT_ROUTE } from '@/lib/utils/constants';
 
 import { fetchUserInfo } from './authApi';
 import { SESSION_COOKIE_NAME } from './sessionCookie';
@@ -59,7 +59,12 @@ export async function requireSession(): Promise<UserInfoRead> {
 
   const session = await resolveSession(sessionValue);
   if (!session) {
-    redirect(SIGN_IN_ROUTE);
+    // The browser had a session but the auth service says it is gone — it enforces its
+    // own absolute cap, this app asserts no session lifetime of its own (brief R17). So
+    // this navigation is the moment the user finds out, and they are told the same plain
+    // thing the idle warning would have told them, rather than meeting an empty form or a
+    // raw error.
+    redirect(SIGN_IN_TIMED_OUT_ROUTE);
   }
 
   return session;

@@ -12,6 +12,7 @@
  * of a remembered value (epic brief BR3, AC-6).
  */
 import { AppHeader } from '@/components/layout/AppHeader';
+import { SessionTimeoutWarning } from '@/components/session/SessionTimeoutWarning';
 import { requireSession } from '@/lib/auth/requireSession';
 
 import type { ReactNode } from 'react';
@@ -37,6 +38,12 @@ export default async function AuthenticatedLayout({
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         {children}
       </main>
+      {/*
+        Mounted once for the whole signed-in area, not per screen: the idle period is a
+        property of the session, so every protected screen shares one clock and one
+        warning. It renders nothing while the user is active (R16).
+      */}
+      <SessionTimeoutWarning />
     </div>
   );
 }

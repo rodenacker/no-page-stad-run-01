@@ -127,10 +127,18 @@ function createDeferred<T>(): Deferred<T> {
 
 /**
  * Renders the `(authenticated)` layout the way a navigation does: invoke the
- * async server component once and render what it returned.
+ * async server component once and render what it returned — inside the root
+ * layout's real toast composition, which is where this layout always sits in the
+ * running app (`src/app/layout.tsx`), and which the shell's own notifications
+ * (Story 6's session-timeout warning) rely on being there.
  */
 const renderShell = async (children: ReactNode) =>
-  render(await AuthenticatedLayout({ children }));
+  render(
+    <ToastProvider>
+      {await AuthenticatedLayout({ children })}
+      <ToastContainer />
+    </ToastProvider>,
+  );
 
 /** Sign-out rendered inside the root layout's real toast composition. */
 const renderSignOut = () =>

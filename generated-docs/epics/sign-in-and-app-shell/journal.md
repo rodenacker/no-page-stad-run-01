@@ -40,3 +40,11 @@ later.
 - Your design system's success / warning / error / information colours had no home in the component library's standard set, so named slots were added for them (plus the brand's other two blues), each with a matching text colour and a value in both versions. Screens can now show a status colour without writing a colour value into the screen itself, which is what the next epics need for request statuses.
 - The pop-up notification component that came with the starter kit still had fixed light-mode colours baked in — a white card with green/red/grey text — so it would have stayed light while the rest of the app went dark. It now uses the same named colours as everything else.
 - The theme switch sits in the header as its own button next to your name, not as an entry inside the account menu: one press changes the whole app, rather than open-menu-then-click.
+
+## Story 6 — Session timeout warning
+
+- Leave the app sitting idle and about a minute before your session would end you now get a warning offering to stay signed in; taking it keeps you working without signing in again. Ignore it, or come back after the service has already ended your session, and you land back on the sign-in screen with one plain sentence explaining that it timed out — never a technical error.
+- The idle and warning times are settings, in seconds, so a tester can shorten them instead of waiting 30 minutes. Both names, and a worked example, are written down in `web/.env.example`.
+- The app deliberately runs no maximum-session timer of its own — the auth service owns that — so all the app does is warn an idle user and explain plainly when the service says the session is gone.
+- Story 3's shell test now renders the signed-in layout inside the notifications setup the real app always has around it. Nothing it checks was changed; it just needed the same surroundings as the running app.
+- Found that the app's backend addresses are fixed when the app is built rather than when it runs. It makes two of Story 3's automated browser checks fail in the production-build mode and would stop one build being reused across environments. Written up with a recommended fix, awaiting a decision.

@@ -56,6 +56,23 @@ export const SIGNED_IN_HOME_ROUTE = '/';
 export const SIGN_IN_ROUTE = '/sign-in';
 
 /**
+ * How the sign-in screen is told WHY someone arrived there, so it can explain a session
+ * that ended on its own instead of just presenting an empty form (R16/R17).
+ *
+ * It is a query parameter rather than anything remembered client-side because it has to
+ * survive the one thing that always happens next — a navigation — and has to work
+ * equally for the two ways a session ends: the idle period running out in the browser,
+ * and the server-side gate finding the auth service has already ended it.
+ */
+export const SESSION_ENDED_PARAM = 'reason';
+
+/** The one value of that parameter this app uses: the session timed out. */
+export const SESSION_TIMED_OUT_REASON = 'session-timed-out';
+
+/** The sign-in screen, asked to explain that the session timed out. */
+export const SIGN_IN_TIMED_OUT_ROUTE = `${SIGN_IN_ROUTE}?${SESSION_ENDED_PARAM}=${SESSION_TIMED_OUT_REASON}`;
+
+/**
  * Default pagination settings
  * Customize based on your application's needs
  */

@@ -24,7 +24,11 @@
       "A signed-in person whose roles this project does not recognise sees \"Nothing has been made available to your account yet\" rather than an empty screen. Nothing in the source documents covers that case.",
       "As agreed (register-now), a permitted user who follows the upload or review entry point today reaches a not-found page, because those screens ship in later epics. Confirm that is acceptable to see during manual testing of this epic.",
       "The theme choice is remembered per browser, not per signed-in account. Two people sharing one browser profile would share one theme choice, and a choice made on one machine does not follow the person to another. Storing it against the account would need a backend field to hold it — confirm which you want.",
-      "The header theme switch only exists once you are signed in, so on the sign-in screen you get your remembered choice if you have one, otherwise your computer's setting, with no way to change it from that screen."
+      "The header theme switch only exists once you are signed in, so on the sign-in screen you get your remembered choice if you have one, otherwise your computer's setting, with no way to change it from that screen.",
+      "The 30-minute idle timeout and 60-second warning are inferred defaults, not stated requirements — confirm they suit, or name different numbers. They are now a settings change, not a code change.",
+      "Wording of the one sentence the user is given: 'Your session timed out and you have been signed out, so please sign in again to carry on.' Used both when the idle time runs out and when the service reports the session already gone.",
+      "When the idle period runs out the app also tells the auth service to end the session, without waiting for its reply before returning the user to sign-in. If the service treats a logout for an already-ended session as an error, that call may be logged as a failure server-side — harmless to the user, but worth confirming with the service owners.",
+      "A page the user has never touched is treated as having been idle since it arrived, rather than since the app finished starting up. Confirm this reads right for a page left open unattended in a background tab: the next click returns them to sign-in with the timed-out explanation."
     ],
     "manualTestResults": [],
     "designChoices": {
@@ -69,13 +73,13 @@
       "completedAt": "2026-08-03T12:13:29.760Z"
     },
     "6": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-03T12:14:35.681Z",
+      "completedAt": "2026-08-03T13:05:12.042Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-03T12:13:29.760Z"
+  "lastUpdated": "2026-08-03T13:05:12.042Z"
 }
