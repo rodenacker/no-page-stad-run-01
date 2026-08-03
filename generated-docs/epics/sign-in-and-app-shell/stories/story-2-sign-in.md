@@ -50,6 +50,19 @@ Composes the existing Shadcn input/label/button primitives.
 
 ## Implementation notes
 
+### Two error-path traps found during test generation — handle both
+
+1. **The shared API client discards the service's error message.** `web/src/lib/api/client.ts` only reads a `Messages[]` envelope in its 400/401 branches, but this project's `ErrorResponse` body is `{ Error, Message }`. Left as-is, the user sees `"HTTP 401"` where AC-5 requires the service's own wording. The auth endpoint layer must surface `Message` onto the thrown error.
+2. **`POST /v1/auth/login` documents a `401` with no response body at all** (only the `400` carries `ErrorResponse`). So a refusal may arrive with nothing to display. Provide a generic fallback message for that case — one that still does **not** reveal which field was wrong (AC-4). This path is unspecified in the API contract and therefore not covered by a test; it is on the manual checklist instead.
+
+### Contract the tests expect
+
+- `web/src/app/sign-in/page.tsx` renders a named-export client component `SignInForm` at `web/src/components/auth/SignInForm.tsx`.
+- Login goes through `post` from `@/lib/api/client` to the same-origin `/v1/auth/login` — **browser-side, not a Server Action**, so the Playwright layer can intercept it with `page.route()`.
+- The refusal message renders **verbatim, exactly once**, in a form-level `role="alert"` — not additionally toasted. Both fields are cleared. No client-side attempt counting.
+
+### General
+
 - Shadcn primitives already present in `web/src/components/ui/`: `button`, `card`, `input`, `label`. Install `form` with the pinned CLI rather than hand-rolling: `(cd web && npx shadcn add form --yes)`.
 - Add the sign-in schema to the existing `web/src/lib/validation/schemas.ts` (Zod) — don't create a parallel validation module.
 - Reuse the existing toast infrastructure (`web/src/contexts/ToastContext.tsx`, `web/src/components/toast/`, `web/src/lib/utils/toast.ts`) for error surfacing — don't build a new notification system.

@@ -11,10 +11,12 @@ Next.js 16 frontend application with TypeScript, React 19, Tailwind CSS 4 and Sh
    ```
 
 2. **Configure environment**
-   Create a `.env.local` file:
+   Copy `.env.example` to `.env.local` (`npm run setup:env` does this) and set the
+   two backend addresses for your environment:
 
    ```env
-   NEXT_PUBLIC_API_BASE_URL=http://localhost:8042
+   NEXT_PUBLIC_AUTH_API_BASE_URL=http://localhost:4424
+   NEXT_PUBLIC_TRANSACTIONS_API_BASE_URL=http://localhost:4423/transactions-api
    ```
 
 3. **Run development server**

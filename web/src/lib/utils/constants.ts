@@ -1,17 +1,41 @@
 /**
- * Application Constants Template
+ * Application Constants
  *
- * Define your application-specific constants here
- * Examples include API configuration, UI settings, and business logic constants
+ * Application-wide constants: API paths, UI settings, business rules.
  */
 
 /**
- * API base URL - Retrieved from environment variable
- * Set NEXT_PUBLIC_API_BASE_URL in your .env.local file
- * Default: http://localhost:8042 (adjust as needed)
+ * API paths — same-origin by design.
+ *
+ * This project talks to two backend services (auth-api and transactions-api),
+ * and the browser addresses neither of them directly: it calls the app's own
+ * address, and the rewrites in `next.config.ts` forward the call to the right
+ * service. So there is no base URL to prepend to a browser-side call — the path
+ * already carries the service prefix. That is why this is deliberately an empty
+ * string rather than absent: `apiClient` has one documented place to look, and a
+ * server-side caller (which cannot use a relative path) overrides it explicitly
+ * with the service address from configuration.
+ *
+ * Same-origin also means the browser attaches the `session` cookie by itself and
+ * no cross-origin CORS negotiation is involved (project.md NFR-base-6).
  */
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8042';
+export const API_BASE_PATH = '';
+
+/** Same-origin prefix for auth-api calls; rewritten to the auth service. */
+export const AUTH_API_BASE_PATH = '/v1/auth';
+
+/**
+ * Same-origin prefix for transactions-api calls; rewritten to the transactions
+ * service (whose configured base URL already ends in `/transactions-api`).
+ */
+export const TRANSACTIONS_API_BASE_PATH = '/transactions-api';
+
+/** The auth service's endpoints, as the browser addresses them. */
+export const AUTH_ENDPOINTS = {
+  login: `${AUTH_API_BASE_PATH}/login`,
+  logout: `${AUTH_API_BASE_PATH}/logout`,
+  userinfo: `${AUTH_API_BASE_PATH}/userinfo`,
+} as const;
 
 /**
  * Default pagination settings

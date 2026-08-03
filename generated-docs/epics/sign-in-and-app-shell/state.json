@@ -9,7 +9,10 @@
     "unverifiedAssumptions": [
       "Verify the role names the service actually returns for your two accounts: the app decides what you are offered by matching your account's role to exactly \"Finance Uploader\" or \"Approver\". The sign-in service's own documentation shows a different example role (\"Viewer\"), and the source material flags that naming inconsistency. If the real names differ in wording or spelling, a signed-in user could be offered nothing at all, or be offered actions that are not theirs.",
       "Verify how the sign-in service handles time and repeated failures: the app assumes that staying active keeps your session alive, warns you about a minute before it would drop you, and assumes the service itself reports a temporarily locked account after repeated wrong passwords. If the service uses a different session length, does not extend it while you work, or does not track failed attempts, you may be signed out with no warning, or never see a lockout message — the app cannot count attempts or hold a session open on its own.",
-      "Verify one real sign-in in a browser, end to end: the app is built so the browser only ever calls the app's own address, which forwards on to the two backend services — that is what sidesteps the cross-origin permission header neither service currently returns. If any call reaches a service directly, sign-in will fail in the browser with nothing on screen to explain why, even though every automated test passes."
+      "Verify one real sign-in in a browser, end to end: the app is built so the browser only ever calls the app's own address, which forwards on to the two backend services — that is what sidesteps the cross-origin permission header neither service currently returns. If any call reaches a service directly, sign-in will fail in the browser with nothing on screen to explain why, even though every automated test passes.",
+      "When the auth service is unreachable or returns a 500, a signed-in person sees an error rather than being returned to the sign-in screen. Only an expired/rejected session sends them to sign-in. Confirm that is the behaviour you want when a backend is down.",
+      "The /transactions-api/* forwarding rule is set up but nothing in this epic calls the transactions service, so the forwarded address shape is unverified against the live service. The first story that reads transaction data will prove it.",
+      "The session cookie is treated as Secure everywhere except when BFF_INSECURE_COOKIE=1 is set for local plain-HTTP development. Confirm the deployed environments are HTTPS."
     ],
     "manualTestResults": [],
     "designChoices": {
@@ -19,11 +22,11 @@
   "phase": "BUILD",
   "stories": {
     "1": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-03T10:31:11.005Z",
+      "completedAt": "2026-08-03T10:50:25.417Z"
     },
     "2": {
       "status": "pending",
@@ -62,5 +65,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-03T09:38:46.094Z"
+  "lastUpdated": "2026-08-03T10:50:25.417Z"
 }

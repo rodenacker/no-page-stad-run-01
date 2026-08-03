@@ -40,11 +40,12 @@ export type QueryParams = Record<
 export interface APIRequestConfig extends RequestInit {
   params?: QueryParams;
   /**
-   * When true, the client injects an auth header from getAuthHeader() (env-var
-   * driven, populated by api-connectivity-agent during INTAKE Step 4b). Caller-
-   * supplied headers always win — set headers explicitly to override.
+   * Overrides the default same-origin API base path with an absolute service
+   * address. Needed only by server-side callers: the Next.js server process
+   * cannot fetch a relative path, whereas browser calls are same-origin and are
+   * routed to the right backend by the `next.config.ts` rewrites.
    */
-  requiresAuth?: boolean;
+  baseUrl?: string;
   lastChangedUser?: string; // For audit trails - remove if not needed
   isBinaryResponse?: boolean; // Flag to indicate response should be treated as binary data
 }

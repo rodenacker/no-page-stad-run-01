@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { AUTH_API_STUB_URL } from './e2e/support/auth-api-stub';
+
 const isCI = !!process.env.CI;
 // The epic-end batched run sets E2E_PROD=1 to test a *production build* — every route
 // precompiled — instead of the on-demand-compiling dev server. Under parallel workers
@@ -17,6 +19,11 @@ export default defineConfig({
   retries: isCI ? 2 : 1, // one retry locally as a net for genuinely rare flakes
   workers: isCI ? 1 : undefined, // local: Playwright auto-scales workers to the machine
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // Boots/stops the mocked auth service. Specs never contact a live backend, and
+  // page.route() cannot intercept the SERVER-side session check every protected
+  // screen performs — see e2e/support/auth-api-stub.ts.
+  globalSetup: './e2e/support/global-setup.ts',
+  globalTeardown: './e2e/support/global-teardown.ts',
   use: {
     baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
@@ -40,5 +47,14 @@ export default defineConfig({
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // Points the app's auth base URL at the mocked auth service for this run only
+    // (Next never overwrites a variable already present in process.env, so
+    // .env.local's real localhost:4424 value is left alone for `npm run dev`).
+    // Both names are set because the server-side auth client may read either the
+    // public or the server-only form.
+    env: {
+      NEXT_PUBLIC_AUTH_API_BASE_URL: AUTH_API_STUB_URL,
+      AUTH_API_BASE_URL: AUTH_API_STUB_URL,
+    },
   },
 });

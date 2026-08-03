@@ -50,9 +50,22 @@ Identity and role are **re-resolved on server-rendered navigation** rather than 
 
 ## Implementation notes
 
+### Module paths the tests pin
+
+- Async **server** layout at `web/src/app/(authenticated)/layout.tsx` (default export), awaiting Story 1's `requireSession()`.
+- Client `SignOutButton` at `web/src/components/layout/SignOutButton.tsx`. Together with Story 5's `ThemeToggle`, `web/src/components/layout/` is this epic's home for shell components.
+- Sign-out goes through `post()` from `@/lib/api/client` (CLAUDE.md §2), **not a Server Action** — a Server Action can't branch client-side into the error path AC-2 requires.
+
+### Landmark trap — real accessibility failure if missed
+
+The template's root layout (`web/src/app/layout.tsx`) currently wraps children in `<main className="min-h-screen">`. A `<header>` nested **inside** `<main>` loses its `banner` landmark role in the real DOM — so an isolated component test can pass while Story 3's real-browser accessibility scan (AC-5) fails. Restructure the root layout so the shell `<header>` is a **sibling** of `<main>`, not a descendant. This is exactly the kind of change CLAUDE.md §6 authorises: replace the template's structure rather than nesting inside it.
+
+### General
+
 - `web/src/app/page.tsx` is the starter template's Welcome page and must be **REPLACED, not wrapped** (CLAUDE.md §6) — AC-3 exists precisely to force that.
 - `web/src/app/layout.tsx` already wraps children in `ToastProvider` — **extend that root layout** rather than nesting a new provider stack inside it (CLAUDE.md §6).
-- Install `dropdown-menu` with the pinned Shadcn CLI for the user/theme menu: `(cd web && npx shadcn add dropdown-menu --yes)`.
+- Install `dropdown-menu` with the pinned Shadcn CLI **if** the identity/sign-out area needs a menu: `(cd web && npx shadcn add dropdown-menu --yes)`. A plain header button for sign-out is acceptable and simpler — don't add a menu just to have one.
+- **The theme control is NOT a dropdown item.** Story 5 specifies an always-visible switch in the header (a single `<button>` whose accessible name states the theme it will switch *to*). Build that shape, not a menu entry — one shape only, no duplication between this story and Story 5.
 - Reuse the existing toast infrastructure for the failed-sign-out error.
 - Accessibility bar is **WCAG 2.2 AA** (requirements §6.6.5).
 - No colour values in components — reference tokens per [styling-centralisation.md](../../../../.claude/policies/styling-centralisation.md).

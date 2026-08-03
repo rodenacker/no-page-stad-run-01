@@ -46,6 +46,20 @@ Separately, when the auth service reports the session **already gone** — the a
 
 **Manual-test setup note:** to make the idle-timeout checks practical, shorten the idle and warning thresholds via their env vars rather than waiting 30 minutes. Document the variable names in `web/.env.example` when implementing, and point the tester there — every timeout check above uses the same shortened thresholds.
 
+## Required new module — `web/src/lib/session/config.ts`
+
+Both test layers import from here, so it must exist with exactly these exports:
+
+| Export | Meaning |
+|---|---|
+| `SESSION_IDLE_TIMEOUT_MS` | idle period before the session would end, in **milliseconds** |
+| `SESSION_WARNING_LEAD_MS` | how long before that the warning appears, in **milliseconds** |
+| `SESSION_TIMED_OUT_MESSAGE` | the one plain-English sentence shared by the idle path **and** the session-already-gone path |
+
+**Unit mismatch to resolve — the two layers named these differently.** The Playwright spec drives the app through env vars **in seconds**: `NEXT_PUBLIC_SESSION_IDLE_TIMEOUT_SECONDS` (default `1800`) and `NEXT_PUBLIC_SESSION_IDLE_WARNING_SECONDS` (default `60`). The Vitest suite imports the **millisecond** constants above. So `config.ts` must read those two **seconds** env vars and expose the **`_MS`** constants — one conversion point, both names documented in `web/.env.example`. Don't introduce a second pair of env vars.
+
+No literal `30 minutes` appears in either suite — every duration derives from these constants, so shortening the env values for manual testing cannot break the tests.
+
 ## Implementation notes
 
 - Install `alert-dialog` with the pinned Shadcn CLI for the warning: `(cd web && npx shadcn add alert-dialog --yes)`.

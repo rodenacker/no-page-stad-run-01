@@ -216,16 +216,15 @@ describe('API Client Integration Tests', () => {
     });
   });
 
-  describe('requiresAuth flag', () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it('injects an Authorization header from env vars when requiresAuth is true', async () => {
-      vi.stubEnv('NEXT_PUBLIC_API_TOKEN', 'test-token-abc');
-      vi.stubEnv('NEXT_PUBLIC_API_AUTH_HEADER', 'Authorization');
-      vi.stubEnv('NEXT_PUBLIC_API_AUTH_VALUE_PREFIX', 'Bearer');
-
+  /**
+   * This project authenticates with an HttpOnly session cookie and nothing else:
+   * the frontend holds no token or static credential (generated-docs/project.md
+   * §Authentication; epic `sign-in-and-app-shell` BR2). The template's original
+   * block here asserted an env-var-driven `Authorization` header — behaviour this
+   * project forbids — so it asserts the real contract instead.
+   */
+  describe('cookie-session contract', () => {
+    const okJson = () =>
       (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -233,78 +232,60 @@ describe('API Client Integration Tests', () => {
         json: async () => ({}),
       });
 
-      await apiClient('/v1/me', { method: 'GET', requiresAuth: true });
+    const headersOfFirstCall = (): Record<string, string> =>
+      ((global.fetch as Mock).mock.calls[0][1]?.headers ?? {}) as Record<
+        string,
+        string
+      >;
+
+    it('sends no credential of its own, so nothing browser-side can leak one', async () => {
+      okJson();
+
+      await apiClient('/v1/auth/userinfo', { method: 'GET' });
+
+      const headers = headersOfFirstCall();
+      expect(headers.Authorization).toBeUndefined();
+      expect(
+        Object.keys(headers).filter((name) =>
+          /authorization|token|api-?key|secret/i.test(name),
+        ),
+      ).toEqual([]);
+    });
+
+    it("addresses endpoints on the app's own origin, which is what forwards them to the right service", async () => {
+      okJson();
+
+      await get('/v1/auth/userinfo');
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer test-token-abc',
-          }),
-        }),
+        '/v1/auth/userinfo',
+        expect.anything(),
       );
     });
 
-    it('does not set the Authorization header when requiresAuth is false', async () => {
-      vi.stubEnv('NEXT_PUBLIC_API_TOKEN', 'test-token-abc');
+    it('addresses a service directly when the caller supplies its address, as a server-side call must', async () => {
+      okJson();
 
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: async () => ({}),
-      });
-
-      // A token IS configured — passing requiresAuth: false must still suppress
-      // the header. This pins the explicit-false path the test name claims.
-      await apiClient('/v1/public', { method: 'GET', requiresAuth: false });
-
-      const call = (global.fetch as Mock).mock.calls[0];
-      const headers = call[1]?.headers as Record<string, string>;
-      expect(headers?.Authorization).toBeUndefined();
-    });
-
-    it('does not set the Authorization header when no token is configured', async () => {
-      vi.stubEnv('NEXT_PUBLIC_API_TOKEN', '');
-
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: async () => ({}),
-      });
-
-      await apiClient('/v1/me', { method: 'GET', requiresAuth: true });
-
-      const call = (global.fetch as Mock).mock.calls[0];
-      const headers = call[1]?.headers as Record<string, string>;
-      expect(headers?.Authorization).toBeUndefined();
-    });
-
-    it('lets caller-supplied headers override the env-driven auth header', async () => {
-      vi.stubEnv('NEXT_PUBLIC_API_TOKEN', 'env-token');
-
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: async () => ({}),
-      });
-
-      await apiClient('/v1/me', {
+      await apiClient('/v1/auth/userinfo', {
         method: 'GET',
-        requiresAuth: true,
-        headers: { Authorization: 'Bearer caller-override' },
+        baseUrl: 'http://auth-service.internal:4424',
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer caller-override',
-          }),
-        }),
+        'http://auth-service.internal:4424/v1/auth/userinfo',
+        expect.anything(),
       );
+    });
+
+    it('forwards a session cookie the caller supplies, unchanged', async () => {
+      okJson();
+
+      await apiClient('/v1/auth/userinfo', {
+        method: 'GET',
+        headers: { Cookie: 'session=opaque-session-value' },
+      });
+
+      expect(headersOfFirstCall().Cookie).toBe('session=opaque-session-value');
     });
   });
 });

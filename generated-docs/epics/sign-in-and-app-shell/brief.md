@@ -48,7 +48,7 @@ No session token or credential is ever held client-side (Rule 10, `authenticatio
 | R14 | Both roles sign in the same way (identical form, identical flow); once signed in, the user's role set determines which actions and screens are offered afterwards — this epic delivers the sign-in flow and the gating mechanism; per-action gating for other epics' screens is wired into that mechanism by those epics. |
 | R15 | The signed-in app header includes a theme control: on first load the app follows the OS `prefers-color-scheme`; the control lets the signed-in user override it; an explicit override is remembered and takes precedence over the OS setting on every subsequent load, for this browser/user. |
 | R16 | An idle session (no user activity) times out after 30 minutes; a warning appears 60 seconds before idle sign-out gives the user a chance to stay signed in. |
-| R17 | A session ends absolutely 12 hours after sign-in, regardless of activity, and the user is returned to the sign-in screen. |
+| R17 | The **auth service** enforces any absolute session cap (an inferred 12 hours). The app asserts **no** session lifetime of its own and MUST NOT implement a client-side absolute timer — when the service reports the session gone, the user's next action returns them to the sign-in screen with the same plain timed-out explanation rather than a raw error. |
 | R18 | After five consecutive failed sign-in attempts on an account, sign-in states that the account is temporarily locked and states when it can be retried. |
 
 R16–R18 are sourced from requirements §6.6.1 "Session UX" and are marked `inferred` there (not literally stated by the original brief) — treat as this epic's working defaults, not a hard contract; see Notes & Caveats.
@@ -90,7 +90,7 @@ R16–R18 are sourced from requirements §6.6.1 "Session UX" and are marked `inf
 ### 4. Session ends on its own (idle or absolute timeout)
 
 1. 60 seconds before a 30-minute idle timeout would fire, a warning gives the user the chance to remain signed in (R16).
-2. If the user takes no action (or 12 hours pass regardless of activity — R17), the session ends and the sign-in screen is shown again.
+2. If the user takes no action, the session ends and the sign-in screen is shown again. Separately, whenever the **auth service** reports the session already gone — it owns any absolute cap (R17) — the user's next action returns them to sign-in with the same plain explanation. The app does not run its own absolute timer.
 
 ### 5. Reaching an excluded screen or action
 
