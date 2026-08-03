@@ -45,6 +45,32 @@ export const simplePasswordSchema = z
   .min(8, 'Password must be at least 8 characters');
 
 /**
+ * The one message a sign-in form shows for a missing credential.
+ *
+ * It names both fields whichever one is missing (epic `sign-in-and-app-shell`
+ * R4/R5) and is the wording the auth service itself uses for the same situation
+ * (`documentation/auth-api.yaml` → `ErrorResponse` example), so the screen and the
+ * service never contradict each other.
+ */
+export const REQUIRED_CREDENTIALS_MESSAGE =
+  'Username and password are required.';
+
+/**
+ * Sign-in credentials (`documentation/auth-api.yaml` → `LoginRequest`).
+ *
+ * Presence is all that is checked here: the credential store owns what a valid
+ * username or password looks like, and a frontend rule guessing at it would refuse
+ * a real account. The username may be an email address in practice, so no
+ * email-vs-username format rule either (epic brief §Notes & Caveats).
+ */
+export const signInSchema = z.object({
+  username: z.string().trim().min(1, REQUIRED_CREDENTIALS_MESSAGE),
+  password: z.string().min(1, REQUIRED_CREDENTIALS_MESSAGE),
+});
+
+export type SignInValues = z.infer<typeof signInSchema>;
+
+/**
  * User ID validation schema
  * Validates MongoDB ObjectId or UUID format
  */

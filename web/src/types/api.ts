@@ -17,6 +17,17 @@ export interface DefaultResponse {
 }
 
 /**
+ * ErrorResponse - how this project's services describe a rejected request
+ * (`documentation/auth-api.yaml` → `components.schemas.ErrorResponse`).
+ * `Error` is a machine-readable code (e.g. `INVALID_REQUEST`); `Message` is the
+ * human-readable wording, and is what the user is shown.
+ */
+export interface ErrorResponse {
+  Error: string;
+  Message: string;
+}
+
+/**
  * APIError - Standardized error object for API failures
  * Used throughout the application for consistent error handling
  */

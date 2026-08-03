@@ -15,6 +15,7 @@
  * for the service it talks to (project.md calls it the auth-api / BFF).
  */
 import { apiClient } from '@/lib/api/client';
+import { statusCodeOf } from '@/lib/api/errors';
 import { AUTH_ENDPOINTS } from '@/lib/utils/constants';
 
 import { sessionCookieHeader } from './sessionCookie';
@@ -33,15 +34,6 @@ export const authApiBaseUrl = (): string => {
     process.env.AUTH_API_BASE_URL ?? process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
   const baseUrl = configured?.trim() || DEFAULT_AUTH_API_BASE_URL;
   return baseUrl.replace(/\/+$/, '');
-};
-
-/** The HTTP status of a failed `apiClient` call, when it carries one. */
-const statusCodeOf = (error: unknown): number | undefined => {
-  if (typeof error === 'object' && error !== null && 'statusCode' in error) {
-    const { statusCode } = error as { statusCode?: unknown };
-    return typeof statusCode === 'number' ? statusCode : undefined;
-  }
-  return undefined;
 };
 
 /**

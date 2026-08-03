@@ -22,11 +22,13 @@
  * incoming session explicitly via a `Cookie` header.
  */
 
+import { CLIENT_FALLBACK_MESSAGES } from '@/lib/api/errors';
 import { API_BASE_PATH } from '@/lib/utils/constants';
 import type {
   APIError,
   APIRequestConfig,
   DefaultResponse,
+  ErrorResponse,
   HTTPStatusCode,
   QueryParams,
 } from '@/types/api';
@@ -81,7 +83,7 @@ export async function apiClient<T = unknown>(
     // Handle network errors or other unexpected errors
     if (error instanceof Error && error.name === 'TypeError') {
       throw createAPIError(
-        'Network error: Unable to connect to the API server',
+        CLIENT_FALLBACK_MESSAGES.network,
         0,
         ['Please check your internet connection and try again.'],
         url,
@@ -185,6 +187,38 @@ function buildHeaders(
 }
 
 /**
+ * The human-readable message a failed response carries, if any.
+ *
+ * Two body shapes are in play across this project's services, and BOTH have to be
+ * read: the `DefaultResponse` envelope (`Messages[]`) and the `ErrorResponse`
+ * shape (`{ Error, Message }`) that `documentation/auth-api.yaml` returns on a
+ * rejected call. Reading only the envelope is how the service's own wording gets
+ * thrown away and the user is shown a bare status line instead (epic
+ * `sign-in-and-app-shell` AC-5).
+ */
+function readableMessagesOf(body: unknown): string[] {
+  if (typeof body !== 'object' || body === null) {
+    return [];
+  }
+  const { Messages, Message } = body as Partial<DefaultResponse> &
+    Partial<ErrorResponse>;
+
+  if (Array.isArray(Messages)) {
+    const messages = Messages.filter(
+      (message): message is string =>
+        typeof message === 'string' && message.trim() !== '',
+    );
+    if (messages.length > 0) {
+      return messages;
+    }
+  }
+  if (typeof Message === 'string' && Message.trim() !== '') {
+    return [Message];
+  }
+  return [];
+}
+
+/**
  * Handles error responses from the API
  * Customize this function based on your API's error response format
  */
@@ -201,12 +235,14 @@ async function handleErrorResponse(
   try {
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      const errorData = (await response.json()) as DefaultResponse;
+      const errorData = (await response.json()) as
+        | (Partial<DefaultResponse> & Partial<ErrorResponse>)
+        | null;
 
-      if (errorData.Messages && errorData.Messages.length > 0) {
-        errorMessages = errorData.Messages;
+      errorMessages = readableMessagesOf(errorData);
+      if (errorMessages.length > 0) {
         defaultMessage = errorMessages[0];
-      } else if (errorData.MessageType) {
+      } else if (errorData?.MessageType) {
         defaultMessage = `${errorData.MessageType}: ${defaultMessage}`;
       }
     }
@@ -217,9 +253,14 @@ async function handleErrorResponse(
   // Handle specific status codes
   // Customize these messages based on your application's needs
   switch (statusCode) {
+    // A rejected sign-in arrives here, and the auth service's own reason for the
+    // refusal — a temporary lockout and when it can be retried, say — is the whole
+    // point of the response, so it is preferred over the generic line below.
     case 401:
       throw createAPIError(
-        'Unauthorized: Please log in to continue',
+        errorMessages.length > 0
+          ? errorMessages[0]
+          : CLIENT_FALLBACK_MESSAGES.unauthorized,
         statusCode,
         errorMessages.length > 0
           ? errorMessages
@@ -229,7 +270,7 @@ async function handleErrorResponse(
 
     case 403:
       throw createAPIError(
-        'Forbidden: You do not have permission to perform this action',
+        CLIENT_FALLBACK_MESSAGES.forbidden,
         statusCode,
         errorMessages.length > 0 ? errorMessages : ['Access denied.'],
         url,
@@ -237,7 +278,7 @@ async function handleErrorResponse(
 
     case 404:
       throw createAPIError(
-        'Not Found: The requested resource does not exist',
+        CLIENT_FALLBACK_MESSAGES.notFound,
         statusCode,
         errorMessages.length > 0 ? errorMessages : ['Resource not found.'],
         url,
@@ -245,7 +286,7 @@ async function handleErrorResponse(
 
     case 500:
       throw createAPIError(
-        'Internal Server Error: Something went wrong on the server',
+        CLIENT_FALLBACK_MESSAGES.serverError,
         statusCode,
         errorMessages.length > 0
           ? errorMessages

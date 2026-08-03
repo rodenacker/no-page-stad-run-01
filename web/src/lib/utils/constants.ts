@@ -38,6 +38,14 @@ export const AUTH_ENDPOINTS = {
 } as const;
 
 /**
+ * Where a signed-in user belongs: the app's main signed-in screen. Sign-in sends
+ * the user here, and it is the counterpart of `SIGN_IN_ROUTE`
+ * (`src/lib/auth/requireSession.ts`), which is where a caller without a session is
+ * sent. Kept here rather than beside it because that module is server-only.
+ */
+export const SIGNED_IN_HOME_ROUTE = '/';
+
+/**
  * Default pagination settings
  * Customize based on your application's needs
  */

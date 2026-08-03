@@ -12,7 +12,10 @@
       "Verify one real sign-in in a browser, end to end: the app is built so the browser only ever calls the app's own address, which forwards on to the two backend services — that is what sidesteps the cross-origin permission header neither service currently returns. If any call reaches a service directly, sign-in will fail in the browser with nothing on screen to explain why, even though every automated test passes.",
       "When the auth service is unreachable or returns a 500, a signed-in person sees an error rather than being returned to the sign-in screen. Only an expired/rejected session sends them to sign-in. Confirm that is the behaviour you want when a backend is down.",
       "The /transactions-api/* forwarding rule is set up but nothing in this epic calls the transactions service, so the forwarded address shape is unverified against the live service. The first story that reads transaction data will prove it.",
-      "The session cookie is treated as Secure everywhere except when BFF_INSECURE_COOKIE=1 is set for local plain-HTTP development. Confirm the deployed environments are HTTPS."
+      "The session cookie is treated as Secure everywhere except when BFF_INSECURE_COOKIE=1 is set for local plain-HTTP development. Confirm the deployed environments are HTTPS.",
+      "Wording for the two sign-in failures the API contract doesn't specify: a refusal with no explanation from the service shows 'Sign-in failed. Check your details and try again.', and an unreachable/broken auth service shows 'Sign-in is unavailable right now. Please try again in a moment.' Confirm both read the way you want them to.",
+      "The sign-in screen's copy: heading 'Sign in', helper line 'Sign in with your username and password to reach the expense screens.', required-field legend '* indicates a required field', and the button label 'Sign in'. No prototype or design source specified this screen's copy.",
+      "A successful sign-in always lands on / (the app's main signed-in screen). There is no 'return to where you were trying to go' behaviour yet — if a bookmarked deep link should be honoured after signing in, that's a change to make."
     ],
     "manualTestResults": [],
     "designChoices": {
@@ -29,11 +32,11 @@
       "completedAt": "2026-08-03T10:50:25.417Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-03T10:51:45.605Z",
+      "completedAt": "2026-08-03T11:08:48.268Z"
     },
     "3": {
       "status": "pending",
@@ -65,5 +68,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-03T10:50:25.417Z"
+  "lastUpdated": "2026-08-03T11:08:48.268Z"
 }
