@@ -4,6 +4,10 @@
  * Toast - Individual toast notification component
  * Provides feedback for operations with success, error, info, and warning variants
  * Auto-dismisses after specified duration and supports manual dismissal
+ *
+ * Every colour here comes from the theme tokens (`text-success`, `text-destructive`,
+ * `bg-card`, …) rather than a fixed palette value, so a toast follows the app into its
+ * dark version like everything else does (styling-centralisation.md rules 1-5).
  */
 
 import { useEffect } from 'react';
@@ -27,7 +31,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       case 'success':
         return (
           <svg
-            className="w-5 h-5 text-green-500"
+            className="w-5 h-5 text-success"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -42,7 +46,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       case 'error':
         return (
           <svg
-            className="w-5 h-5 text-red-500"
+            className="w-5 h-5 text-destructive"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -57,7 +61,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       case 'warning':
         return (
           <svg
-            className="w-5 h-5 text-amber-500"
+            className="w-5 h-5 text-warning"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -72,7 +76,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       case 'info':
         return (
           <svg
-            className="w-5 h-5 text-blue-500"
+            className="w-5 h-5 text-info"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -91,13 +95,13 @@ export function Toast({ toast, onDismiss }: ToastProps) {
   const getBorderColor = () => {
     switch (toast.variant) {
       case 'success':
-        return 'border-green-500';
+        return 'border-success';
       case 'error':
-        return 'border-red-500';
+        return 'border-destructive';
       case 'warning':
-        return 'border-amber-500';
+        return 'border-warning';
       case 'info':
-        return 'border-blue-500';
+        return 'border-info';
     }
   };
 
@@ -121,7 +125,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
   return (
     <div
       className={`
-        bg-white rounded-lg shadow-lg border-l-4 ${getBorderColor()} p-4
+        bg-card text-card-foreground rounded-lg shadow-lg border-l-4 ${getBorderColor()} p-4
         flex items-start gap-3 pointer-events-auto
         animate-in slide-in-from-right fade-in duration-300
         ${toast.onClick ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''}
@@ -136,9 +140,9 @@ export function Toast({ toast, onDismiss }: ToastProps) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900">{toast.title}</p>
+        <p className="text-sm font-semibold">{toast.title}</p>
         {toast.message && (
-          <p className="text-sm text-gray-600 mt-1">{toast.message}</p>
+          <p className="text-muted-foreground text-sm mt-1">{toast.message}</p>
         )}
       </div>
 
@@ -149,7 +153,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
             e.stopPropagation();
             onDismiss(toast.id);
           }}
-          className="text-gray-400 hover:text-gray-600 flex-shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 rounded"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex-shrink-0 rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
           aria-label="Dismiss notification"
         >
           <svg

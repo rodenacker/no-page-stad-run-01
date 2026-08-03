@@ -11,6 +11,7 @@
  * The identity it shows comes from the session the layout resolved for THIS
  * navigation — nothing here caches it (epic brief BR3).
  */
+import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 
 import type { UserInfoRead } from '@/types/auth';
@@ -22,8 +23,13 @@ export function AppHeader({ session }: { session: UserInfoRead }) {
         <p className="text-base font-semibold tracking-tight">
           Employee Expenses
         </p>
-        {/* Story 5's theme switch joins the user menu in this group. */}
+        {/*
+          The theme switch sits beside the user menu as a control of its own, not as
+          an item inside it: it is a one-press change to how the app looks, and
+          burying it behind the identity menu would make it a two-step action.
+        */}
         <div className="flex items-center gap-1">
+          <ThemeToggle />
           <UserMenu user={session} />
         </div>
       </div>

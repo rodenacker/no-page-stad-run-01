@@ -3,12 +3,49 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * THE token layer for this project — every colour, face and radius in the app comes
+ * from here and from nowhere else (styling-centralisation.md rules 1-5). Values are
+ * raw hex, taken from `documentation/design-system-light.html` (the `:root` block
+ * below) and `documentation/design-system-dark.html` (the `.dark` block), which are
+ * this project's styling source of truth. Change a brand colour here and the whole
+ * app follows; no component carries a colour value.
+ *
+ * Which light/dark version is live is decided by the `dark` class on <html>, put
+ * there before first paint by the inline script in `src/app/layout.tsx` and flipped
+ * at runtime by `src/components/layout/ThemeToggle.tsx`.
+ */
+
 /* Shadcn UI Theme Configuration */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /*
+   * Cabin (loaded and self-hosted by next/font in the root layout) is the whole
+   * app's face, headings and body alike. The design system records the brand face as
+   * proprietary self-hosted "Barclays Effra", which is not loadable; Cabin is its own
+   * documented substitute (project.md §Styling & Branding).
+   */
+  --font-sans: var(--font-cabin), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /*
+   * Status intents (UI-21: a status is colour plus an icon or text label). Shadcn
+   * ships no success/warning/info token, so these three are declared here — with a
+   * paired foreground each, and a value in BOTH themes — rather than leaving screens
+   * to reach for a Tailwind palette utility.
+   */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+  /* The brand's other two blues, for surfaces that are neither primary nor status. */
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-brand-tertiary: var(--brand-tertiary);
+  --color-brand-tertiary-foreground: var(--brand-tertiary-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -44,73 +81,116 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * LIGHT — documentation/design-system-light.html.
+ *
+ * Every foreground below is paired with the surface it sits on at >= 4.5:1 (WCAG 2.2
+ * AA, requirements §6.6.5). Two pairings are worth naming, because the brand colours
+ * are light ones and the obvious white-on-brand choice fails:
+ * - `--primary-foreground` is the dark text colour, not white: white on #00AEEF is
+ *   2.5:1, the brand blue with #272727 on it is 5.9:1.
+ * - `--destructive` keeps a white foreground (6.5:1) — the error red is dark enough.
+ * `--input` is deliberately darker than `--border`: an input's outline is the only
+ * thing marking the field, so it clears 3:1 against the background (WCAG 1.4.11),
+ * while a decorative divider does not have to.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: light;
+  /* 6px — the design system's card/button radius; `rounded-md` lands on its 4px. */
+  --radius: 0.375rem;
+  --background: #ffffff;
+  --foreground: #272727;
+  --card: #ffffff;
+  --card-foreground: #272727;
+  --popover: #ffffff;
+  --popover-foreground: #272727;
+  --primary: #00aeef;
+  --primary-foreground: #272727;
+  --secondary: #f6f6f6;
+  --secondary-foreground: #272727;
+  --muted: #f6f6f6;
+  --muted-foreground: #515151;
+  --accent: #f6f6f6;
+  --accent-foreground: #272727;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+  --brand-accent: #006de3;
+  --brand-accent-foreground: #ffffff;
+  --brand-tertiary: #001276;
+  --brand-tertiary-foreground: #ffffff;
+  --border: #dde0e1;
+  --input: #8b9194;
+  --ring: #006de3;
+  --chart-1: #00aeef;
+  --chart-2: #006de3;
+  --chart-3: #001276;
+  --chart-4: #15803d;
+  --chart-5: #b45309;
+  --sidebar: #f6f6f6;
+  --sidebar-foreground: #272727;
+  --sidebar-primary: #00aeef;
+  --sidebar-primary-foreground: #272727;
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: #272727;
+  --sidebar-border: #dde0e1;
+  --sidebar-ring: #006de3;
 }
 
+/*
+ * DARK — documentation/design-system-dark.html. Same token names, same pairing rule:
+ * the lifted brand and status colours all take the dark text colour as their
+ * foreground (7:1 or better), never white.
+ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --background: #171d1f;
+  --foreground: #e9eced;
+  --card: #283236;
+  --card-foreground: #e9eced;
+  --popover: #283236;
+  --popover-foreground: #e9eced;
+  --primary: #49bee9;
+  --primary-foreground: #171d1f;
+  --secondary: #283236;
+  --secondary-foreground: #e9eced;
+  --muted: #283236;
+  --muted-foreground: #a5b1b6;
+  --accent: #283236;
+  --accent-foreground: #e9eced;
+  --destructive: #e97b7b;
+  --destructive-foreground: #171d1f;
+  --success: #2cbe62;
+  --success-foreground: #171d1f;
+  --warning: #f4842f;
+  --warning-foreground: #171d1f;
+  --info: #779dee;
+  --info-foreground: #171d1f;
+  --brand-accent: #5ca1eb;
+  --brand-accent-foreground: #171d1f;
+  --brand-tertiary: #1e35b8;
+  --brand-tertiary-foreground: #e9eced;
+  --border: #3a464b;
+  --input: #7a8a90;
+  --ring: #5ca1eb;
+  --chart-1: #49bee9;
+  --chart-2: #5ca1eb;
+  --chart-3: #779dee;
+  --chart-4: #2cbe62;
+  --chart-5: #f4842f;
+  --sidebar: #283236;
+  --sidebar-foreground: #e9eced;
+  --sidebar-primary: #49bee9;
+  --sidebar-primary-foreground: #171d1f;
+  --sidebar-accent: #171d1f;
+  --sidebar-accent-foreground: #e9eced;
+  --sidebar-border: #3a464b;
+  --sidebar-ring: #5ca1eb;
 }
 
 @layer base {
