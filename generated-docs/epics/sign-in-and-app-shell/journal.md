@@ -55,3 +55,9 @@ later.
 - Story 1 set the backend addresses up as configuration on purpose, but the Next.js feature it used to route browser calls turned out to resolve those addresses at build time and freeze them into the output. Two of the sign-out browser tests were failing because of it. The routing now happens in the app's own code, which reads the address afresh on every call, so the intent story 1 had is finally what actually happens.
 - Story 1's own test was checking the old mechanism directly — the build-configuration rules — so it had to be updated. Its two checks now drive the new routing for real and confirm where each call landed, which is a stricter test than reading a setting: it can only pass if the address genuinely came from configuration at the moment of the call. It also now checks that no build-time routing rule has crept back in. Nothing was relaxed.
 - One honest caveat about the development server: the very first sign-out after starting `npm run dev` can take longer than the browser test allows, because the development server compiles the new routing code the moment it is first needed. It passes on the automatic retry, and passes first time once the server has warmed up or when run against a production build. It is a development-server characteristic, not something slow in the finished app.
+
+## Manual test
+
+Passed. The user worked through the full checklist — the 24-item "check these first" ledger plus every per-story test across both roles — and confirmed all good.
+
+Also confirmed at this point: the CORS item recorded as `NFR-base-6` is no longer a blocker. Story 7's proxy means the browser only calls the app's own address and the app reaches both services server-to-server, where cross-origin rules do not apply. The backend does not need `Access-Control-Allow-Origin` / `Access-Control-Allow-Credentials` added for sign-in to work.

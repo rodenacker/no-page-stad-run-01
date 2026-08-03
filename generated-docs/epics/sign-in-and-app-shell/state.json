@@ -32,63 +32,71 @@
       "The transactions proxy forwards to <TRANSACTIONS_API_BASE_URL>/<path> — the /transactions-api mount prefix is dropped, because project.md records the configured base URL as already ending in /transactions-api. No transactions call is exercised in a browser yet, so the first transactions screen in a later epic is the first real confirmation that the assembled address is right.",
       "The transactions proxy accepts GET/POST/PUT/DELETE and no PATCH, taken from documentation/transactions-api.yaml. If the service in fact accepts a verb the spec omits, that verb will be refused at the app rather than forwarded."
     ],
-    "manualTestResults": [],
+    "manualTestResults": [
+      {
+        "story": "all",
+        "test": "Full epic manual checklist incl. the 24-item unverified-assumptions ledger",
+        "passed": true,
+        "comment": "User confirmed all good in chat at the manual-test approval.",
+        "recordedAt": "2026-08-03T14:46:35.848Z"
+      }
+    ],
     "designChoices": {
       "roleDenialRegistration": "register-now"
     }
   },
-  "phase": "EPIC-END",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "not-applicable",
       "startedAt": "2026-08-03T10:31:11.005Z",
       "completedAt": "2026-08-03T10:50:25.417Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-03T10:51:45.605Z",
       "completedAt": "2026-08-03T11:08:48.268Z"
     },
     "3": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-03T11:09:58.219Z",
       "completedAt": "2026-08-03T11:30:52.872Z"
     },
     "4": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-03T11:32:03.777Z",
       "completedAt": "2026-08-03T11:47:15.394Z"
     },
     "5": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-03T11:50:28.748Z",
       "completedAt": "2026-08-03T12:13:29.760Z"
     },
     "6": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-03T12:14:35.681Z",
       "completedAt": "2026-08-03T13:05:12.042Z"
     },
     "7": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "not-applicable",
       "startedAt": "2026-08-03T13:10:45.272Z",
       "completedAt": "2026-08-03T14:12:42.488Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-03T14:14:09.137Z"
+  "lastUpdated": "2026-08-03T14:46:35.848Z"
 }
