@@ -9,14 +9,17 @@
 | --- | --- | --- |
 | `apiClient`, `get`, `post`, `put`, `del` | `web/src/lib/api/client.ts` | The only HTTP surface. Same-origin paths by default; `baseUrl` in the request config addresses a service directly for server-side calls; sends no credential (cookie-session only). Reads a failed response's own wording from either body shape (`Messages[]` or `{ Error, Message }`). |
 | `isAPIError`, `statusCodeOf`, `serviceMessageOf`, `CLIENT_FALLBACK_MESSAGES` | `web/src/lib/api/errors.ts` | Reading a failed API call: its status, and the message the service actually sent — `undefined` when all that came back was a client-side placeholder, which no user should be shown. |
-| `API_BASE_PATH`, `AUTH_API_BASE_PATH`, `TRANSACTIONS_API_BASE_PATH`, `AUTH_ENDPOINTS`, `SIGNED_IN_HOME_ROUTE` | `web/src/lib/utils/constants.ts` | Same-origin API paths for both backends, the auth service's login/logout/userinfo paths, and the route a signed-in user lands on. |
+| `API_BASE_PATH`, `AUTH_API_BASE_PATH`, `TRANSACTIONS_API_BASE_PATH`, `AUTH_ENDPOINTS`, `SIGNED_IN_HOME_ROUTE`, `SIGN_IN_ROUTE` | `web/src/lib/utils/constants.ts` | Same-origin API paths for both backends, the auth service's login/logout/userinfo paths, and the two session routes (signed-in landing, sign-in screen) — usable from browser code, unlike the server-only gate. |
 | `UserInfoRead`, `RoleRead`, `ROLE_FINANCE_UPLOADER`, `ROLE_APPROVER`, `PROJECT_ROLES`, `ProjectRole` | `web/src/types/auth.ts` | The identity/role contract and the two project role names — single source of truth, re-exported by the `src/mocks/data/` factories. |
-| `requireSession`, `SIGN_IN_ROUTE` | `web/src/lib/auth/requireSession.ts` | Server-side gate for protected layouts: resolves the current identity or redirects to the sign-in screen. |
+| `requireSession`, `SIGN_IN_ROUTE` (re-export) | `web/src/lib/auth/requireSession.ts` | Server-side gate for protected layouts: resolves the current identity or redirects to the sign-in screen. |
 | `authApiBaseUrl`, `fetchUserInfo` | `web/src/lib/auth/authApi.ts` | Server-side auth-service access: configured base URL, and identity lookup that forwards the session cookie (`null` on 401/403, throws on real failures). |
 | `SESSION_COOKIE_NAME`, `sessionCookieOptions`, `clearedSessionCookieOptions`, `sessionCookieHeader` | `web/src/lib/auth/sessionCookie.ts` | The session cookie's name and attributes; set and cleared forms derive from one place so they always match. |
 | `isProjectRole`, `rolesOf`, `hasRole` | `web/src/lib/auth/roles.ts` | Role checks against the current userinfo response; unrecognised role names grant nothing. |
 | `signIn`, `signInFailureMessage`, `SIGN_IN_REFUSED_MESSAGE`, `SIGN_IN_UNAVAILABLE_MESSAGE` | `web/src/lib/auth/signInApi.ts` | Browser-side sign-in (so the auth service's `Set-Cookie` reaches the browser), plus what to tell the user when it fails: the service's reason as given, else a refusal or unavailable message. |
+| `signOut`, `signOutFailureMessage`, `SIGN_OUT_FAILED_TITLE`, `SIGN_OUT_UNAVAILABLE_MESSAGE` | `web/src/lib/auth/signOutApi.ts` | Browser-side sign-out: resolves only once the auth service confirms the session ended (rejects otherwise), plus what to tell the user when it fails. |
+| `displayNameOf`, `roleLabelOf` | `web/src/lib/auth/identity.ts` | How a person reads on screen: their name from the identity parts, and a role label listing only roles this project recognises. |
 | `signInSchema`, `SignInValues`, `REQUIRED_CREDENTIALS_MESSAGE` | `web/src/lib/validation/schemas.ts` | Sign-in credential presence rules and the single required-field wording; sits alongside the project's other Zod schemas. |
+| `AppHeader`, `UserMenu`, `SignOutButton` | `web/src/components/layout/` | The signed-in shell's `banner` header: the current session's name and role, and the user menu holding sign-out. Shell components (theme switch, future header controls) belong in this folder. |
 
 ## Conventions
 
@@ -26,8 +29,12 @@
 - Test/mock factories in `web/src/mocks/data/` re-export the production types and role constants rather than declaring their own, so mocks cannot drift from the app's contract.
 - Forms compose the Shadcn `form` primitive with react-hook-form and a Zod schema from `lib/validation/schemas.ts`. Required-field checks report on blur (`mode` and `reValidateMode` both `'onBlur'`, `noValidate` on the `<form>`), server-checked rules on submit; nothing reports on a keystroke. Required fields carry an `aria-hidden` asterisk in the label plus one legend line per form.
 - A failed request's message is shown to the user only when it came from the service (`serviceMessageOf`); otherwise the screen supplies its own plain wording.
+- Every screen needing a session is a page under `web/src/app/(authenticated)/`. That group's layout is the only gate (`force-dynamic`, `await requireSession()`) and renders the shared header; a new protected screen adds a page there and re-gates nothing.
+- The root layout renders no `<main>`. Each screen supplies its own, so the app header stays a sibling of `main` and keeps its `banner` landmark.
+- Header/user menus are non-modal (`modal={false}`): a modal Radix menu marks the rest of the page `aria-hidden` while it stays focusable, which fails the accessibility scan.
 
 ## Cross-epic debt
 
 - CORS on both backends is an open backend requirement (project.md NFR-base-6). The same-origin rewrites make it a non-issue for browser calls; any future direct browser-to-service call would reintroduce it.
+- The template's toast components (`web/src/components/toast/`) still paint with Tailwind palette literals (`bg-white`, `text-green-500`, `text-gray-900`) rather than tokens, so they will not follow the dark theme until they reference tokens (styling-centralisation.md rules 1–5).
 - The brand colours are light (primary `#00AEEF`, accent `#006DE3`). Whichever epic populates the tokens must pair filled `bg-primary` / `bg-destructive` surfaces with a foreground that clears 4.5:1, or every screen's accessibility check fails on contrast.

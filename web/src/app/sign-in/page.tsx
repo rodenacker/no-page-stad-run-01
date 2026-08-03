@@ -19,10 +19,13 @@ export const metadata: Metadata = {
  * The only screen reachable without a session. It stays a server component — the
  * interactive part is the `SignInForm` client component — so nothing but the form
  * itself is shipped to the browser.
+ *
+ * It supplies its own `<main>` landmark: the root layout provides none, so that the
+ * signed-in shell's header can be a sibling of `main` rather than sit inside it.
  */
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>
@@ -37,6 +40,6 @@ export default function SignInPage() {
           <SignInForm />
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

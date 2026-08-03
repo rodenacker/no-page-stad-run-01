@@ -39,11 +39,21 @@ export const AUTH_ENDPOINTS = {
 
 /**
  * Where a signed-in user belongs: the app's main signed-in screen. Sign-in sends
- * the user here, and it is the counterpart of `SIGN_IN_ROUTE`
- * (`src/lib/auth/requireSession.ts`), which is where a caller without a session is
- * sent. Kept here rather than beside it because that module is server-only.
+ * the user here, and it is the counterpart of `SIGN_IN_ROUTE` below, which is
+ * where a caller without a session is sent.
  */
 export const SIGNED_IN_HOME_ROUTE = '/';
+
+/**
+ * The one screen reachable without a session, and where every signed-out caller
+ * ends up: the server-side gate redirects there (`src/lib/auth/requireSession.ts`,
+ * which re-exports this value) and sign-out sends the browser there.
+ *
+ * It lives here rather than beside the gate because the gate is server-only —
+ * importing it into a client component would pull `next/headers` into the browser
+ * bundle.
+ */
+export const SIGN_IN_ROUTE = '/sign-in';
 
 /**
  * Default pagination settings

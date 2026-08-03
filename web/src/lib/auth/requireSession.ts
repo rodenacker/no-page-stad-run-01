@@ -15,13 +15,20 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+import { SIGN_IN_ROUTE } from '@/lib/utils/constants';
+
 import { fetchUserInfo } from './authApi';
 import { SESSION_COOKIE_NAME } from './sessionCookie';
 
 import type { UserInfoRead } from '@/types/auth';
 
-/** Where a caller without a valid session is sent. */
-export const SIGN_IN_ROUTE = '/sign-in';
+/**
+ * Where a caller without a valid session is sent. Declared in
+ * `lib/utils/constants.ts` so browser-side code (sign-out) can use the same value
+ * without importing this server-only module, and re-exported here because this is
+ * where the redirect happens.
+ */
+export { SIGN_IN_ROUTE };
 
 /**
  * The signed-in identity for the current request, or a redirect to the sign-in
