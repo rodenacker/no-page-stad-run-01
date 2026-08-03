@@ -6,11 +6,61 @@
     "createdAt": "2026-08-03T09:38:46.094Z",
     "dependsOn": [],
     "introducesSharedSurface": false,
-    "unverifiedAssumptions": [],
-    "manualTestResults": []
+    "unverifiedAssumptions": [
+      "Verify the role names the service actually returns for your two accounts: the app decides what you are offered by matching your account's role to exactly \"Finance Uploader\" or \"Approver\". The sign-in service's own documentation shows a different example role (\"Viewer\"), and the source material flags that naming inconsistency. If the real names differ in wording or spelling, a signed-in user could be offered nothing at all, or be offered actions that are not theirs.",
+      "Verify how the sign-in service handles time and repeated failures: the app assumes that staying active keeps your session alive, warns you about a minute before it would drop you, and assumes the service itself reports a temporarily locked account after repeated wrong passwords. If the service uses a different session length, does not extend it while you work, or does not track failed attempts, you may be signed out with no warning, or never see a lockout message — the app cannot count attempts or hold a session open on its own.",
+      "Verify one real sign-in in a browser, end to end: the app is built so the browser only ever calls the app's own address, which forwards on to the two backend services — that is what sidesteps the cross-origin permission header neither service currently returns. If any call reaches a service directly, sign-in will fail in the browser with nothing on screen to explain why, even though every automated test passes."
+    ],
+    "manualTestResults": [],
+    "designChoices": {
+      "roleDenialRegistration": "register-now"
+    }
   },
-  "phase": "PLAN",
-  "stories": {},
+  "phase": "BUILD",
+  "stories": {
+    "1": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "4": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "5": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "6": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
   "halt": null,
   "lastUpdated": "2026-08-03T09:38:46.094Z"
 }
