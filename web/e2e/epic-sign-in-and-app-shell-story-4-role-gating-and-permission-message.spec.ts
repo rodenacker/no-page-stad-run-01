@@ -41,17 +41,23 @@
  *   - The excluded address is registered in this story's single route access map
  *     (`designChoices.roleDenialRegistration: "register-now"`), so reaching it
  *     renders the in-page denial instead of falling through to not-found. This
- *     spec does not hardcode that path: it reads it from the upload entry point a
- *     permitted user is offered, so it follows whatever path the access map seeds
- *     and cannot drift from it. That entry point must therefore be a real
- *     navigational link with an `href` (the same contract this story's Vitest file
- *     asserts), not a click handler on a button.
+ *     spec does not hardcode that path: it reads it from the review-and-decide
+ *     entry point a permitted user is offered, so it follows whatever path the
+ *     access map seeds and cannot drift from it. That entry point must therefore be
+ *     a real navigational link with an `href` (the same contract this story's Vitest
+ *     file asserts), not a click handler on a button.
+ *   - WHICH PAIR OF ROLES. The denial is walked on the review-and-decide address,
+ *     which the access map grants to the Approver and withholds from the Finance
+ *     Uploader. It used to be walked the other way round, on the upload address, but
+ *     the `expense-file-upload` epic widened that one to BOTH roles (its R9 — both
+ *     roles read the expense files), so it can no longer deny anybody. The criterion
+ *     is unchanged: an address the session's roles exclude explains itself in place.
  *   - The permission message renders as the Shadcn `alert` primitive
  *     (`role="alert"`, per the story's implementation notes), inside story 3's
  *     normal shell (`<header>` → `role="banner"`), naming the missing permission —
- *     requirements §6.5 labels it "Upload an expense file" — and how to ask for
- *     access ("Request the missing access from the account holder", requirements
- *     §6.4 recovery).
+ *     requirements §6.5 labels it "Review and decide on a transaction" — and how to
+ *     ask for access ("Request the missing access from the account holder",
+ *     requirements §6.4 recovery).
  * - Cookie assumptions: the mock `session` cookie carries production-like
  *   attributes (HttpOnly, SameSite=Strict). `Secure` is omitted because the E2E
  *   server is plain http on localhost; the real cookie's full attribute set is
@@ -153,46 +159,48 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
   });
 
   // AC-3
-  test('an Approver opening the upload address gets the permission message in the app shell, not a not-found page', async ({
+  test('a Finance Uploader opening the review-and-decide address gets the permission message in the app shell, not a not-found page', async ({
     page,
     context,
   }) => {
     // Signed in as a role the access map permits. Cookie token and userinfo body
     // name the SAME role, so the server-side gate and any browser-side identity
     // read cannot disagree about who is signed in.
-    await seedMockSession(page, context, ROLE_FINANCE_UPLOADER);
-    await mockUserInfoFor(page, ROLE_FINANCE_UPLOADER);
+    await seedMockSession(page, context, ROLE_APPROVER);
+    await mockUserInfoFor(page, ROLE_APPROVER);
 
-    // The address the app itself offers for uploading, read from the landing
-    // screen of a role the access map permits — so this spec targets whatever
+    // The address the app itself offers for reviewing and deciding, read from the
+    // landing screen of a role the access map permits — so this spec targets whatever
     // path the map seeds instead of duplicating a guess at it. `.first()` because
     // the shell may also offer the same destination in its navigation.
     await page.goto(LANDING_PATH);
-    const uploadEntryPoint = page
-      .getByRole('link', { name: /upload/i })
+    const reviewEntryPoint = page
+      .getByRole('link', { name: /review/i })
       .first();
-    await expect(uploadEntryPoint).toBeVisible();
-    const uploadPath = await uploadEntryPoint.getAttribute('href');
-    if (!uploadPath) {
+    await expect(reviewEntryPoint).toBeVisible();
+    const reviewPath = await reviewEntryPoint.getAttribute('href');
+    if (!reviewPath) {
       throw new Error(
-        'The upload entry point must be a navigational link with an href — the ' +
-          "access map path is read from it (see this spec's Mocking strategy).",
+        'The review-and-decide entry point must be a navigational link with an ' +
+          "href — the access map path is read from it (see this spec's Mocking " +
+          'strategy).',
       );
     }
 
-    // Now go straight to that same address as an Approver, whom the access map
+    // Now go straight to that same address as a Finance Uploader, whom the access map
     // excludes from it — as if the address had been typed in or bookmarked. Both
     // layers switch role together: re-seeding overwrites the cookie with the token
-    // the auth stub resolves to the Approver, and the browser-side userinfo follows.
-    await seedMockSession(page, context, ROLE_APPROVER);
-    await mockUserInfoFor(page, ROLE_APPROVER);
-    const approver = userInfoFor(ROLE_APPROVER);
-    const response = await page.goto(uploadPath);
+    // the auth stub resolves to the Finance Uploader, and the browser-side userinfo
+    // follows.
+    await seedMockSession(page, context, ROLE_FINANCE_UPLOADER);
+    await mockUserInfoFor(page, ROLE_FINANCE_UPLOADER);
+    const deniedUser = userInfoFor(ROLE_FINANCE_UPLOADER);
+    const response = await page.goto(reviewPath);
 
     // A rendered screen, not a not-found (404) or a generic error (5xx) response.
     expect(response?.status()).toBe(200);
     // The denial explains itself in place — the user is not bounced elsewhere.
-    await expect(page).toHaveURL(new RegExp(`${uploadPath}$`));
+    await expect(page).toHaveURL(new RegExp(`${reviewPath}$`));
 
     // The in-page permission message (Shadcn `alert` → role="alert"), scoped to the
     // screen's own content: Next.js renders its route announcer as a second,
@@ -201,9 +209,9 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
     // the denial is part of the page rather than floating chrome.
     const permissionMessage = page.getByRole('main').getByRole('alert');
     await expect(permissionMessage).toBeVisible();
-    // It names the missing permission (requirements §6.5: "Upload an expense
-    // file") rather than saying only that access was denied.
-    await expect(permissionMessage).toContainText(/upload/i);
+    // It names the missing permission (requirements §6.5: "Review and decide on a
+    // transaction") rather than saying only that access was denied.
+    await expect(permissionMessage).toContainText(/review and decide/i);
     // ...and states how to get that access (requirements §6.4 recovery:
     // "Request the missing access from the account holder").
     await expect(permissionMessage).toContainText(
@@ -214,7 +222,7 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
     // shows who the user is signed in as (brief R3) — not a bare error screen.
     const appHeader = page.getByRole('banner');
     await expect(appHeader).toBeVisible();
-    await expect(appHeader).toContainText(new RegExp(approver.LastName, 'i'));
+    await expect(appHeader).toContainText(new RegExp(deniedUser.LastName, 'i'));
 
     // And explicitly not Next.js's not-found page.
     await expect(page.getByText(/this page could not be found/i)).toBeHidden();

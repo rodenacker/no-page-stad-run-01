@@ -53,6 +53,16 @@ Every displayed value is passed straight through from the service (BR5) — an u
 - Mock/test factories belong in `web/src/mocks/data/` and re-export the production types (add a `fileLog` factory beside the existing identity/role/user ones) so mocks cannot drift from the app's contract.
 - Playwright alert queries must be scoped to a region (e.g. `getByRole('main').getByRole('alert')`) — Next.js renders a permanently empty body-level `role="alert"` route announcer.
 
+## Reconciled test contracts (pinned by the generated tests — build to these)
+
+All three stories modify the same page, and their tests were generated together; these are the shared contracts both test layers already assume.
+
+- **The list is a client component** at `web/src/components/files/SubmittedFilesList.tsx` — named export, no required props, loads its own data. All three stories' Vitest files agree on this path.
+- **The read must happen in the browser**, not in a server component or Server Action: `get` from `@/lib/api/client` against `${TRANSACTIONS_API_BASE_PATH}/v1/file-logs` with `IsActive: 'Yes'`. Playwright's `page.route()` cannot intercept a server-side fetch, so moving this read server-side silently bypasses the E2E mocks.
+- **State surfaces:** loading is `role="status"`; empty is the wording *"No files have been submitted yet."*; failure is `role="alert"` carrying the service's own message plus a **Try again** control that re-requests.
+- **`ProcessDate` renders verbatim** as returned by the service (consistent with the project's "displayed, not policed" stance). If a formatted date is wanted, that is a spec change and the tests need updating with it.
+- **The landing-screen entry point stays a real `<a href="/upload">`** — the E2E spec locates it by destination, not label, precisely because this story rewords that copy for the Approver.
+
 ## Notes
 
 - AC-6 is the one deep-link guard this epic carries: epic 1 introduced the protected surface and owns the sign-out / back-button trio, but its specs cannot cover a route that did not exist then.

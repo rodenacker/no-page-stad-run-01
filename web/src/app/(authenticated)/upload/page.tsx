@@ -1,23 +1,29 @@
 /**
- * The upload address, registered now so that reaching it is answered by THIS app
- * rather than by a generic not-found page.
+ * The expense files screen: every submitted file, and how each one is getting on.
  *
- * The permission check runs on the server before anything is rendered: an Approver
- * who types this address in gets a rendered screen (HTTP 200) explaining which
- * permission is missing, inside the normal signed-in shell — the denial can never
- * fall through to a browser error page (brief R11, R13).
+ * The permission check runs on the server before anything is rendered. Both roles may
+ * open this screen — the Finance Uploader sends files, the Approver watches them
+ * (brief R9) — and any other signed-in account gets a rendered screen (HTTP 200)
+ * explaining which permission is missing, inside the normal signed-in shell, rather
+ * than a browser error page (epic `sign-in-and-app-shell` R11, R13). Who may open the
+ * address is decided in `lib/auth/access-map.ts` and nowhere else; this page adds no
+ * second gate.
  *
- * The upload screen itself belongs to the file-upload epic. Until it ships, a
- * PERMITTED Finance Uploader following the entry point reaches not-found — the
- * accepted, temporary consequence of registering the address early (story 4 §
- * "Known interim state"). That epic replaces the `notFound()` below with the real
- * screen and leaves the check above exactly as it is.
+ * The list itself is a client component because it reads the files from the browser,
+ * at the app's own address, and owns its loading / empty / failed states.
  */
-import { notFound } from 'next/navigation';
-
 import { PermissionDeniedMessage } from '@/components/auth/PermissionDeniedMessage';
+import { SubmittedFilesList } from '@/components/files/SubmittedFilesList';
 import { UPLOAD_PATH, canAccess } from '@/lib/auth/access-map';
 import { requireSession } from '@/lib/auth/requireSession';
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Expense files',
+  description:
+    'Submit a CSV file of employee expense payment requests and follow every submitted file through validation and import.',
+};
 
 export default async function UploadPage() {
   const session = await requireSession();
@@ -26,5 +32,10 @@ export default async function UploadPage() {
     return <PermissionDeniedMessage deniedPath={UPLOAD_PATH} />;
   }
 
-  notFound();
+  return (
+    <div className="grid gap-8">
+      <h1 className="text-2xl font-semibold tracking-tight">Expense files</h1>
+      <SubmittedFilesList />
+    </div>
+  );
 }

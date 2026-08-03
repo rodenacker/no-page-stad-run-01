@@ -51,6 +51,17 @@ The existing `/transactions-api/[...path]` proxy already exports POST and buffer
 - Failed-request wording: show the service's own message via `serviceMessageOf` from `web/src/lib/api/errors.ts`.
 - Add a `fileSetting` factory to `web/src/mocks/data/` re-exporting the production type, so both test layers share one contract.
 
+## Reconciled test contracts (pinned by the generated tests — build to these)
+
+- **The setting picker is the Shadcn `select`** (Radix): a trigger exposed as `combobox` that opens a listbox of `option`s, arrow-keys to move between them, Enter to choose. Install it with the pinned Shadcn CLI. A native `<select>` is **not** acceptable here — its option list is drawn by the OS, so the keyboard journey AC-6 asserts (focus an `option`, then Enter) is unreachable to a real browser driver. This was reconciled at test-generation time after the two layers initially disagreed; the Vitest layer adds the small jsdom polyfills Radix needs (`hasPointerCapture`, `releasePointerCapture`, `scrollIntoView`) to the project's Vitest setup file rather than avoiding the component.
+- **`web/vitest.setup.ts` carries load-bearing test infrastructure for this story** — a small guarded block shimming `hasPointerCapture`, `releasePointerCapture` and `scrollIntoView`, which Radix needs under jsdom. Each shim reports jsdom's true state and swallows no errors (the click must still land, the listbox must still open, the option must still be selectable). Reverting it makes every picker interaction in this story's tests die at the first click. It is a one-time addition the later request-list epic reuses for any `select` / `dropdown-menu` / `popover`.
+- **The picker trigger must carry the `id` its `FormLabel`'s `htmlFor` points at**, so the label reaches it.
+- **The file chooser is a real `<input type="file">` that stays in the tab order.** Visually hiding it (`sr-only`) is fine; `display: none`, `hidden` or `tabindex="-1"` is exactly the keyboard-completability failure AC-6 exists to catch.
+- **The submission confirmation renders in-page** as `role="alert"` inside the screen's own `main`, and **must still be on screen after the list has been re-read** — a transient toast alone does not satisfy AC-4.
+- **The refusal reason for a failed upload comes from `APIError.details`, not `serviceMessageOf`.** The spec documents only 200/401/500 for `POST /v1/files/upload`, and `apiClient`'s 500 branch puts its own placeholder on `APIError.message` with the service's `Messages[]` on `APIError.details` — so `serviceMessageOf()` returns `undefined` for a refused upload. Read the reason out of `details`, the same gap epic 1 closed for sign-in in `lib/auth/signInApi.ts`. AC-5 pins this: the alert must carry the service's wording, never `Internal Server Error: …`.
+- **`GET /v1/file-settings` accepts no parameters**, so there is no server-side `IsActive` filter — narrowing the picker to active settings is necessarily the screen's own job.
+- **The new row after submitting comes from re-reading the list.** The upload response is a generic envelope carrying no file identifier, so the screen finds the submitted file by re-reading the active file list; the E2E mock is wired as a connected pair (the POST flips state, the list read then serves the new row built from the query params the request carried).
+
 ## Notes
 
 - The CSV check is on the **file name** (`ExpenseFile.CurrentFileName`, R5) — it must run before any request is issued (BR3), so a refused file never reaches the backend.

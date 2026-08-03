@@ -49,6 +49,13 @@ A file that resolves to `Validation failed` shows that status and produces **no*
 - Browser state that exists before React runs is read with `useSyncExternalStore`, never copied into state in an effect (the `react-hooks` lint rule rejects it).
 - The polling loop must clear itself on unmount and must not stack intervals across re-renders.
 
+## Reconciled test contracts (pinned by the generated tests — build to these)
+
+- **The refresh interval must be 60 seconds or less.** Neither the brief nor this story sets a cadence, so the exact value is the developer's choice — but the Playwright spec advances the browser clock in 60-second jumps and buys one refresh per jump, so an interval longer than 60s reads to that spec as "it never refreshed". The Vitest tests deliberately assert only that the row catches up within a fake-clock window, so any sensible cadence satisfies them.
+- **The refresh is a re-read of the same list call** (`GET /transactions-api/v1/file-logs?IsActive=Yes`), not a new endpoint and not one call per file. The Vitest layer throws loudly on any other endpoint, and the E2E layer asserts every observed read carries `IsActive=Yes`.
+- **The notification is not role-gated inside the list component.** Story 1's component carries no session/role prop, and this story's Approver "sees the same live rows". The tests assert the notification fires on the transition into `Imported`; if role gating is ever wanted it must be an optional prop that still notifies by default.
+- **The polling loop must clear itself on unmount and must not stack intervals across re-renders** — the E2E spec counts requests over a bounded window after everything settles.
+
 ## Notes
 
 - AC-6 is where this epic's real-browser accessibility scan runs — on the finished screen, list plus submit form together, since all three stories modify the same page.
