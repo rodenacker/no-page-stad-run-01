@@ -28,6 +28,16 @@ Decisions and changes worth remembering from this epic, in build order.
 - One shared read serves all four triggers (first load, Try again, the submission announcement, and the timer), so there is a single list call and no second refresh mechanism. The interval is keyed on the one fact "something is in progress", so it cannot stack across re-renders and clears itself on unmount.
 - Cadence is 15 seconds — inside the ≤60s ceiling the E2E spec needs, short enough that a finished import is news, and it only runs while something is actually working. It is the single number to change if finance wants faster movement or less traffic.
 
+## Story 4 — Get between screens from anywhere (added mid-epic)
+
+Added after the user reported at the manual test that the app had no menu. Not a missed requirement — the source requirements exclude UI layout and never named one — but a real gap, since this epic is what made a second screen worth navigating to. See the brief's Notes & Caveats for the full reasoning and the two decisions the user made.
+
+- The header now carries the menu. Every screen a person's roles allow is offered as a link in it, taken straight from the same list the landing screen's cards are built from — so a later epic that registers its screen appears in the menu without anyone having to remember to add it. The app's name is now the way back to the landing screen, and the screen you are on is shown with a highlight, a heavier label and an underline (never colour on its own).
+- **The menu deliberately does NOT collapse behind a hamburger at phone width** — it wraps onto a second row instead. Two reasons, both worth knowing before anyone "improves" it: a button hidden by CSS at desktop width is still in the header, and epic 1's keyboard check walks every control in the header and would fail on one it can never focus; and hiding the destinations behind a control (or behind a width check in JavaScript) would take them out of the page altogether, which is how we prove which screens a role is offered.
+- Story 2's keyboard walk to the setting picker did **not** need its press budget raised. The new links add exactly two stops before the form (the app name and the expense-files destination), so the picker is the fifth stop from page load against a budget of forty. That spec was left untouched.
+- An Approver is offered "Review and decide expense requests" now, and following it lands on a page-not-found until that epic is built — exactly as agreed at the manual test. No "coming soon" wording, no filtering.
+- The viewed address is normalised through the access map's own `accessEntryFor()` rather than a string compare, so `/upload/` and `/upload?from=email` mark the same destination current, and an unregistered address marks nothing.
+
 ### Test infrastructure added this epic
 
 - `web/vitest.setup.ts` gained a small guarded block shimming `hasPointerCapture`, `releasePointerCapture` and `scrollIntoView`, which Radix needs under jsdom. Added for story 2's setting picker; the later request-list epic reuses it for any `select` / `dropdown-menu` / `popover`. Each shim reports jsdom's true state and swallows no errors.
