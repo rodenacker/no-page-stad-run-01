@@ -2,7 +2,7 @@
 
 /**
  * Every expense file that has been submitted, as the transactions service reports
- * it — the screen both the Finance Uploader and the Approver watch (brief R3, R9) —
+ * it — the screen both the Importer and the Approver watch (brief R3, R9) —
  * keeping itself current while any of those files is still being processed.
  *
  * Five things about this component are deliberate and easy to break:

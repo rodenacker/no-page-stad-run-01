@@ -18,7 +18,7 @@
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
-import { ROLE_FINANCE_UPLOADER, roleNamed } from './role';
+import { ROLE_IMPORTER, roleNamed } from './role';
 
 import type { RoleRead } from './role';
 import type { UserInfoRead } from '../../types/auth';
@@ -34,7 +34,8 @@ export type UserRead = UserInfoRead;
 export type { UserInfoRead };
 
 /**
- * Canonical user. Defaults to a Finance Uploader; override any field.
+ * Canonical user. Defaults to an Importer (the role the requirements call
+ * "Finance Uploader"); override any field.
  * ZA-locale identity values (project.md §Compliance — POPIA, region ZA).
  */
 export const createUser = (overrides: Partial<UserRead> = {}): UserRead => ({
@@ -42,8 +43,8 @@ export const createUser = (overrides: Partial<UserRead> = {}): UserRead => ({
   Email: 'frances.nkosi@example.co.za',
   FirstName: 'Frances',
   LastName: 'Nkosi',
-  RolesString: ROLE_FINANCE_UPLOADER,
-  Roles: [roleNamed(ROLE_FINANCE_UPLOADER)],
+  RolesString: ROLE_IMPORTER,
+  Roles: [roleNamed(ROLE_IMPORTER)],
   LastChangedUser: 'System',
   LastChangedDate: '2026-04-30 15:00:00',
   ...overrides,

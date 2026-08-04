@@ -61,7 +61,7 @@ import { SignInForm } from '@/components/auth/SignInForm';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { post } from '@/lib/api/client';
 import { loginErrorResponse, userInfoFor } from '@/mocks/data/identity';
-import { ROLE_FINANCE_UPLOADER } from '@/mocks/data/role';
+import { ROLE_IMPORTER } from '@/mocks/data/role';
 
 import type { APIError } from '@/types/api';
 
@@ -98,7 +98,7 @@ const USERNAME_LABEL = /username\s*\*/i;
 const PASSWORD_LABEL = /password\s*\*/i;
 
 /** A real project identity for form-fill; the password is never a real one. */
-const KNOWN_USERNAME = userInfoFor(ROLE_FINANCE_UPLOADER).Email;
+const KNOWN_USERNAME = userInfoFor(ROLE_IMPORTER).Email;
 const ANY_PASSWORD = 'mock-password-not-a-credential';
 
 /**

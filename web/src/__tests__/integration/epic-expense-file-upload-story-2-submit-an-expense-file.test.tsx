@@ -19,7 +19,7 @@
  * 1. `web/src/app/(authenticated)/upload/page.tsx` keeps the `requireSession()` /
  *    `canAccess()` gate it already has (story 1 widened `/upload` to both roles),
  *    and additionally renders the submit surface — `<SubmitExpenseFileForm />` —
- *    ONLY when `hasRole(session, ROLE_FINANCE_UPLOADER)` (`@/lib/auth/roles.ts`).
+ *    ONLY when `hasRole(session, ROLE_IMPORTER)` (`@/lib/auth/roles.ts`).
  *    For any other session the form is LEFT OUT OF THE MARKUP, never rendered
  *    disabled (brief BR4 / source UI-24). The page stays an async server
  *    component callable with no arguments, so a test can `render(await
@@ -118,7 +118,7 @@ import {
   inactiveFileSetting,
 } from '@/mocks/data/file-setting';
 import { userInfoFor } from '@/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
@@ -403,10 +403,10 @@ describe('Epic expense-file-upload, Story 2: Submit an expense file', () => {
   // AC-2
   // Runtime-only: that the gate decides on the server, before any submit markup
   // is ever sent to the browser, is confirmed in the manual checklist.
-  it('offers the submit form to a Finance Uploader and offers an Approver no submit surface anywhere on the screen', async () => {
+  it('offers the submit form to an Importer and offers an Approver no submit surface anywhere on the screen', async () => {
     stubTransactionsService();
 
-    const uploaderView = await renderUploadPage(ROLE_FINANCE_UPLOADER);
+    const uploaderView = await renderUploadPage(ROLE_IMPORTER);
 
     expect(await settingPicker()).toBeInTheDocument();
     expect(screen.getByLabelText(CSV_FILE_LABEL)).toBeInTheDocument();

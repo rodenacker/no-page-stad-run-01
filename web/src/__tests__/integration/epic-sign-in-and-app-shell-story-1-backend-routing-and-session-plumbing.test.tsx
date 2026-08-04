@@ -62,11 +62,7 @@
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  ROLE_APPROVER,
-  ROLE_FINANCE_UPLOADER,
-  createRole,
-} from '@/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER, createRole } from '@/mocks/data/role';
 import { userInfoFor, userInfoForRoles } from '@/mocks/data/identity';
 import { createUser } from '@/mocks/data/user';
 
@@ -404,15 +400,15 @@ describe('Epic 1, Story 1: backend routing, session plumbing and role types', ()
     const { hasRole, rolesOf, isProjectRole } =
       await import('@/lib/auth/roles');
 
-    const uploader = userInfoFor(ROLE_FINANCE_UPLOADER);
+    const uploader = userInfoFor(ROLE_IMPORTER);
     const approver = userInfoFor(ROLE_APPROVER);
-    const both = userInfoForRoles([ROLE_FINANCE_UPLOADER, ROLE_APPROVER]);
+    const both = userInfoForRoles([ROLE_IMPORTER, ROLE_APPROVER]);
 
-    expect(hasRole(uploader, ROLE_FINANCE_UPLOADER)).toBe(true);
+    expect(hasRole(uploader, ROLE_IMPORTER)).toBe(true);
     expect(hasRole(uploader, ROLE_APPROVER)).toBe(false);
     expect(hasRole(approver, ROLE_APPROVER)).toBe(true);
-    expect(hasRole(approver, ROLE_FINANCE_UPLOADER)).toBe(false);
-    expect(rolesOf(both)).toEqual([ROLE_FINANCE_UPLOADER, ROLE_APPROVER]);
+    expect(hasRole(approver, ROLE_IMPORTER)).toBe(false);
+    expect(rolesOf(both)).toEqual([ROLE_IMPORTER, ROLE_APPROVER]);
 
     // The auth spec's own "Viewer" example is NOT a role of this project
     // (epic brief §Notes & Caveats) — it must grant nothing at all.
@@ -422,9 +418,9 @@ describe('Epic 1, Story 1: backend routing, session plumbing and role types', ()
     });
     expect(isProjectRole('Viewer')).toBe(false);
     expect(rolesOf(outsider)).toEqual([]);
-    expect(hasRole(outsider, ROLE_FINANCE_UPLOADER)).toBe(false);
+    expect(hasRole(outsider, ROLE_IMPORTER)).toBe(false);
     expect(hasRole(outsider, ROLE_APPROVER)).toBe(false);
-    expect(isProjectRole(ROLE_FINANCE_UPLOADER)).toBe(true);
+    expect(isProjectRole(ROLE_IMPORTER)).toBe(true);
     expect(isProjectRole(ROLE_APPROVER)).toBe(true);
   });
 

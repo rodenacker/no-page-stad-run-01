@@ -108,7 +108,7 @@
  * response below is mocked, so no live backend is contacted and no real credentials
  * are needed.
  * These tests WILL FAIL until the story is implemented (TDD red) — `/upload` still
- * answers a permitted Finance Uploader with `notFound()` and offers no submit form.
+ * answers a permitted Importer with `notFound()` and offers no submit form.
  * ---------------------------------------------------------------------------
  */
 import { expect, test } from '@playwright/test';
@@ -127,7 +127,7 @@ import {
   fileSettingListResponse,
 } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
-import { ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
+import { ROLE_IMPORTER } from '../src/mocks/data/role';
 
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { FileLog } from '../src/mocks/data/file-log';
@@ -374,8 +374,8 @@ test.describe('Epic expense-file-upload, Story 2: submit an expense file', () =>
     page,
     context,
   }) => {
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileSettingList(page);
     const upload = await mockUploadAndFileList(page);
     await blockLiveBackends(page);
@@ -431,8 +431,8 @@ test.describe('Epic expense-file-upload, Story 2: submit an expense file', () =>
     page,
     context,
   }) => {
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileSettingList(page);
     const upload = await mockUploadAndFileList(page);
     await blockLiveBackends(page);

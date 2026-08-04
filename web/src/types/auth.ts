@@ -49,13 +49,29 @@ export interface UserInfoRead {
 
 /**
  * This project's two real roles (generated-docs/project.md §Roles & Permissions).
+ *
+ * THESE VALUES MUST MATCH THE AUTH SERVICE, NOT THE REQUIREMENTS' WORDING. The
+ * live auth service (`GET /v1/auth/userinfo`) returns exactly two role names for
+ * this project: `Importer` and `Approver` — verified against the running service
+ * on 2026-08-04.
+ *
+ * The two names differ from the business language on purpose:
+ *
+ * - `Importer` is the auth service's name for the role that submits expense
+ *   files. The requirements (`documentation/requirements-application.md` §3, §6.5)
+ *   and every epic brief call that same business role "Finance Uploader". There
+ *   is NO role named "Finance Uploader" in the auth service, so matching on that
+ *   string recognises nobody — every authorization check here matches the wire
+ *   value `Importer`.
+ * - `Approver` is the same word in both the service and the requirements.
+ *
  * The auth spec's own `RoleRead` example shows "Viewer", which is NOT a role of
  * this project and must grant nothing (epic brief §Notes & Caveats).
  */
-export const ROLE_FINANCE_UPLOADER = 'Finance Uploader';
+export const ROLE_IMPORTER = 'Importer';
 export const ROLE_APPROVER = 'Approver';
 
 /** Every role this project recognises, in a stable display order. */
-export const PROJECT_ROLES = [ROLE_FINANCE_UPLOADER, ROLE_APPROVER] as const;
+export const PROJECT_ROLES = [ROLE_IMPORTER, ROLE_APPROVER] as const;
 
 export type ProjectRole = (typeof PROJECT_ROLES)[number];

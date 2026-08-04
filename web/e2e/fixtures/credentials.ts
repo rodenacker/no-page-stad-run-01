@@ -16,10 +16,7 @@
  * so Playwright resolves them with no alias plumbing.
  */
 import { userInfoFor } from '../../src/mocks/data/identity';
-import {
-  ROLE_APPROVER,
-  ROLE_FINANCE_UPLOADER,
-} from '../../src/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '../../src/mocks/data/role';
 
 export interface MockCredential {
   /** What the user types into the Username field. May be an email — the auth
@@ -34,10 +31,11 @@ export interface MockCredential {
 /** Shared placeholder password — mock-only, deliberately self-describing. */
 const MOCK_PASSWORD = 'mock-password-not-a-credential';
 
-export const financeUploaderUser: MockCredential = {
-  username: userInfoFor(ROLE_FINANCE_UPLOADER).Email,
+/** The account holding the Importer role — the requirements' "Finance Uploader". */
+export const importerUser: MockCredential = {
+  username: userInfoFor(ROLE_IMPORTER).Email,
   password: MOCK_PASSWORD,
-  role: ROLE_FINANCE_UPLOADER,
+  role: ROLE_IMPORTER,
 };
 
 export const approverUser: MockCredential = {
@@ -48,7 +46,7 @@ export const approverUser: MockCredential = {
 
 /** Every mock identity the stubbed auth service accepts. */
 export const mockCredentials: readonly MockCredential[] = [
-  financeUploaderUser,
+  importerUser,
   approverUser,
 ];
 

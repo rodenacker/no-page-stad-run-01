@@ -28,7 +28,7 @@
  * `expense-request-list` epic widens `/requests` to both roles while keeping the
  * decide actions themselves Approver-only inside the screen.
  */
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/types/auth';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/types/auth';
 
 import { hasRole, type RoleBearer } from './roles';
 
@@ -71,27 +71,29 @@ export interface AccessMapEntry {
 }
 
 /**
- * Seeded from requirements §6.5: uploading a file belongs to the Finance Uploader,
- * reviewing and deciding (including bulk approval) to the Approver.
+ * Seeded from requirements §6.5: uploading a file belongs to the Finance Uploader
+ * — the auth service's `Importer` role (`@/types/auth`) — and reviewing and
+ * deciding (including bulk approval) to the Approver.
  */
 export const ACCESS_MAP: readonly AccessMapEntry[] = [
   {
     path: LANDING_PATH,
     permission: 'View main dashboard',
-    allowedRoles: [ROLE_FINANCE_UPLOADER, ROLE_APPROVER],
+    allowedRoles: [ROLE_IMPORTER, ROLE_APPROVER],
   },
   {
     /**
      * BOTH roles, deliberately: §6.5 grants `ExpenseFile` READ to the Approver as
      * well, so both roles open this address and watch the same file list (epic
-     * `expense-file-upload` R9). Submitting a file is the Finance Uploader's alone
-     * (R8) and is a role check on the submit control INSIDE the screen, not on the
-     * address — which is why the wording below describes the screen rather than
-     * promising the visitor they may send something.
+     * `expense-file-upload` R9). Submitting a file is the Importer's alone (R8 —
+     * the requirements' "Finance Uploader") and is a role check on the submit
+     * control INSIDE the screen, not on the address — which is why the wording
+     * below describes the screen rather than promising the visitor they may send
+     * something.
      */
     path: UPLOAD_PATH,
     permission: 'Upload an expense file',
-    allowedRoles: [ROLE_FINANCE_UPLOADER, ROLE_APPROVER],
+    allowedRoles: [ROLE_IMPORTER, ROLE_APPROVER],
     entryPoint: {
       label: 'Expense files',
       description:

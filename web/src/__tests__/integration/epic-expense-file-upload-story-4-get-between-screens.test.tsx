@@ -90,7 +90,7 @@ import { entryPointsFor } from '@/lib/auth/access-map';
 
 // Project-wide identity + role sources, shared with the Playwright layer.
 import { userInfoFor } from '@/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
@@ -222,8 +222,8 @@ describe('Epic expense-file-upload, Story 4: getting between screens from the he
   // AC-1
   // Data-contract note: that following one of these addresses really lands on the
   // screen is the sibling Playwright spec's (AC-5) and the manual checklist's.
-  it('offers the Finance Uploader the expense files screen, and the Approver both the expense files and the review-and-decide screens — exactly the set the access map permits', () => {
-    const uploader = userInfoFor(ROLE_FINANCE_UPLOADER);
+  it('offers the Importer the expense files screen, and the Approver both the expense files and the review-and-decide screens — exactly the set the access map permits', () => {
+    const uploader = userInfoFor(ROLE_IMPORTER);
 
     const uploaderView = render(<AppHeader session={uploader} />);
 
@@ -261,7 +261,7 @@ describe('Epic expense-file-upload, Story 4: getting between screens from the he
   });
 
   // AC-2
-  it('does not render the review-and-decide destination at all for a Finance Uploader, while offering it to an Approver', () => {
+  it('does not render the review-and-decide destination at all for an Importer, while offering it to an Approver', () => {
     const approverView = render(
       <AppHeader session={userInfoFor(ROLE_APPROVER)} />,
     );
@@ -277,7 +277,7 @@ describe('Epic expense-file-upload, Story 4: getting between screens from the he
 
     approverView.unmount();
 
-    render(<AppHeader session={userInfoFor(ROLE_FINANCE_UPLOADER)} />);
+    render(<AppHeader session={userInfoFor(ROLE_IMPORTER)} />);
 
     // Absent from the markup — not hidden from the accessibility tree, not a
     // disabled button or menu item, and its wording nowhere in the header.
@@ -309,7 +309,7 @@ describe('Epic expense-file-upload, Story 4: getting between screens from the he
   it('makes the app’s name in the header a link to the signed-in landing screen', () => {
     currentPathname.value = EXPENSE_FILES_PATH;
 
-    render(<AppHeader session={userInfoFor(ROLE_FINANCE_UPLOADER)} />);
+    render(<AppHeader session={userInfoFor(ROLE_IMPORTER)} />);
 
     expect(
       within(header()).getByRole('link', { name: APP_NAME }),

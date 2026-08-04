@@ -31,7 +31,7 @@
  * convention); do not build a second gating mechanism.
  *
  * Access map seeded in this epic, from requirements §6.5 (roles-×-resources):
- *   - upload an expense file            → Finance Uploader only
+ *   - upload an expense file            → Importer only
  *   - review and decide / bulk approve  → Approver only
  *
  * SINCE WIDENED, and reflected below. The `expense-file-upload` epic's R9 gives
@@ -72,7 +72,7 @@ import { RoleEntryPoints } from '@/components/dashboard/RoleEntryPoints';
 // Project-wide identity + role sources, shared with the Playwright layer. The
 // userinfo body is never hand-written in a test.
 import { userInfoFor, userInfoForRoles } from '@/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
@@ -122,9 +122,9 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
   // Read the "SINCE WIDENED" note above first: the expense files address is open to
   // both roles (`expense-file-upload` R9), so this is now "each role is offered it",
   // and the hidden-never-disabled half of the original criterion lives in AC-2.
-  it('offers the expense-files entry point to a Finance Uploader and to an Approver, as a real navigational link', () => {
+  it('offers the expense-files entry point to an Importer and to an Approver, as a real navigational link', () => {
     const uploaderView = render(
-      <RoleEntryPoints user={userInfoFor(ROLE_FINANCE_UPLOADER)} />,
+      <RoleEntryPoints user={userInfoFor(ROLE_IMPORTER)} />,
     );
 
     const uploaderEntryPoint = entryPointTo(EXPENSE_FILES_PATH);
@@ -144,7 +144,7 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
   });
 
   // AC-2
-  it('offers the review-and-decide entry point to an Approver and does not render it at all for a Finance Uploader', () => {
+  it('offers the review-and-decide entry point to an Approver and does not render it at all for an Importer', () => {
     const approverView = render(
       <RoleEntryPoints user={userInfoFor(ROLE_APPROVER)} />,
     );
@@ -155,7 +155,7 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
 
     approverView.unmount();
 
-    render(<RoleEntryPoints user={userInfoFor(ROLE_FINANCE_UPLOADER)} />);
+    render(<RoleEntryPoints user={userInfoFor(ROLE_IMPORTER)} />);
 
     expect(
       screen.queryByRole('link', { name: /review/i, hidden: true }),
@@ -171,7 +171,7 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
   // in the browser (this story's Playwright spec) and on the manual checklist.
   it('offers a way back from the permission message to a screen the role does allow, never back to the denied address', () => {
     // The denied address is the very entry point an Approver is offered and a
-    // Finance Uploader is not — the same access-map entry seen from the other side,
+    // Importer is not — the same access-map entry seen from the other side,
     // so the test cannot drift from whichever path the map seeds.
     const approverView = render(
       <RoleEntryPoints user={userInfoFor(ROLE_APPROVER)} />,
@@ -200,7 +200,7 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
   it('offers the entry points for the roles on the current session, so a differently-rolled user is offered a different set', () => {
     const bothRolesView = render(
       <RoleEntryPoints
-        user={userInfoForRoles([ROLE_FINANCE_UPLOADER, ROLE_APPROVER])}
+        user={userInfoForRoles([ROLE_IMPORTER, ROLE_APPROVER])}
       />,
     );
 
@@ -212,9 +212,7 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
     // Same component, a session carrying one of those roles — the offered set
     // follows `Roles[]` rather than a value hardcoded per screen or remembered
     // from an earlier check (BR3).
-    render(
-      <RoleEntryPoints user={userInfoForRoles([ROLE_FINANCE_UPLOADER])} />,
-    );
+    render(<RoleEntryPoints user={userInfoForRoles([ROLE_IMPORTER])} />);
 
     expect(entryPointTo(EXPENSE_FILES_PATH)).toBeInTheDocument();
     expect(

@@ -4,8 +4,9 @@
  * Submitting one expense file: choose a named setting, choose a CSV, send it.
  *
  * The screen decides WHETHER to render this at all — it is left out of the markup
- * entirely for a session without the Finance Uploader role (brief BR4 / source
- * UI-24), so there is no role check, and no disabled state, in here.
+ * entirely for a session without the Importer role — the requirements' "Finance
+ * Uploader" (brief BR4 / source UI-24) — so there is no role check, and no
+ * disabled state, in here.
  *
  * Four things about this component are deliberate and easy to break:
  *

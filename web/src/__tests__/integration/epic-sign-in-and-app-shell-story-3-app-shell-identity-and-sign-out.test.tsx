@@ -67,7 +67,7 @@ import { post } from '@/lib/api/client';
 // and this project's role names, shared with the Playwright layer. Never inline
 // a userinfo body in a test.
 import { logoutSuccessResponse, userInfoFor } from '@/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
 import { fullNameOf } from '@/mocks/data/user';
 
 import type { ReactNode } from 'react';
@@ -163,14 +163,14 @@ describe('Epic sign-in-and-app-shell, Story 3: signed-in app shell — identity 
 
   // AC-1
   it('shows the signed-in person and their role in the shell header, around the page content', async () => {
-    const uploader = userInfoFor(ROLE_FINANCE_UPLOADER);
+    const uploader = userInfoFor(ROLE_IMPORTER);
     mockRequireSession.mockResolvedValue(uploader);
 
     await renderShell(<p>Import expenses</p>);
 
     const header = screen.getByRole('banner');
     expect(header).toHaveTextContent(fullNameOf(uploader));
-    expect(header).toHaveTextContent(ROLE_FINANCE_UPLOADER);
+    expect(header).toHaveTextContent(ROLE_IMPORTER);
     expect(screen.getByText('Import expenses')).toBeInTheDocument();
   });
 
@@ -213,7 +213,7 @@ describe('Epic sign-in-and-app-shell, Story 3: signed-in app shell — identity 
   // Runtime-only: that the gate blocks *before* protected content renders is the
   // Playwright spec's AC-3; this pins the per-navigation re-resolution (BR3).
   it('re-resolves the identity on each navigation, so a changed role set shows on the next screen', async () => {
-    const uploader = userInfoFor(ROLE_FINANCE_UPLOADER);
+    const uploader = userInfoFor(ROLE_IMPORTER);
     const approver = userInfoFor(ROLE_APPROVER);
     mockRequireSession
       .mockResolvedValueOnce(uploader)

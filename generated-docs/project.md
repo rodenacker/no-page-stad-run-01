@@ -22,6 +22,19 @@ A central finance person uploads batches of ad-hoc employee expense payment requ
 | Review and decide on a transaction | | ✓ |
 | Bulk-approve transactions | | ✓ |
 
+### What these roles are actually called in the sign-in service (VERIFIED)
+
+The requirements and the Approver role use different words for the same thing, so this mapping matters. It was checked against the running sign-in service (`GET http://localhost:4424/v1/auth/userinfo`) on 2026-08-04 — these are the only two role names it returns for this project:
+
+| Role in the requirements (§3, §6.5) and in every epic brief | Role name the sign-in service actually sends | 
+|---|---|
+| Finance Uploader | `Importer` |
+| Approver | `Approver` |
+
+There is **no** role called "Finance Uploader" in the sign-in service. The app matches on the service's names, so anywhere the app decides what someone may see or do it uses `Importer` and `Approver` (they live in one place in the code, `web/src/types/auth.ts`). Any future epic must use those two names too — matching on "Finance Uploader" recognises nobody, and the person signing in would be shown nothing at all.
+
+Where the app displays the signed-in person's role, it shows the service's own word: **Importer**. This was a deliberate choice (user-confirmed 2026-08-04) rather than translating it back to "Finance Uploader" on screen.
+
 > Permissions extend during BUILD as new stories surface new actions — see [agent-autonomy.md](.claude/shared/agent-autonomy.md). Additions land here via a project-change PR (§6.1 of the epic-branch plan). Permission removals or role-set changes halt for user review.
 >
 > `[SOURCE NOTE]` The source spec (`documentation/requirements-application.md` §6.5) already documents a detailed roles-×-resources access-control matrix (Transaction, ExpenseFile, FileSetting, FileProcessLog, User, Role, SignInRequest, and per-flow access) for these two roles, including one conditional grant (`Approver` may decide their own expense request, per BR-02). That detail is intentionally **not** duplicated here — per the custom-template convention this table stays minimal at the project level — and instead feeds the Functional Requirements / Access Control sections of each epic's `brief.md` as its stories surface those actions.

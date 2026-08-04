@@ -86,7 +86,7 @@ import { sessionCookieFor, sessionTokenFor } from './support/auth-api-stub';
 // userinfo body here. Relative import (not `@/`) so Playwright's runtime resolves
 // it without alias plumbing.
 import { userInfoFor, loginSuccessResponse } from '../src/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '../src/mocks/data/role';
 
 import type { BrowserContext, Page } from '@playwright/test';
 
@@ -159,7 +159,7 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
   });
 
   // AC-3
-  test('a Finance Uploader opening the review-and-decide address gets the permission message in the app shell, not a not-found page', async ({
+  test('an Importer opening the review-and-decide address gets the permission message in the app shell, not a not-found page', async ({
     page,
     context,
   }) => {
@@ -187,14 +187,14 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
       );
     }
 
-    // Now go straight to that same address as a Finance Uploader, whom the access map
-    // excludes from it — as if the address had been typed in or bookmarked. Both
-    // layers switch role together: re-seeding overwrites the cookie with the token
-    // the auth stub resolves to the Finance Uploader, and the browser-side userinfo
-    // follows.
-    await seedMockSession(page, context, ROLE_FINANCE_UPLOADER);
-    await mockUserInfoFor(page, ROLE_FINANCE_UPLOADER);
-    const deniedUser = userInfoFor(ROLE_FINANCE_UPLOADER);
+    // Now go straight to that same address as an Importer (the requirements'
+    // "Finance Uploader"), whom the access map excludes from it — as if the address
+    // had been typed in or bookmarked. Both layers switch role together: re-seeding
+    // overwrites the cookie with the token the auth stub resolves to the Importer,
+    // and the browser-side userinfo follows.
+    await seedMockSession(page, context, ROLE_IMPORTER);
+    await mockUserInfoFor(page, ROLE_IMPORTER);
+    const deniedUser = userInfoFor(ROLE_IMPORTER);
     const response = await page.goto(reviewPath);
 
     // A rendered screen, not a not-found (404) or a generic error (5xx) response.

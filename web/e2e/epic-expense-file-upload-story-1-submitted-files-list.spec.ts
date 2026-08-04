@@ -91,7 +91,7 @@ import { sessionTokenFor } from './support/auth-api-stub';
 import { createFileLog, fileLogListResponse } from '../src/mocks/data/file-log';
 import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '../src/mocks/data/role';
 import { fullNameOf } from '../src/mocks/data/user';
 
 import type { BrowserContext, Locator, Page } from '@playwright/test';
@@ -235,14 +235,14 @@ test.describe('Epic expense-file-upload, Story 1: the submitted expense files li
   // readable by each of them (brief R9), so the roles are walked in one journey
   // with the identity switched in between — the header assertion proves the switch
   // really happened rather than the same person being checked twice.
-  test('a Finance Uploader and an Approver are each offered the expense files entry point and see the list, not a permission message', async ({
+  test('an Importer and an Approver are each offered the expense files entry point and see the list, not a permission message', async ({
     page,
     context,
   }) => {
     await mockFileLogList(page);
     await mockFileSettingList(page);
 
-    for (const roleName of [ROLE_FINANCE_UPLOADER, ROLE_APPROVER]) {
+    for (const roleName of [ROLE_IMPORTER, ROLE_APPROVER]) {
       await seedSession(context, roleName);
       await mockBrowserIdentityCall(page, roleName);
       await blockLiveBackends(page);

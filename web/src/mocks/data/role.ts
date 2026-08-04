@@ -12,9 +12,12 @@
  * `LastChangedUser`, `LastChangedDate` — exact field names and PascalCase casing.
  *
  * ROLE NAMES: the OpenAPI spec's own example shows `"Viewer"`. That is NOT this
- * project's role set. The two real roles are `Finance Uploader` and `Approver`
- * (generated-docs/project.md §Roles & Permissions; epic brief §Notes & Caveats).
- * Role checks and mocks use those two names only.
+ * project's role set. The two real roles the auth service returns are `Importer`
+ * and `Approver` (generated-docs/project.md §Roles & Permissions; verified against
+ * the live service on 2026-08-04). `Importer` is the service's name for the role
+ * the requirements call "Finance Uploader" — the mocks must emit the SERVICE's
+ * name, or every layer passes while the app recognises nobody. Role checks and
+ * mocks use those two names only.
  *
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
@@ -30,19 +33,19 @@
 import {
   PROJECT_ROLES,
   ROLE_APPROVER,
-  ROLE_FINANCE_UPLOADER,
+  ROLE_IMPORTER,
   type ProjectRole,
   type RoleRead,
 } from '../../types/auth';
 
-export { ROLE_APPROVER, ROLE_FINANCE_UPLOADER };
+export { ROLE_APPROVER, ROLE_IMPORTER };
 export type { RoleRead };
 
 export type ProjectRoleName = ProjectRole;
 
 /** Stable ids so assertions and fixtures agree on the same role across layers. */
 const ROLE_IDS: Record<ProjectRoleName, number> = {
-  [ROLE_FINANCE_UPLOADER]: 1,
+  [ROLE_IMPORTER]: 1,
   [ROLE_APPROVER]: 2,
 };
 
@@ -52,11 +55,12 @@ export const isProjectRoleName = (name: string): name is ProjectRoleName =>
   (PROJECT_ROLE_NAMES as readonly string[]).includes(name);
 
 /**
- * Canonical `RoleRead`. Defaults to Finance Uploader; override any field.
+ * Canonical `RoleRead`. Defaults to the Importer (the requirements' "Finance
+ * Uploader"); override any field.
  */
 export const createRole = (overrides: Partial<RoleRead> = {}): RoleRead => ({
-  Id: ROLE_IDS[ROLE_FINANCE_UPLOADER],
-  Name: ROLE_FINANCE_UPLOADER,
+  Id: ROLE_IDS[ROLE_IMPORTER],
+  Name: ROLE_IMPORTER,
   LastChangedUser: 'System',
   LastChangedDate: '2026-04-30 15:00:00',
   ...overrides,

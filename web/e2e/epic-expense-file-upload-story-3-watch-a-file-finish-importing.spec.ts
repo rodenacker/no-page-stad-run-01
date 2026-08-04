@@ -109,7 +109,7 @@ import {
 } from '../src/mocks/data/file-log';
 import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
-import { ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
+import { ROLE_IMPORTER } from '../src/mocks/data/role';
 
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { FileLog } from '../src/mocks/data/file-log';
@@ -345,10 +345,10 @@ test.describe('Epic expense-file-upload, Story 3: watch a file finish importing'
     // configured refresh interval can be crossed instantly.
     await page.clock.install();
     await blockLiveBackends(page);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileSettings(page);
     const feed = await serveFileLogs(page, [uploaded]);
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
 
     await page.goto(UPLOAD_ROUTE);
 
@@ -417,10 +417,10 @@ test.describe('Epic expense-file-upload, Story 3: watch a file finish importing'
 
     await page.clock.install();
     await blockLiveBackends(page);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileSettings(page);
     const feed = await serveFileLogs(page, [validating]);
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
 
     await page.goto(UPLOAD_ROUTE);
 
@@ -464,7 +464,7 @@ test.describe('Epic expense-file-upload, Story 3: watch a file finish importing'
 
   // AC-6
   // This epic's single real-browser accessibility scan, on the finished screen as a
-  // Finance Uploader — the one role that sees BOTH surfaces the epic adds: the file
+  // Importer — the one role that sees BOTH surfaces the epic adds: the file
   // list (with a status label for every status value the brief lists, so the status
   // chips' colour/contrast pairings are all covered) and story 2's submit form.
   // No fake clock here: axe is never run under faked timers. The mocked list serves
@@ -476,10 +476,10 @@ test.describe('Epic expense-file-upload, Story 3: watch a file finish importing'
     const files = fileLogsInEveryStatus();
 
     await blockLiveBackends(page);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileSettings(page);
     await serveFileLogs(page, files);
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
 
     await page.goto(UPLOAD_ROUTE);
 
@@ -492,7 +492,7 @@ test.describe('Epic expense-file-upload, Story 3: watch a file finish importing'
       ).toContainText(file.CurrentStatus);
     }
 
-    // ...and the submit surface the Finance Uploader is offered (story 2): the file
+    // ...and the submit surface the Importer is offered (story 2): the file
     // setting picker and the submit action.
     const uploadForm = page.getByRole('main');
     await expect(uploadForm.getByRole('combobox').first()).toBeVisible();

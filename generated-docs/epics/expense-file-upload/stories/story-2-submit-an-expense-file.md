@@ -44,7 +44,7 @@ The existing `/transactions-api/[...path]` proxy already exports POST and buffer
 
 ## Infrastructure reuse notes
 
-- The submit-action check inside the screen uses `hasRole(session, ROLE_FINANCE_UPLOADER)` from `web/src/lib/auth/roles.ts` — no new gating mechanism, and the excluded action is **left out of the markup**, never disabled.
+- The submit-action check inside the screen uses `hasRole(session, ROLE_IMPORTER)` from `web/src/lib/auth/roles.ts` (`ROLE_IMPORTER` is the auth service's name for the Finance Uploader role — see `generated-docs/project.md` §Roles & Permissions) — no new gating mechanism, and the excluded action is **left out of the markup**, never disabled.
 - The `post` helper in `web/src/lib/api/client.ts` JSON-stringifies its body and defaults `Content-Type` to `application/json`; this upload needs a raw `application/octet-stream` body with query parameters, so add a dedicated endpoint wrapper (e.g. `web/src/lib/api/files.ts`) that calls `apiClient` with an explicit Content-Type and `params` — do **not** call `fetch()` directly (CLAUDE.md §2).
 - Forms follow the established convention: Shadcn `form` + react-hook-form + a Zod schema in `web/src/lib/validation/schemas.ts`, validating on blur (never on a keystroke), `noValidate` on the form, required fields marked with an `aria-hidden` asterisk plus one legend line.
 - Install `select` with the pinned Shadcn CLI if not already present; `form`, `input`, `label`, `button`, `card` and `alert` are already installed.

@@ -13,14 +13,15 @@
  * project's contract — authorisation is driven purely by `Roles[]` (brief BR3),
  * re-resolved per server-rendered navigation rather than cached.
  *
- * Roles are project facts (generated-docs/project.md §Roles & Permissions):
- * `Finance Uploader` and `Approver`. The spec's own `"Viewer"` example is not
- * this project's role set (epic brief §Notes & Caveats).
+ * Roles are project facts (generated-docs/project.md §Roles & Permissions): the
+ * auth service returns `Importer` (the role the requirements call "Finance
+ * Uploader") and `Approver`. The spec's own `"Viewer"` example is not this
+ * project's role set (epic brief §Notes & Caveats).
  *
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from './role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from './role';
 import { createUserWithRoles } from './user';
 
 import type { UserInfoRead } from './user';
@@ -36,8 +37,8 @@ import type { UserInfoRead } from './user';
  */
 export const userInfoFor = (roleName: string): UserInfoRead => {
   switch (roleName) {
-    case ROLE_FINANCE_UPLOADER:
-      return createUserWithRoles([ROLE_FINANCE_UPLOADER], {
+    case ROLE_IMPORTER:
+      return createUserWithRoles([ROLE_IMPORTER], {
         Id: 101,
         Email: 'frances.nkosi@example.co.za',
         FirstName: 'Frances',
@@ -53,7 +54,7 @@ export const userInfoFor = (roleName: string): UserInfoRead => {
     default:
       throw new Error(
         `Unknown role "${roleName}". userInfoFor accepts this project's two roles: ` +
-          `${ROLE_FINANCE_UPLOADER}, ${ROLE_APPROVER} ` +
+          `${ROLE_IMPORTER}, ${ROLE_APPROVER} ` +
           `(see generated-docs/project.md §Roles & Permissions).`,
       );
   }

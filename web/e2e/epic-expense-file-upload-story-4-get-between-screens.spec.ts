@@ -118,7 +118,7 @@ import { sessionTokenFor } from './support/auth-api-stub';
 import { createFileLog, fileLogListResponse } from '../src/mocks/data/file-log';
 import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '../src/mocks/data/role';
 
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 
@@ -395,8 +395,8 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     page,
     context,
   }) => {
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileLogList(page);
     await mockFileSettingList(page);
     await blockLiveBackends(page);
@@ -430,8 +430,8 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     page,
     context,
   }) => {
-    await seedSession(context, ROLE_FINANCE_UPLOADER);
-    await mockBrowserIdentityCall(page, ROLE_FINANCE_UPLOADER);
+    await seedSession(context, ROLE_IMPORTER);
+    await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileLogList(page);
     await mockFileSettingList(page);
     await blockLiveBackends(page);
