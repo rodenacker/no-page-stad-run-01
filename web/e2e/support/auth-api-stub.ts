@@ -42,10 +42,7 @@ import {
   logoutSuccessResponse,
   userInfoFor,
 } from '../../src/mocks/data/identity';
-import {
-  ROLE_APPROVER,
-  ROLE_FINANCE_UPLOADER,
-} from '../../src/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '../../src/mocks/data/role';
 
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 
@@ -63,7 +60,7 @@ export const AUTH_API_STUB_URL = `http://127.0.0.1:${AUTH_API_STUB_PORT}`;
  * the spec having to hand-write a userinfo body.
  */
 const SESSION_TOKENS: Record<string, string> = {
-  [ROLE_FINANCE_UPLOADER]: 'mock-session-finance-uploader',
+  [ROLE_IMPORTER]: 'mock-session-importer',
   [ROLE_APPROVER]: 'mock-session-approver',
 };
 
@@ -75,7 +72,7 @@ export const sessionTokenFor = (roleName: string): string => {
   if (!token) {
     throw new Error(
       `No mock session for role "${roleName}". This project has two roles: ` +
-        `${ROLE_FINANCE_UPLOADER}, ${ROLE_APPROVER} ` +
+        `${ROLE_IMPORTER}, ${ROLE_APPROVER} ` +
         `(generated-docs/project.md §Roles & Permissions).`,
     );
   }
@@ -198,7 +195,10 @@ const handleRequest = async (
     return;
   }
 
-  // GET /v1/auth/userinfo — the identity/role set the app gates on.
+  // GET /v1/auth/userinfo — the identity/role set the app gates on. The role
+  // NAMES in that body are the live service's own (`Importer`, `Approver` —
+  // `src/types/auth.ts`), so a spec passing here means the app recognises the
+  // roles the real service actually returns.
   if (method === 'GET' && pathname === '/v1/auth/userinfo') {
     const role = roleFromRequest(req);
     if (!role) {

@@ -49,6 +49,47 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   })) as unknown as typeof window.matchMedia;
 }
 
+// Pointer-capture and scroll-into-view, for Radix primitives in jsdom.
+//
+// jsdom implements none of the Pointer Capture API and no `scrollIntoView`. Radix
+// uses both to run an accessible listbox — `Select` asks the event target
+// `hasPointerCapture(pointerId)` on pointer-down to tell a click from a
+// press-and-drag selection, and scrolls the highlighted item into view when the
+// list opens. Without these a `user.click()` on a `Select` trigger dies with
+// "target.hasPointerCapture is not a function" before the listbox ever opens, so
+// the component cannot be driven in a test at all.
+//
+// These are honest do-nothing stands-in for browser APIs jsdom lacks, matching
+// the `matchMedia` shim above — NOT a way to make a failing component pass:
+// - `hasPointerCapture` reports false, i.e. "this element has not captured the
+//   pointer", which is the true state in jsdom (nothing ever captures it);
+// - `releasePointerCapture` is the no-op that state implies (Radix calls it on
+//   the press-and-drag-to-select path);
+// - `scrollIntoView` is a no-op because scrolling has no meaning in a layout
+//   engine with no viewport — jsdom reports every element at 0×0 regardless.
+// None of them swallow an error or fake a result a real browser would compute
+// differently, so a genuinely broken interaction still fails: the click still has
+// to land, the listbox still has to open, the option still has to be selectable.
+//
+// Kept to what Radix actually calls — `hasPointerCapture` and `scrollIntoView`
+// were both confirmed load-bearing (click-to-open and keyboard-to-open alike die
+// without them); `setPointerCapture` is deliberately NOT stubbed, because nothing
+// in this stack calls it and an unused shim is one more thing to mistrust.
+//
+// Test-environment only; no production code is touched. Shared infrastructure —
+// any epic rendering a Shadcn `select` / `dropdown-menu` / `popover` needs it.
+if (typeof Element !== 'undefined') {
+  if (typeof Element.prototype.hasPointerCapture !== 'function') {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (typeof Element.prototype.releasePointerCapture !== 'function') {
+    Element.prototype.releasePointerCapture = () => {};
+  }
+  if (typeof Element.prototype.scrollIntoView !== 'function') {
+    Element.prototype.scrollIntoView = () => {};
+  }
+}
+
 // Polyfill for Web APIs needed by Next.js
 // These are required for testing files that import from 'next/server'
 if (typeof Request === 'undefined') {

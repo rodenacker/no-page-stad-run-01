@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "expense-file-upload",
+    "name": "Upload an expense file",
+    "createdAt": "2026-08-03T15:23:59.922Z",
+    "dependsOn": [
+      "sign-in-and-app-shell"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [
+      "Verify the status wording the service actually uses: the screen assumes a submitted file's status reads as Uploaded, Validating, Validation failed, Imported or Cancelled. Those five come from the requirements document, not from the API specification (which types the status as free text with no fixed list). If the real service words them differently, statuses will show up unstyled and the 'finished importing' notification may never fire.",
+      "Verify a file you have just submitted appears in the list: the upload call answers with a generic acknowledgement and no file identifier, so the screen finds your new file by re-reading the active file list. If the service does not list a freshly submitted file straight away, you would get a successful confirmation but see nothing appear.",
+      "Verify a real CSV is accepted by the real service: the upload sends the setting, the setting name and the file name in the address and the file's raw bytes as the request body, exactly as the API specification describes. If the running service actually expects a form-style upload instead, every automated test still passes while real uploads are refused.",
+      "At phone width the header's menu wraps onto a second row rather than collapsing behind a hamburger button. That keeps every destination one Tab away and keeps the app's keyboard checks honest, but it does make the header two rows tall on a phone — worth a look on a real handset to confirm it reads well.",
+      "Menu items use the access map's own wording, so the Approver's item reads in full as 'Review and decide expense requests' — accurate and consistent with the landing screen, but long for a header. Shortening it would mean rewording the landing screen's card too, since both read from the one place.",
+      "The list asks the service again every 15 seconds while a file is being processed. Neither the requirements nor the brief name a cadence — if finance expects a file's status to move faster, or wants less traffic on the service, this is the single number to change.",
+      "The 'file imported' notification is shown to anyone watching the screen, including an Approver, because the list cannot tell who is looking at it. Requirement R10 names only the Finance Uploader — so this is broader than asked, not narrower. If the notification must be the uploader's alone, say so and the list will be told the current role.",
+      "A refused upload's reason is read out of the 500 response's Messages[] (what the transactions spec documents). If the live service refuses with some other status, or an empty body, the user gets the app's own wording — 'The file could not be submitted. Please try again.' — rather than a specific reason. Worth confirming against the real service.",
+      "'The file name must identify a CSV' is implemented as: the name ends in .csv, any capitalisation. So 'expenses.csv.txt' is refused and 'EXPENSES.CSV' is accepted — confirm that is the intent.",
+      "The setting picker offers each setting by NAME only; the chosen setting's source and file type appear on a line beneath it rather than inside the options, so the option list stays unambiguous. Confirm that reads well for you.",
+      "The submit form clears itself (setting and file both) after a file is accepted. If you would rather the last submission stayed on screen ready to re-send, say so.",
+      "Confirm an Approver is meant to see the expense files list and be offered its entry point. This widens what epic 1 shipped — back then an Approver reaching that address got a 'you do not have permission' message. It follows from requirements §6.5 (ExpenseFile read for both roles) via this epic's R9, but it changes behaviour you have already seen working the other way.",
+      "Check the landing-screen wording for the expense files screen reads correctly for an Approver who only watches files: 'Expense files' / 'See every expense file that has been sent for import and how each one is getting on. New CSV files of employee expense payment requests are submitted here too.'",
+      "project.md's roles table has no row for viewing submitted expense files — the Approver's read access comes from requirements §6.5 via this epic's brief. If that table should carry the permission explicitly, say so and I'll land it as a project-level change rather than an epic edit.",
+      "The app reads your roles from the Roles list in the sign-in service's response and ignores the RolesString text the same response also carries. We have now confirmed the role NAMES ('Importer' and 'Approver'), but not that the live service actually fills in that Roles list. If it only fills in RolesString, no role is recognised even after this fix — the landing screen would still show 'Nothing has been made available to your account yet'. Signing in as the Approver account settles it: cards and a menu means the Roles list is populated and all is well; the empty message again means the app needs to read RolesString instead. Deliberately not guessed at — assuming a shape without checking is exactly what caused the 'Finance Uploader' role-name bug."
+    ],
+    "manualTestResults": []
+  },
+  "phase": "COMPLETE-ON-BRANCH",
+  "stories": {
+    "1": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T15:52:00.000Z",
+      "completedAt": "2026-08-03T16:26:00.000Z"
+    },
+    "2": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T16:28:00.000Z",
+      "completedAt": "2026-08-03T16:49:00.000Z"
+    },
+    "3": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-03T16:51:00.000Z",
+      "completedAt": "2026-08-03T17:02:00.000Z"
+    },
+    "4": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-04T08:05:00.000Z",
+      "completedAt": "2026-08-04T08:22:00.000Z"
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-03T15:31:00.000Z"
+}

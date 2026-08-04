@@ -59,6 +59,7 @@ Referenced only for the `LastExecutedActivityName` value already carried on `Fil
 8. **R8** — Only the Finance Uploader can submit a file; the Approver is not offered the submit action. *(source RBAC — Finance Uploader: ExpenseFile C/R/D and "Upload an expense file" X; Approver: ExpenseFile R only)*
 9. **R9** — Both the Finance Uploader and the Approver can read the file list, the file settings, and the identity reference data (User, Role) used to render it. *(source RBAC — ExpenseFile R, FileSetting R, User R, Role R for both roles)*
 10. **R10** — The Finance Uploader receives an in-app notification when a submitted file finishes importing. *(source NT-01)*
+11. **R11** — From any signed-in screen, the user can reach every other screen their roles permit, without using the browser's Back button. *(source: added during this epic's manual test, 2026-08-04 — see Notes)*
 
 ---
 
@@ -69,6 +70,7 @@ Referenced only for the `LastExecutedActivityName` value already carried on `Fil
 3. **BR3** — The non-CSV check (BR-07, blocker) runs client-side on file selection/submission, before the upload request is issued — a rejected file never reaches the backend.
 4. **BR4** — The submit action is hidden (not shown disabled) for a signed-in user without the Finance Uploader role, per UI-24's rule that role-excluded actions are hidden rather than disabled.
 5. **BR5** — The status, most-recent-activity and record-count values shown for a file are exactly what `GET /v1/file-logs` returns; the frontend does not compute or infer these values.
+6. **BR6** — The set of screens offered for navigation is exactly the set the current session's roles permit, read from the one access map (`entryPointsFor`) — the same facts the landing screen already renders. A screen a role excludes is absent, never shown disabled (the UI-24 convention epic 1 established). A permitted screen whose own epic has not shipped yet is still offered, and reaching it lands on a not-found page — user-accepted interim state, see Notes.
 
 ---
 
@@ -111,7 +113,10 @@ Referenced only for the `LastExecutedActivityName` value already carried on `Fil
 
 ## Notes & Caveats
 
-- **List-refresh inference:** the source's automatic-refresh requirement (F-20, UI-05) is stated for the shared transaction list, not explicitly for the file list. This brief extends the same expectation to the file list's status column (Feature NFRs above) because §5's Upload flow describes the uploader waiting for validation to resolve on-screen. Confirm during BUILD if a lighter approach (manual refresh only) is preferred.
+- **Navigation added mid-epic (R11 / BR6), 2026-08-04.** At this epic's manual test the user reported *"There is no menu in the application"* — correct: epic 1's header carried the app name, the theme switch and the user menu, and the only route into a screen was the landing screen's entry-point cards, with the browser Back button the only way out. No requirement names a menu (source §1 excludes UI layout, deferring it to a later UX design step), so this is a **scope addition, not a missed requirement**. The user chose to add it to this epic rather than defer it, because this epic is what made a second real screen reachable. It is shell work and every later epic inherits it.
+  - The user also chose that the menu offers **every permitted screen**, mirroring the access map exactly — so an Approver is offered "Review and decide expense requests" now and reaches a not-found page until the `expense-request-list` epic builds it. Accepted knowingly; it matches the "KNOWN, DELIBERATE INTERIM STATE" already documented in `web/src/lib/auth/access-map.ts`, and it means no epic has to remember to add itself to the menu.
+
+- **List-refresh inference — RESOLVED at the stories approval (2026-08-03):** the source's automatic-refresh requirement (F-20, UI-05) is stated for the shared transaction list, not explicitly for the file list. This brief extended the same expectation to the file list's status column (Feature NFRs above) because §5's Upload flow describes the uploader waiting for validation to resolve on-screen. **The user confirmed the auto-refresh behaviour** over a manual-refresh-button alternative: while any listed file is still processing the list re-reads itself on an interval and stops once nothing is in progress. Story 3 owns it. This also settles the convention for the later `expense-request-list` epic, whose auto-refresh (R20/R48) is explicit in the source.
 - **Upload request shape:** `POST /v1/files/upload` takes `FileSettingId`, `FileSettingName` and `FileName` as **query parameters** and the raw file as an `application/octet-stream` request body — not a multipart form. The frontend's API client wrapper for this call needs to build the query string and stream the file body directly.
 - **`GET /v1/file-logs` requires `IsActive`** as a required query parameter (example value `"Yes"`). This epic's list call should default to `IsActive=Yes` to show active files (cancelled files, out of this epic's scope, are the `Cancelled` / inactive case).
 - **CORS is an open backend item** (project.md NFR-base-6): neither the auth-api/BFF nor the transactions-api currently returns `Access-Control-Allow-Origin` for the browser-origin cookie flow this epic's upload and list calls depend on. Treat any in-browser cross-origin failure during BUILD as this known backend dependency, not a frontend defect.

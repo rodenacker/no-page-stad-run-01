@@ -16,10 +16,11 @@
  * source documents (`documentation/requirements-application.md` §6.5) name actions,
  * not URLs. Roles come from the §6.5 roles-×-resources matrix.
  *
- * KNOWN, DELIBERATE INTERIM STATE. `/upload` and `/requests` are registered now,
- * before the screens themselves exist, so permission denial is real and testable
- * from this epic onward. Until those epics ship, a PERMITTED user following one of
- * these entry points reaches a not-found page — accepted and temporary.
+ * KNOWN, DELIBERATE INTERIM STATE. Addresses are registered before their screens
+ * exist, so permission denial is real and testable from the first epic onward. Until
+ * an epic ships its screen, a PERMITTED user following that entry point reaches a
+ * not-found page — accepted and temporary. `/upload` has since shipped (the expense
+ * files screen); `/requests` has not.
  *
  * KNOWN FUTURE ADJUSTMENT, not a regression. `/requests` is seeded Approver-only
  * because §6.5 grants the review-and-decide flow to the Approver. Requirements R86
@@ -27,7 +28,7 @@
  * `expense-request-list` epic widens `/requests` to both roles while keeping the
  * decide actions themselves Approver-only inside the screen.
  */
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/types/auth';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/types/auth';
 
 import { hasRole, type RoleBearer } from './roles';
 
@@ -70,23 +71,33 @@ export interface AccessMapEntry {
 }
 
 /**
- * Seeded from requirements §6.5: uploading a file belongs to the Finance Uploader,
- * reviewing and deciding (including bulk approval) to the Approver.
+ * Seeded from requirements §6.5: uploading a file belongs to the Finance Uploader
+ * — the auth service's `Importer` role (`@/types/auth`) — and reviewing and
+ * deciding (including bulk approval) to the Approver.
  */
 export const ACCESS_MAP: readonly AccessMapEntry[] = [
   {
     path: LANDING_PATH,
     permission: 'View main dashboard',
-    allowedRoles: [ROLE_FINANCE_UPLOADER, ROLE_APPROVER],
+    allowedRoles: [ROLE_IMPORTER, ROLE_APPROVER],
   },
   {
+    /**
+     * BOTH roles, deliberately: §6.5 grants `ExpenseFile` READ to the Approver as
+     * well, so both roles open this address and watch the same file list (epic
+     * `expense-file-upload` R9). Submitting a file is the Importer's alone (R8 —
+     * the requirements' "Finance Uploader") and is a role check on the submit
+     * control INSIDE the screen, not on the address — which is why the wording
+     * below describes the screen rather than promising the visitor they may send
+     * something.
+     */
     path: UPLOAD_PATH,
     permission: 'Upload an expense file',
-    allowedRoles: [ROLE_FINANCE_UPLOADER],
+    allowedRoles: [ROLE_IMPORTER, ROLE_APPROVER],
     entryPoint: {
-      label: 'Upload an expense file',
+      label: 'Expense files',
       description:
-        'Submit a CSV file of employee expense payment requests, and see how the files you have sent are getting on.',
+        'See every expense file that has been sent for import and how each one is getting on. New CSV files of employee expense payment requests are submitted here too.',
     },
   },
   {

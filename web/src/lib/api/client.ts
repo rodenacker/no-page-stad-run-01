@@ -23,7 +23,10 @@
  * incoming session explicitly via a `Cookie` header.
  */
 
-import { CLIENT_FALLBACK_MESSAGES } from '@/lib/api/errors';
+import {
+  CLIENT_FALLBACK_DETAILS,
+  CLIENT_FALLBACK_MESSAGES,
+} from '@/lib/api/errors';
 import { API_BASE_PATH } from '@/lib/utils/constants';
 import type {
   APIError,
@@ -86,7 +89,7 @@ export async function apiClient<T = unknown>(
       throw createAPIError(
         CLIENT_FALLBACK_MESSAGES.network,
         0,
-        ['Please check your internet connection and try again.'],
+        [CLIENT_FALLBACK_DETAILS.network],
         url,
       );
     }
@@ -265,7 +268,7 @@ async function handleErrorResponse(
         statusCode,
         errorMessages.length > 0
           ? errorMessages
-          : ['Your session may have expired. Please log in again.'],
+          : [CLIENT_FALLBACK_DETAILS.unauthorized],
         url,
       );
 
@@ -273,7 +276,9 @@ async function handleErrorResponse(
       throw createAPIError(
         CLIENT_FALLBACK_MESSAGES.forbidden,
         statusCode,
-        errorMessages.length > 0 ? errorMessages : ['Access denied.'],
+        errorMessages.length > 0
+          ? errorMessages
+          : [CLIENT_FALLBACK_DETAILS.forbidden],
         url,
       );
 
@@ -281,7 +286,9 @@ async function handleErrorResponse(
       throw createAPIError(
         CLIENT_FALLBACK_MESSAGES.notFound,
         statusCode,
-        errorMessages.length > 0 ? errorMessages : ['Resource not found.'],
+        errorMessages.length > 0
+          ? errorMessages
+          : [CLIENT_FALLBACK_DETAILS.notFound],
         url,
       );
 
@@ -291,9 +298,7 @@ async function handleErrorResponse(
         statusCode,
         errorMessages.length > 0
           ? errorMessages
-          : [
-              'Please try again later or contact support if the problem persists.',
-            ],
+          : [CLIENT_FALLBACK_DETAILS.serverError],
         url,
       );
 

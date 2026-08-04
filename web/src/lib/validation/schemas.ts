@@ -71,6 +71,58 @@ export const signInSchema = z.object({
 export type SignInValues = z.infer<typeof signInSchema>;
 
 /**
+ * The one thing a user is told when the file they chose is not a CSV.
+ *
+ * The wording is the requirement's own (epic `expense-file-upload` R2/R7, source
+ * F-05) and is deliberately about the file rather than about a field, because that
+ * is what the user changed.
+ */
+export const CSV_ONLY_MESSAGE = 'Only CSV files can be uploaded.';
+
+/** Asked for when no file setting has been chosen yet (BR1). */
+export const FILE_SETTING_REQUIRED_MESSAGE =
+  'Choose the file setting this file was prepared for.';
+
+/** Asked for when no file has been chosen yet (BR1). */
+export const FILE_REQUIRED_MESSAGE = 'Choose a CSV file to submit.';
+
+/**
+ * Whether a file's own name identifies a CSV.
+ *
+ * The check is on the NAME (`ExpenseFile.CurrentFileName`, epic
+ * `expense-file-upload` R5) and NOT on the content type the browser reports: the
+ * browser's guess depends on the operating system's file associations, so a
+ * spreadsheet can arrive labelled `text/csv` and a genuine CSV as
+ * `application/octet-stream`. The requirement is about the file name, so that is
+ * what is checked.
+ */
+export const isCsvFileName = (fileName: string): boolean =>
+  /\.csv$/i.test(fileName.trim());
+
+/**
+ * One expense-file submission (epic `expense-file-upload` BR1): a chosen setting,
+ * and the chosen file's own name — which must identify a CSV.
+ *
+ * The file's BYTES are not modelled here. This schema is what decides whether the
+ * submission may be sent at all, and every rule it expresses is about the two
+ * values the user chose; the file itself is carried alongside them.
+ *
+ * `fileSettingId` is a string because that is what a listbox selection is; the
+ * numeric `FileSettingId` the contract wants is resolved from the chosen setting.
+ */
+export const expenseFileSubmissionSchema = z.object({
+  fileSettingId: z.string().min(1, FILE_SETTING_REQUIRED_MESSAGE),
+  fileName: z
+    .string()
+    .min(1, FILE_REQUIRED_MESSAGE)
+    .refine(isCsvFileName, CSV_ONLY_MESSAGE),
+});
+
+export type ExpenseFileSubmissionValues = z.infer<
+  typeof expenseFileSubmissionSchema
+>;
+
+/**
  * User ID validation schema
  * Validates MongoDB ObjectId or UUID format
  */

@@ -31,8 +31,18 @@
  * convention); do not build a second gating mechanism.
  *
  * Access map seeded in this epic, from requirements §6.5 (roles-×-resources):
- *   - upload an expense file            → Finance Uploader only
+ *   - upload an expense file            → Importer only
  *   - review and decide / bulk approve  → Approver only
+ *
+ * SINCE WIDENED, and reflected below. The `expense-file-upload` epic's R9 gives
+ * BOTH roles read access to the expense files, so `/upload` — now the expense
+ * files screen — is offered to each of them, and its entry-point wording no
+ * longer says "upload" (it reads for an Approver who only watches files;
+ * submitting a file stays Finance-Uploader-only, checked inside that screen).
+ * AC-1 below therefore pins that the widened entry point is offered to each
+ * role, located by WHERE IT GOES rather than by its wording. The
+ * hidden-never-disabled contract it used to carry is asserted in full by AC-2,
+ * on the review-and-decide entry point, which is still Approver-only.
  *
  * HIDDEN, NEVER DISABLED (R10). For a role that is excluded, the entry point
  * must be **absent from the DOM** — not a disabled button, not `aria-disabled`,
@@ -62,7 +72,7 @@ import { RoleEntryPoints } from '@/components/dashboard/RoleEntryPoints';
 // Project-wide identity + role sources, shared with the Playwright layer. The
 // userinfo body is never hand-written in a test.
 import { userInfoFor, userInfoForRoles } from '@/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '@/mocks/data/role';
+import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
@@ -90,35 +100,51 @@ vi.mock('next/link', () => ({
 /** The signed-in landing screen — viewable by both roles. */
 const LANDING_PATH = '/';
 
+/**
+ * The expense files screen, which both roles may open. Held as an address rather
+ * than a label because the label is the part the `expense-file-upload` epic
+ * rewords; where the entry point GOES is the stable handle.
+ */
+const EXPENSE_FILES_PATH = '/upload';
+
+/**
+ * The offered entry point that goes to an address, or `null` when the current
+ * roles are not offered it at all. `queryAllByRole` so "offered nothing" reads as
+ * an absence rather than throwing.
+ */
+const entryPointTo = (path: string): HTMLElement | null =>
+  screen
+    .queryAllByRole('link')
+    .find((link) => link.getAttribute('href') === path) ?? null;
+
 describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the permission message', () => {
   // AC-1
-  it('offers the file-upload entry point to a Finance Uploader and does not render it at all for an Approver', () => {
+  // Read the "SINCE WIDENED" note above first: the expense files address is open to
+  // both roles (`expense-file-upload` R9), so this is now "each role is offered it",
+  // and the hidden-never-disabled half of the original criterion lives in AC-2.
+  it('offers the expense-files entry point to an Importer and to an Approver, as a real navigational link', () => {
     const uploaderView = render(
-      <RoleEntryPoints user={userInfoFor(ROLE_FINANCE_UPLOADER)} />,
+      <RoleEntryPoints user={userInfoFor(ROLE_IMPORTER)} />,
     );
 
-    const uploadEntryPoint = screen.getByRole('link', { name: /upload/i });
-    expect(uploadEntryPoint).toBeInTheDocument();
-    expect(uploadEntryPoint).toHaveAttribute('href');
+    const uploaderEntryPoint = entryPointTo(EXPENSE_FILES_PATH);
+    expect(uploaderEntryPoint).toBeInTheDocument();
+    expect(uploaderEntryPoint).toHaveAccessibleName();
 
     uploaderView.unmount();
 
     render(<RoleEntryPoints user={userInfoFor(ROLE_APPROVER)} />);
 
-    // Hidden, never disabled (R10): `hidden: true` still matches aria-hidden and
-    // disabled controls, so a greyed-out entry point would fail these.
-    expect(
-      screen.queryByRole('link', { name: /upload/i, hidden: true }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /upload/i, hidden: true }),
-    ).not.toBeInTheDocument();
-    // Nor as non-semantic greyed-out markup: the wording is not rendered at all.
-    expect(screen.queryAllByText(/upload/i)).toHaveLength(0);
+    // The same screen, offered to the role that only watches files — and offered as
+    // a link, not a button that pushes a route, so it can be opened in a new tab and
+    // is announced as a link.
+    const approverEntryPoint = entryPointTo(EXPENSE_FILES_PATH);
+    expect(approverEntryPoint).toBeInTheDocument();
+    expect(approverEntryPoint).toHaveAccessibleName();
   });
 
   // AC-2
-  it('offers the review-and-decide entry point to an Approver and does not render it at all for a Finance Uploader', () => {
+  it('offers the review-and-decide entry point to an Approver and does not render it at all for an Importer', () => {
     const approverView = render(
       <RoleEntryPoints user={userInfoFor(ROLE_APPROVER)} />,
     );
@@ -129,7 +155,7 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
 
     approverView.unmount();
 
-    render(<RoleEntryPoints user={userInfoFor(ROLE_FINANCE_UPLOADER)} />);
+    render(<RoleEntryPoints user={userInfoFor(ROLE_IMPORTER)} />);
 
     expect(
       screen.queryByRole('link', { name: /review/i, hidden: true }),
@@ -144,17 +170,17 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
   // Runtime-only: that following the link lands on a usable screen is confirmed
   // in the browser (this story's Playwright spec) and on the manual checklist.
   it('offers a way back from the permission message to a screen the role does allow, never back to the denied address', () => {
-    // The denied address is the very entry point a Finance Uploader is offered —
-    // the same access-map entry seen from the other side, so the test cannot
-    // drift from whichever path the map seeds.
-    const uploaderView = render(
-      <RoleEntryPoints user={userInfoFor(ROLE_FINANCE_UPLOADER)} />,
+    // The denied address is the very entry point an Approver is offered and a
+    // Importer is not — the same access-map entry seen from the other side,
+    // so the test cannot drift from whichever path the map seeds.
+    const approverView = render(
+      <RoleEntryPoints user={userInfoFor(ROLE_APPROVER)} />,
     );
     const deniedPath = screen
-      .getByRole('link', { name: /upload/i })
+      .getByRole('link', { name: /review/i })
       .getAttribute('href');
     expect(deniedPath).toBeTruthy();
-    uploaderView.unmount();
+    approverView.unmount();
 
     render(<PermissionDeniedMessage deniedPath={deniedPath as string} />);
 
@@ -174,11 +200,11 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
   it('offers the entry points for the roles on the current session, so a differently-rolled user is offered a different set', () => {
     const bothRolesView = render(
       <RoleEntryPoints
-        user={userInfoForRoles([ROLE_FINANCE_UPLOADER, ROLE_APPROVER])}
+        user={userInfoForRoles([ROLE_IMPORTER, ROLE_APPROVER])}
       />,
     );
 
-    expect(screen.getByRole('link', { name: /upload/i })).toBeInTheDocument();
+    expect(entryPointTo(EXPENSE_FILES_PATH)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /review/i })).toBeInTheDocument();
 
     bothRolesView.unmount();
@@ -186,11 +212,11 @@ describe('Epic sign-in-and-app-shell, Story 4: role-aware entry points and the p
     // Same component, a session carrying one of those roles — the offered set
     // follows `Roles[]` rather than a value hardcoded per screen or remembered
     // from an earlier check (BR3).
-    render(<RoleEntryPoints user={userInfoForRoles([ROLE_APPROVER])} />);
+    render(<RoleEntryPoints user={userInfoForRoles([ROLE_IMPORTER])} />);
 
-    expect(screen.getByRole('link', { name: /review/i })).toBeInTheDocument();
+    expect(entryPointTo(EXPENSE_FILES_PATH)).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: /upload/i, hidden: true }),
+      screen.queryByRole('link', { name: /review/i, hidden: true }),
     ).not.toBeInTheDocument();
   });
 });

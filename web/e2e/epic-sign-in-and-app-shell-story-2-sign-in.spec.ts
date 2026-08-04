@@ -50,7 +50,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-import { financeUploaderUser } from './fixtures/credentials';
+import { importerUser } from './fixtures/credentials';
 import { sessionCookieFor } from './support/auth-api-stub';
 import {
   loginErrorResponse,
@@ -173,11 +173,11 @@ test.describe('Epic sign-in-and-app-shell, Story 2: Sign in', () => {
   test('accepted credentials take the user from the sign-in screen to the main signed-in screen', async ({
     page,
   }) => {
-    await mockAcceptedAuth(page, financeUploaderUser);
+    await mockAcceptedAuth(page, importerUser);
 
     await page.goto(SIGN_IN_ROUTE);
-    await page.getByLabel(USERNAME_LABEL).fill(financeUploaderUser.username);
-    await page.getByLabel(PASSWORD_LABEL).fill(financeUploaderUser.password);
+    await page.getByLabel(USERNAME_LABEL).fill(importerUser.username);
+    await page.getByLabel(PASSWORD_LABEL).fill(importerUser.password);
     await page.getByRole('button', { name: SUBMIT_NAME }).click();
 
     // Landed on the app's main signed-in screen (R1) — not still on sign-in, and
@@ -188,7 +188,7 @@ test.describe('Epic sign-in-and-app-shell, Story 2: Sign in', () => {
     // The shell greets the identity the mocked auth service returned for this
     // role, which is what makes it the *signed-in* screen rather than a public one.
     await expect(page.getByRole('banner')).toContainText(
-      fullNameOf(userInfoFor(financeUploaderUser.role)),
+      fullNameOf(userInfoFor(importerUser.role)),
     );
   });
 
@@ -196,7 +196,7 @@ test.describe('Epic sign-in-and-app-shell, Story 2: Sign in', () => {
   test('the form is completable by keyboard alone, every control shows focus, and the screen passes an automated accessibility check', async ({
     page,
   }) => {
-    await mockAcceptedAuth(page, financeUploaderUser);
+    await mockAcceptedAuth(page, importerUser);
     await page.goto(SIGN_IN_ROUTE);
 
     const username = page.getByLabel(USERNAME_LABEL);
@@ -228,13 +228,13 @@ test.describe('Epic sign-in-and-app-shell, Story 2: Sign in', () => {
     await expect(username).toBeFocused();
     const usernameFocused = await focusPaintOf(username);
 
-    await page.keyboard.type(financeUploaderUser.username);
+    await page.keyboard.type(importerUser.username);
     await page.keyboard.press('Tab');
     await expect(password).toBeFocused();
     const usernameUnfocused = await focusPaintOf(username);
     const passwordFocused = await focusPaintOf(password);
 
-    await page.keyboard.type(financeUploaderUser.password);
+    await page.keyboard.type(importerUser.password);
     await page.keyboard.press('Tab');
     await expect(submit).toBeFocused();
     const submitFocused = await focusPaintOf(submit);
