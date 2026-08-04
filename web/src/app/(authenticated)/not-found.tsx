@@ -32,6 +32,19 @@ import { MapPinOff } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+import type { Metadata } from 'next';
+
+/**
+ * Named like every other screen in the app, so the browser tab — and the history or
+ * bookmark entry left behind by the address that did not work — says what happened
+ * rather than reading as the landing screen. Next collects a `not-found` boundary's own
+ * metadata as the last item in the chain, so this wins over the root default.
+ */
+export const metadata: Metadata = {
+  title: 'Screen not found',
+  description: 'There is no screen at this address.',
+};
+
 export default function AuthenticatedNotFound() {
   return (
     <section className="grid max-w-prose gap-6">
