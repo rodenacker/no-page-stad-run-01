@@ -37,6 +37,7 @@ Added after the user reported at the manual test that the app had no menu. Not a
 - Story 2's keyboard walk to the setting picker did **not** need its press budget raised. The new links add exactly two stops before the form (the app name and the expense-files destination), so the picker is the fifth stop from page load against a budget of forty. That spec was left untouched.
 - An Approver is offered "Review and decide expense requests" now, and following it lands on a page-not-found until that epic is built — exactly as agreed at the manual test. No "coming soon" wording, no filtering.
 - The viewed address is normalised through the access map's own `accessEntryFor()` rather than a string compare, so `/upload/` and `/upload?from=email` mark the same destination current, and an unregistered address marks nothing.
+- **The not-found page had to be brought inside the shell (AC-7), found by the epic-end code review.** The app had no `not-found.tsx` at all, so `notFound()` bubbled past the signed-in layout to Next's own fallback and rendered a page with no header — meaning the one destination the menu deliberately offers-but-hasn't-built stranded the user with only the browser Back button, the exact thing story 4 was added to remove. A `not-found.tsx` inside the `(authenticated)` group keeps that group's layout, and therefore the menu, on the page. Its wording is deliberately generic: it serves genuinely mistyped addresses too, not just the interim unbuilt screen, and it is not "coming soon" scaffolding.
 
 ### Test infrastructure added this epic
 

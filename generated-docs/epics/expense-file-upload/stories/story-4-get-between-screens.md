@@ -31,6 +31,7 @@ The app name becomes a link to `LANDING_PATH`. The current screen is indicated v
 | AC-4 | The screen currently being viewed is marked as the current one in the navigation, and the other destinations are not. | vitest |
 | AC-5 | From the expense files screen a user can reach the landing screen and come back again using only the header, never the browser's Back button. | playwright |
 | AC-6 | The navigation is reachable and operable using the keyboard alone, and remains usable on a narrow phone-sized screen. | playwright |
+| AC-7 | A signed-in user who reaches an address that has no screen — including the permitted-but-not-yet-built one the menu deliberately offers — still sees the header and its navigation, and can leave using it rather than the browser's Back button. | playwright |
 
 ## Manual test checklist
 
@@ -50,6 +51,7 @@ The app name becomes a link to `LANDING_PATH`. The current screen is indicated v
 - **Do not break epic 1's shell or landing-screen tests.** If one of them becomes genuinely wrong because the header now contains links, retarget it with a comment explaining the supersession — as story 1 did for the role-gating tests — rather than weakening or deleting it.
 - **Story 2's keyboard-only E2E walk is at risk.** It reaches the setting picker by pressing Tab from page load until focused, within a fixed press budget. Adding focusable links to the header inserts stops **before** the form. Verify that spec's press budget still reaches the picker, and raise the budget in that spec if the new stops exhaust it — do not remove the header links from the tab order to make it pass (that would break AC-6).
 - **A permitted screen whose epic has not shipped is still offered** (the Approver's review-and-decide link reaches a not-found page for now). This is user-accepted; do not add "coming soon" scaffolding, and do not filter it out.
+- **AC-7 — the not-found page must keep the shell.** Found by the epic-end code review: with no `not-found.tsx` in the `(authenticated)` group, `notFound()` bubbles past that group's layout to Next's root fallback, so the page renders **without** `AppHeader` — stranding the user exactly where R11 says they should not be stranded. The fix is a `not-found.tsx` inside `app/(authenticated)/`, so the segment's layout (and therefore the menu) still renders. Keep its wording plain and generic — it serves real mistyped addresses too, not just the interim unbuilt screen — and do **not** turn it into "coming soon" scaffolding.
 
 ## Notes
 

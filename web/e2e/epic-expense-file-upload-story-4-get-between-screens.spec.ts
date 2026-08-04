@@ -9,9 +9,10 @@
  *
  * Coverage split (feature-planner tags — one tag, one test, one layer):
  * - AC-5 (the header alone gets a user from the expense files screen to the landing
- *   screen and back, never the browser's Back button) and AC-6 (the navigation is
- *   reachable and operable by keyboard alone, and stays usable at phone width)
- *   → this file.
+ *   screen and back, never the browser's Back button), AC-6 (the navigation is
+ *   reachable and operable by keyboard alone, and stays usable at phone width) and
+ *   AC-7 (an address with no screen still keeps the header, and the user can leave by
+ *   it) → this file.
  * - AC-1 (a destination for every screen the roles permit), AC-2 (an excluded screen
  *   is absent, not disabled), AC-3 (the app's name links to the landing screen) and
  *   AC-4 (the screen being viewed is marked as current) → the Vitest layer at
@@ -37,7 +38,7 @@
  *    below.
  * 2. Browser boundary → `page.route()` (below). This story adds no backend call of its
  *    own — the destinations are computed from the session the server already resolved —
- *    but the journey below LANDS on `/upload`, and that screen makes two reads:
+ *    but every journey below LANDS on `/upload`, and that screen makes two reads:
  *    `GET /transactions-api/v1/file-logs?IsActive=Yes` (story 1's list, re-read on a
  *    timer by story 3) and `GET /transactions-api/v1/file-settings` (story 2's picker).
  *    BOTH are mocked in every test here, including the ones that assert nothing about
@@ -78,6 +79,19 @@
  * - Navigation may be client-side (Next.js `Link`) or a full document load; both are
  *   asserted the same way — by the address AND by content only the destination screen
  *   renders.
+ * - AC-7: an address with no screen must be answered INSIDE the signed-in shell — a
+ *   `not-found.tsx` in `app/(authenticated)/`, so that group's layout (and therefore
+ *   `AppHeader` and its navigation) still renders. Today there is no `not-found.tsx`
+ *   anywhere in `app/`, so `notFound()` bubbles past that layout to Next's root
+ *   fallback and the user is stranded with only the browser's Back button — exactly
+ *   what R11 was added to eliminate (story §Reconciled test contracts).
+ * - AC-7's WORDING CONTRACT, deliberately loose because the developer owns that copy
+ *   and it has to serve genuinely mistyped addresses too: the page's own content must
+ *   say the address has no screen, in words containing "not found" / "could not be
+ *   found" / "does not exist". Nothing else about the copy is asserted — no heading
+ *   level, no exact sentence, and no "coming soon" scaffolding is expected or allowed.
+ *   The address must also still be answered with HTTP 404, not a 200 page that reads
+ *   like a screen.
  * - Cookie assumptions: the mock `session` cookie carries production-like attributes
  *   (HttpOnly, SameSite=Strict). `Secure` is omitted because the E2E server is plain
  *   http on localhost; the real cookie's full attribute set is asserted in the Vitest
@@ -93,8 +107,9 @@
  * playwright.config.ts's webServer block boots the FRONTEND only; every backend
  * response below is mocked, so no live backend is contacted and no real credentials
  * are needed.
- * These tests WILL FAIL until the story is implemented (TDD red) — the header shows
- * the app's name as plain text and holds no navigation at all.
+ * These tests WILL FAIL until the story is implemented (TDD red) — the header shows the
+ * app's name as plain text and holds no navigation at all, and the not-found page has
+ * no header on it whatsoever.
  * ---------------------------------------------------------------------------
  */
 import { expect, test } from '@playwright/test';
@@ -103,13 +118,21 @@ import { sessionTokenFor } from './support/auth-api-stub';
 import { createFileLog, fileLogListResponse } from '../src/mocks/data/file-log';
 import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
-import { ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
+import { ROLE_APPROVER, ROLE_FINANCE_UPLOADER } from '../src/mocks/data/role';
 
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 
 /** The two signed-in screens this story moves between (`lib/auth/access-map.ts`). */
 const LANDING_PATH = '/';
 const UPLOAD_PATH = '/upload';
+
+/**
+ * The review-and-decide address: registered in the access map and offered to an
+ * Approver, but its screen belongs to a later epic, so reaching it lands on not-found
+ * for now (story §Reconciled test contracts — user-accepted). That makes it this
+ * project's one real "permitted address with no screen", which is what AC-7 is about.
+ */
+const REQUESTS_PATH = '/requests';
 
 /**
  * The app's name as the header shows it — the accessible name of the link that takes
@@ -122,6 +145,15 @@ const APP_NAME = /employee expenses/i;
  * phone width, and only when the destinations are not already on screen.
  */
 const NAV_TOGGLE_NAME = /(menu|navigat)/i;
+
+/**
+ * How a not-found page tells the user there is no such screen. Deliberately loose: the
+ * developer owns that copy, and it has to read sensibly for a genuinely mistyped
+ * address as well as for the interim unbuilt screen. Any plain wording along these
+ * lines passes; nothing else about the copy is asserted.
+ */
+const NOT_FOUND_MESSAGE =
+  /(not be found|not found|does ?n[o']?t exist|no such)/i;
 
 /**
  * A phone-sized viewport (a current mid-size handset in CSS pixels). Narrow enough
@@ -438,6 +470,64 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     // the same: the destination is there, and following it gets the user to its screen.
     await expect(narrowExpenseFiles).toBeVisible();
     await narrowExpenseFiles.click();
+    await expect(page).toHaveURL(UPLOAD_PATH);
+    await expect(listedFileRow(page)).toBeVisible();
+  });
+
+  // AC-7
+  // The defect the epic-end code review found: `notFound()` has no `not-found.tsx` in
+  // the `(authenticated)` group to answer it, so it bubbles past that group's layout to
+  // Next's root fallback — a page with no `AppHeader` on it, leaving the user with only
+  // the browser's Back button on the very screen the menu sent them to.
+  //
+  // The address is reached DIRECTLY rather than by clicking the menu item, on purpose:
+  // it isolates this test's red on the missing shell (the menu offering and following
+  // this destination is AC-1's and AC-6's job, and the story's manual checklist walks
+  // the Approver's menu click end to end). It is also literally what a mistyped address
+  // does, which is the other half of what the not-found page has to serve.
+  test('an address with no screen still shows the header, and the user can leave by it rather than the browser Back button', async ({
+    page,
+    context,
+  }) => {
+    // The Approver, because this is the role the menu deliberately offers the
+    // not-yet-built review-and-decide screen to.
+    await seedSession(context, ROLE_APPROVER);
+    await mockBrowserIdentityCall(page, ROLE_APPROVER);
+    await mockFileLogList(page);
+    await mockFileSettingList(page);
+    await blockLiveBackends(page);
+
+    const arrival = await page.goto(REQUESTS_PATH);
+    await expect(page).toHaveURL(REQUESTS_PATH);
+
+    // The address genuinely has no screen — answered as not found, not with a page that
+    // reads like a working one. Asserted on the status rather than on copy, so this part
+    // cannot be satisfied by wording alone.
+    expect(
+      arrival?.status(),
+      `a permitted-but-unbuilt address must still be answered as not found, so ${REQUESTS_PATH} cannot look like a screen that works`,
+    ).toBe(404);
+
+    // THE POINT OF THIS TEST: the signed-in shell is still around the not-found page, so
+    // there is a way out of it. This is what fails today — the page is rendered by
+    // Next's root fallback, entirely outside the `(authenticated)` layout, so there is
+    // no header on it at all.
+    await expect(
+      page.getByRole('banner'),
+      'the not-found page must keep the signed-in header, or the user is stranded there (R11)',
+    ).toBeVisible();
+    const wayOut = headerDestination(page, UPLOAD_PATH);
+    await expect(wayOut).toBeVisible();
+    await expect(appNameLink(page)).toBeVisible();
+
+    // ...and the page says plainly that there is no such screen. Wording is the
+    // developer's; only the sense of it is fixed here (see the header's wording
+    // contract), because this page serves mistyped addresses too.
+    await expect(page.getByRole('main')).toContainText(NOT_FOUND_MESSAGE);
+
+    // Leaving is done with the header — nothing here steps back through history — and
+    // the arrival is asserted by content only the expense files screen renders.
+    await wayOut.click();
     await expect(page).toHaveURL(UPLOAD_PATH);
     await expect(listedFileRow(page)).toBeVisible();
   });
