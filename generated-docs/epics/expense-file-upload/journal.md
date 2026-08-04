@@ -2,6 +2,12 @@
 
 Decisions and changes worth remembering from this epic, in build order.
 
+## Manual test — accepted 2026-08-04
+
+The user accepted the epic at the manual-test approval. Recorded honestly: **no per-test results were handed back**, so `state.json.epic.manualTestResults` is empty and the individual checklist items are not evidenced one by one. What is evidenced is the automated suite (64 Vitest tests, 10 Playwright specs against a production build, four quality gates, three code-review passes) plus the user's own confirmation that the blocking role-name defect was resolved.
+
+The items still carried in `state.json.epic.unverifiedAssumptions` were **not** individually signed off and remain open questions for whoever picks up the next epic — in particular whether the live service populates the `Roles` list or only `RolesString`, and the four real-service checks (file status wording, whether a just-submitted file lists immediately, whether the upload's octet-stream + query-parameter shape is accepted, and whether a refusal carries the service's own reason).
+
 ## Story 1 — The submitted expense files list
 
 - The expense files screen is now open to **both roles**, not just the Finance Uploader — the Approver needs to watch files even though they cannot send one. Its entry point on the landing screen was reworded from "Upload an expense file" to "Expense files", with a description that describes the screen rather than promising every visitor they can submit something.

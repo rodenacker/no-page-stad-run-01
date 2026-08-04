@@ -27,7 +27,7 @@
     ],
     "manualTestResults": []
   },
-  "phase": "MANUAL-TEST",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
       "status": "complete",
