@@ -14,7 +14,9 @@
       "Verify how many requests come back in one go: the service sends every imported request in a single response with no paging, and this screen is built for up to ten thousand. If your live data is much larger, the first load will be slow or may not finish — and no test would show that.",
       "Check the Type column against your live data: the app spells out 'Credit — money in' and 'Debit — money out' for the codes C and D, which is what the sample file uses. The service's own documentation spells 'Debit' out in full instead, and anything the app has no wording for is shown exactly as the service sent it (deliberately, not a bug). If your Type column shows raw values, that is which convention your service uses.",
       "Confirm the request-list link now reads 'Expense requests' in the header for both people, and that a Finance Uploader seeing that link (they could not before) is what you want — they can read every request but are offered nothing to decide.",
-      "Confirm what should happen when a signed-out person types an address that does not exist: they are now sent to the sign-in screen rather than shown a 'page not found'. Signed in, a mistyped address shows 'not found' with the app header still on it, so there is a way out."
+      "Confirm what should happen when a signed-out person types an address that does not exist: they are now sent to the sign-in screen rather than shown a 'page not found'. Signed in, a mistyped address shows 'not found' with the app header still on it, so there is a way out.",
+      "Search treats what you type as plain text, ignoring capitals, and matches the amount exactly as the table prints it — so searching 15750 finds the R15,750 request but searching '15,750' or 'R15750' does not. If finance staff expect to search formatted amounts, that needs saying.",
+      "If the service ever returned a request with a blank status, file name or transaction type, that blank is not offered as a filter choice (there would be nothing to name it with, and the picker cannot hold an empty choice). The sample data has no blanks, so this has never been exercised against the real service."
     ],
     "manualTestResults": []
   },
@@ -28,11 +30,11 @@
       "completedAt": "2026-08-05T08:31:01.000Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-05T08:32:37.000Z",
+      "completedAt": "2026-08-05T09:14:49.000Z"
     },
     "3": {
       "status": "pending",

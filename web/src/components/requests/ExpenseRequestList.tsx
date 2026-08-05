@@ -37,12 +37,36 @@
  * - **The status chip is the shared `StatusBadge`**, which pairs an intent colour with
  *   the status TEXT and an icon, never colour alone (R14). This screen supplies only
  *   what each status MEANS; the tokens are the badge's.
+ *
+ * The narrowing layer (R2/R3/R6/R7/R10/R18) sits on top of that one fetched set:
+ *
+ * - **Nothing narrows on the server and nothing re-reads.** The search term and the
+ *   three filters are component state, narrowing the set already in memory. They are
+ *   deliberately NOT in the URL: the endpoint takes no parameters, and nothing in this
+ *   screen asks for a shareable narrowed address.
+ * - **The term narrows as it is typed, with no timer in the way.** Responsiveness at the
+ *   feature NFR's 10,000-row ceiling is React's to manage (`useDeferredValue`, which
+ *   re-filters at a lower priority than the keystrokes) rather than a delay the user
+ *   waits out.
+ * - **The narrowed-empty state is a different answer from the never-imported one**: it
+ *   names what is applied and offers Clear all, and it deliberately does NOT offer the
+ *   upload action (R10/R18 against R9/R17). Offering "submit a file" to someone whose
+ *   own filter hid their requests is the failure mode those requirements exist to
+ *   prevent.
  */
 
 import { CircleCheck, CircleX, Inbox, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
+import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
+import { RequestNarrowingControls } from '@/components/requests/RequestNarrowingControls';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -66,6 +90,12 @@ import {
   transactionTypeLabel,
 } from '@/lib/transactions/display';
 import {
+  NO_NARROWING,
+  appliedNarrowings,
+  narrowRequests,
+  withFilterValue,
+} from '@/lib/transactions/narrowing';
+import {
   TRANSACTION_STATUS_APPROVED,
   TRANSACTION_STATUS_IMPORTED,
   TRANSACTION_STATUS_REJECTED,
@@ -73,6 +103,10 @@ import {
 } from '@/types/transactions';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type {
+  PickOneFilterField,
+  RequestNarrowing,
+} from '@/lib/transactions/narrowing';
 import type {
   TransactionRead,
   TransactionReadList,
@@ -94,6 +128,21 @@ const EMPTY_ACTION_LABEL = 'Submit an expense file';
 
 /** Names what did not happen, so the alert is not just an apology. */
 const FAILED_TITLE = 'Could not load the expense requests';
+
+/**
+ * Requests exist, but everything applied has hidden them all (R10/R18). This is not the
+ * never-imported state and must not read like it — nothing here mentions importing, and
+ * the upload action is not offered.
+ */
+const NARROWED_EMPTY_MESSAGE =
+  'No expense requests match what is currently applied.';
+
+/** The way back, in the user's terms — Clear all sits with the summary above it. */
+const NARROWED_EMPTY_HINT =
+  'Change what is applied, or clear it all, to see the requests again.';
+
+/** A stable empty set, so narrowing is not recomputed while the list is not loaded. */
+const NO_REQUESTS: TransactionRead[] = [];
 
 /**
  * The two thresholds R11/R19 fix. Real durations, deliberately not shortened or
@@ -198,6 +247,14 @@ export function ExpenseRequestList() {
   const [readsRequested, setReadsRequested] = useState(0);
 
   /**
+   * What the user has applied. Every control reads this one, so each shows its own
+   * chosen value the instant it is chosen.
+   */
+  const [narrowing, setNarrowing] = useState<RequestNarrowing>(NO_NARROWING);
+  /** What the search box holds, spaces and all; the term applied is the trimmed one. */
+  const [searchInput, setSearchInput] = useState('');
+
+  /**
    * Reads the list and puts what came back on screen.
    *
    * `stillWatching` is how a caller says its read no longer matters: this component
@@ -271,6 +328,50 @@ export function ExpenseRequestList() {
     setReadsRequested((reads) => reads + 1);
   };
 
+  /**
+   * The term narrows as the user types (R6), with no timer in the way: a debounce long
+   * enough to matter is a debounce the user waits out, and the responsiveness the
+   * feature NFR asks for at the 10,000-row ceiling comes from `useDeferredValue` below
+   * instead — React keeps the keystrokes smooth by re-filtering at lower priority.
+   * Trimmed on the way in: surrounding spaces are typing, not something to narrow by.
+   */
+  const changeSearchInput = (value: string): void => {
+    setSearchInput(value);
+    setNarrowing((current) => ({ ...current, search: value.trim() }));
+  };
+
+  /** A choice from a pick-one filter applies as it is made — nothing to commit. */
+  const changeFilter = (field: PickOneFilterField, value: string): void => {
+    setNarrowing((current) => withFilterValue(current, field, value));
+  };
+
+  /** R18: the search term and every filter go at once, and the whole set is back. */
+  const clearAllNarrowing = (): void => {
+    setSearchInput('');
+    setNarrowing(NO_NARROWING);
+  };
+
+  /**
+   * What the listed requests and the summary are worked out from. It can trail the
+   * controls by a render while React re-filters a large set, which is what keeps typing
+   * responsive at the volume ceiling; it always catches up, and both surfaces read the
+   * SAME value, so the summary can never name a narrowing the rows do not reflect.
+   */
+  const appliedNarrowing = useDeferredValue(narrowing);
+
+  /** The whole fetched set — what the filters offer their choices from. */
+  const fetchedRequests =
+    state.phase === 'loaded' ? state.requests : NO_REQUESTS;
+  /** Recomputed only when the set or the narrowing changes, never per render. */
+  const visibleRequests = useMemo(
+    () => narrowRequests(fetchedRequests, appliedNarrowing),
+    [fetchedRequests, appliedNarrowing],
+  );
+  const applied = useMemo(
+    () => appliedNarrowings(appliedNarrowing),
+    [appliedNarrowing],
+  );
+
   return (
     <div className="grid gap-4">
       {state.phase === 'loading' && state.wait !== 'brief' && (
@@ -307,44 +408,75 @@ export function ExpenseRequestList() {
         </Alert>
       )}
 
-      {state.phase === 'loaded' &&
-        (state.requests.length === 0 ? (
-          <div className="grid justify-items-start gap-4">
-            <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
-            {/* The next step, as a real navigational link rather than a button that
-                pushes a route. */}
-            <Button asChild variant="outline">
-              <Link href={UPLOAD_PATH}>{EMPTY_ACTION_LABEL}</Link>
-            </Button>
-          </div>
-        ) : (
-          <Table>
-            <TableCaption className="sr-only">
-              Imported expense payment requests: the file each came from, its
-              reference, transaction date, the last four digits of its account
-              number, its description, amount, transaction type and status.
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">File</TableHead>
-                <TableHead scope="col">Reference</TableHead>
-                <TableHead scope="col">Transaction date</TableHead>
-                <TableHead scope="col">Account number</TableHead>
-                <TableHead scope="col">Description</TableHead>
-                <TableHead scope="col" className="text-right">
-                  Amount
-                </TableHead>
-                <TableHead scope="col">Type</TableHead>
-                <TableHead scope="col">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {state.requests.map((request) => (
-                <ExpenseRequestRow key={request.Id} request={request} />
-              ))}
-            </TableBody>
-          </Table>
-        ))}
+      {state.phase === 'loaded' && state.requests.length === 0 && (
+        <div className="grid justify-items-start gap-4">
+          <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
+          {/* The next step, as a real navigational link rather than a button that
+              pushes a route. Offered ONLY here: nothing has ever been imported
+              (R9/R17), which is a different answer from a narrowing that hid
+              everything (R10/R18) — see this file's header. */}
+          <Button asChild variant="outline">
+            <Link href={UPLOAD_PATH}>{EMPTY_ACTION_LABEL}</Link>
+          </Button>
+        </div>
+      )}
+
+      {state.phase === 'loaded' && state.requests.length > 0 && (
+        <>
+          {/* The choices come from the WHOLE fetched set, so a filter always offers
+              its own way back out of what it narrowed to. */}
+          <RequestNarrowingControls
+            requests={state.requests}
+            searchInput={searchInput}
+            onSearchInputChange={changeSearchInput}
+            narrowing={narrowing}
+            onFilterChange={changeFilter}
+          />
+
+          {applied.length > 0 && (
+            <AppliedNarrowingSummary
+              applied={applied}
+              onClearAll={clearAllNarrowing}
+            />
+          )}
+
+          {visibleRequests.length === 0 ? (
+            <div className="grid gap-2">
+              <p className="max-w-prose">{NARROWED_EMPTY_MESSAGE}</p>
+              <p className="text-muted-foreground max-w-prose text-sm">
+                {NARROWED_EMPTY_HINT}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableCaption className="sr-only">
+                Imported expense payment requests: the file each came from, its
+                reference, transaction date, the last four digits of its account
+                number, its description, amount, transaction type and status.
+              </TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">File</TableHead>
+                  <TableHead scope="col">Reference</TableHead>
+                  <TableHead scope="col">Transaction date</TableHead>
+                  <TableHead scope="col">Account number</TableHead>
+                  <TableHead scope="col">Description</TableHead>
+                  <TableHead scope="col" className="text-right">
+                    Amount
+                  </TableHead>
+                  <TableHead scope="col">Type</TableHead>
+                  <TableHead scope="col">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleRequests.map((request) => (
+                  <ExpenseRequestRow key={request.Id} request={request} />
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </>
+      )}
     </div>
   );
 }
