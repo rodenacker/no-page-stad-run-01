@@ -15,6 +15,11 @@
  * A caller maps its own status vocabulary to a {@link StatusPresentation} — a
  * `Record<KnownStatus, StatusPresentation>` plus its own known-value guard — and hands
  * the raw status string here. The file list and the expense request list both do.
+ *
+ * It also carries marks that are not statuses but are read the same way — a short phrase
+ * paired with an intent colour, never colour alone (see
+ * `components/requests/PossibleDuplicateMark`). Anything of that shape belongs here
+ * rather than in a badge of its own.
  */
 import { Badge } from '@/components/ui/badge';
 

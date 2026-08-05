@@ -96,6 +96,30 @@
  *   only one of the two is ever in the markup: a table hidden by CSS would still be read
  *   by assistive technology and would still be the thing a test finds. A wide table in a
  *   sideways-scrolling wrapper does not satisfy R16 either way.
+ *
+ * Possible duplicates, and who is told about them (R4/R8/R21, BR2/BR3):
+ *
+ * - **The comparison covers the WHOLE fetched set, once per load.** Which requests are
+ *   marked is worked out from every request that came back — see
+ *   `lib/transactions/duplicates.ts` for the key and the rejected-request exclusion —
+ *   and then carried through the narrow → order → slice pipeline by id. Comparing the
+ *   requests currently on screen instead would make the mark depend on the search term,
+ *   the filters, the ordering and the page: two matching requests on different pages
+ *   would each look unique (story 6 AC-5).
+ * - **The mark is a memo of the fetched data, never an effect.** An effect that
+ *   re-derived it per render would raise the Approver's notification again every time
+ *   the list re-rendered — a keystroke in the search box would bring a dismissed
+ *   notification back.
+ * - **Only the Approver is notified, once per load** (R21). `roles` is how this client
+ *   component learns who is signed in, since the server page holds the session; it
+ *   exists for that decision alone. The marks themselves are identical for both roles,
+ *   and neither role is offered anything to DO about a duplicate in this epic (BR1).
+ *   An Importer sees the marks and is told nothing. Note this is deliberately UNLIKE
+ *   the previous epic's import notification, which is not role-gated.
+ * - **Which duplicates the user has already been told about lives in a ref**, keyed by
+ *   request id, exactly as `SubmittedFilesList` remembers which files it has announced.
+ *   That is what makes a dismissed notification stay dismissed across every later
+ *   re-render, while a duplicate that appears in a LATER read is still news.
  */
 
 import {
@@ -114,12 +138,14 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
 
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
+import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RequestActions } from '@/components/requests/RequestActions';
 import { RequestCards } from '@/components/requests/RequestCards';
 import { RequestDetailPanel } from '@/components/requests/RequestDetailPanel';
@@ -139,6 +165,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useToast } from '@/contexts/ToastContext';
 import {
   fetchTransactions,
   transactionListFailureMessage,
@@ -150,6 +177,7 @@ import {
   subscribeToViewportWidth,
 } from '@/lib/layout/viewport';
 import { transactionTypeLabel } from '@/lib/transactions/display';
+import { possibleDuplicateIdsIn } from '@/lib/transactions/duplicates';
 import {
   NO_NARROWING,
   appliedNarrowings,
@@ -172,6 +200,7 @@ import {
   subscribeToSort,
 } from '@/lib/transactions/sortPreference';
 import { PAGINATION } from '@/lib/utils/constants';
+import { ROLE_APPROVER } from '@/types/auth';
 import {
   TRANSACTION_STATUS_APPROVED,
   TRANSACTION_STATUS_IMPORTED,
@@ -189,6 +218,7 @@ import type {
   RequestColumnDefinition,
   RequestSort,
 } from '@/lib/transactions/ordering';
+import type { ProjectRole } from '@/types/auth';
 import type {
   TransactionRead,
   TransactionReadList,
@@ -232,6 +262,28 @@ const ACTIONS_COLUMN_LABEL = 'Actions';
 
 /** A stable empty set, so narrowing is not recomputed while the list is not loaded. */
 const NO_REQUESTS: TransactionRead[] = [];
+
+/**
+ * Nobody signed in, as far as this component can tell — which notifies nobody. Stable,
+ * so the render that omits the prop does not look like a new set of roles each time.
+ */
+const NO_ROLES: ProjectRole[] = [];
+
+/** Heads the Approver's notification when a load finds possible duplicates (R21). */
+const DUPLICATES_FOUND_TITLE = 'Possible duplicates found';
+
+/**
+ * What the Approver is told: how many requests the load marked, why, and that nothing
+ * has happened to them. ONE sentence for the load, however many requests were marked —
+ * a notification per marked request would bury the screen it is pointing at.
+ *
+ * Always plural: a match takes at least two requests, so a load that marks anything
+ * marks two or more.
+ */
+const duplicatesFoundMessage = (markedRequests: number): string =>
+  `${String(markedRequests)} expense requests share an account number, amount and ` +
+  'transaction date with another request. They are marked in the list; nothing has ' +
+  'been decided on any of them.';
 
 /**
  * The two thresholds R11/R19 fix. Real durations, deliberately not shortened or
@@ -293,18 +345,21 @@ const presentationOf = (
  * One request's row: the service's values, its type in plain language, its status, and
  * the controls that open it.
  *
- * Memoised, and its props kept stable for that reason — the request itself, and one
- * callback that takes the request rather than a fresh closure per row. A row's contents
- * depend on nothing but the request, so a keystroke in the search box or a range bound
+ * Memoised, and its props kept stable for that reason — the request itself, whether the
+ * load marked it a possible duplicate (a plain boolean, so the memo still holds), and
+ * one callback that takes the request rather than a fresh closure per row. A row's
+ * contents depend on nothing else, so a keystroke in the search box or a range bound
  * that leaves the page unchanged re-renders no rows at all. That is what keeps a page
  * render inside the feature NFR's 400ms p95 at the 10,000-row ceiling, where every row
  * carries an action overflow of its own.
  */
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
+  possibleDuplicate,
   onOpen,
 }: {
   request: TransactionRead;
+  possibleDuplicate: boolean;
   onOpen: (request: TransactionRead) => void;
 }) {
   return (
@@ -323,10 +378,17 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
       </TableCell>
       <TableCell>{transactionTypeLabel(request.TransactionType)}</TableCell>
       <TableCell>
-        <StatusBadge
-          status={request.Status}
-          presentation={presentationOf(request)}
-        />
+        {/* Where the request stands, and — beside it, in words — whether another
+            request in the same load repeats it (R8). The mark sits in the row itself
+            so it is readable without opening anything, and it is one element carrying
+            one phrase. */}
+        <div className="flex flex-wrap items-center gap-1">
+          <StatusBadge
+            status={request.Status}
+            presentation={presentationOf(request)}
+          />
+          {possibleDuplicate && <PossibleDuplicateMark />}
+        </div>
       </TableCell>
       <TableCell>
         <RequestActions
@@ -396,7 +458,22 @@ function SortableColumnHeading({
   );
 }
 
-export function ExpenseRequestList() {
+interface ExpenseRequestListProps {
+  /**
+   * The recognised roles the signed-in person holds, from the server page that has the
+   * session (`rolesOf(session)`) — this is a client component and cannot read it.
+   *
+   * It decides ONE thing: who is notified when a load finds a possible duplicate (R21,
+   * the Approver only). The list itself is the same for both roles, and neither is
+   * offered anything that changes a request (R20/BR1). Optional on purpose — a render
+   * that omits it simply notifies nobody.
+   */
+  roles?: ProjectRole[];
+}
+
+export function ExpenseRequestList({
+  roles = NO_ROLES,
+}: ExpenseRequestListProps) {
   const [state, setState] = useState<ListState>(LOADING);
   /** Bumped by Try again; asking for the list again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
@@ -431,6 +508,20 @@ export function ExpenseRequestList() {
    * shows is always the fetched set's own values. `null` is "the reader is on the list".
    */
   const [openRequestId, setOpenRequestId] = useState<number | null>(null);
+
+  /** The app's one notification surface, in the root layout (R21). */
+  const { showToast } = useToast();
+
+  /**
+   * Which possible duplicates the user has already been told about, by request id. This
+   * is a record of what has been SAID, not something rendered, so it lives in a ref —
+   * the same arrangement `SubmittedFilesList` uses to tell a file that has just finished
+   * from one that was already finished when the screen opened.
+   *
+   * It is what makes a dismissed notification stay dismissed: re-rendering the list for
+   * any reason — a keystroke, a sort, a page change — finds nothing new to announce.
+   */
+  const duplicatesAlreadyAnnounced = useRef<Set<number>>(new Set());
 
   /**
    * Whether the reader is at phone width. The browser already knows before React runs,
@@ -589,6 +680,54 @@ export function ExpenseRequestList() {
   /** The whole fetched set — what the filters offer their choices from. */
   const fetchedRequests =
     state.phase === 'loaded' ? state.requests : NO_REQUESTS;
+
+  /**
+   * Which requests this load marks as possible duplicates (BR2/BR3), worked out over the
+   * WHOLE fetched set and keyed on it — so it is derived once per load and not again
+   * until the list is read again. Narrowing, ordering and paging all happen downstream
+   * of this, and none of them can change what it holds (story 6 AC-5).
+   *
+   * A memo of the data, deliberately, not an effect: an effect would re-derive on every
+   * render and re-raise the notification below with it.
+   */
+  const possibleDuplicateIds = useMemo(
+    () => possibleDuplicateIdsIn(fetchedRequests),
+    [fetchedRequests],
+  );
+
+  /** Whether the person reading this is the one R21 asks to be told. */
+  const isApprover = roles.includes(ROLE_APPROVER);
+
+  /**
+   * R21: when a load finds at least one possible duplicate, the Approver is told — ONCE
+   * for the load, however many requests it marked, and only about requests they have not
+   * already been told about. An Importer is told nothing: they see the marks in the list,
+   * which is all R8 asks for.
+   *
+   * The notification does not time out. It is a warning the Approver is meant to act on
+   * (by looking at the marked requests), so it stays until they dismiss it rather than
+   * disappearing while they are reading elsewhere on the screen.
+   */
+  useEffect(() => {
+    if (!isApprover) {
+      return;
+    }
+    const announced = duplicatesAlreadyAnnounced.current;
+    const newlyMarked = [...possibleDuplicateIds].filter(
+      (id) => !announced.has(id),
+    );
+    if (newlyMarked.length === 0) {
+      return;
+    }
+    newlyMarked.forEach((id) => announced.add(id));
+    showToast({
+      variant: 'warning',
+      title: DUPLICATES_FOUND_TITLE,
+      message: duplicatesFoundMessage(possibleDuplicateIds.size),
+      duration: 0,
+    });
+  }, [isApprover, possibleDuplicateIds, showToast]);
+
   /** Recomputed only when the set or the narrowing changes, never per render. */
   const visibleRequests = useMemo(
     () => narrowRequests(fetchedRequests, appliedNarrowing),
@@ -743,6 +882,7 @@ export function ExpenseRequestList() {
                 <RequestCards
                   requests={requestsOnPage}
                   presentationOf={presentationOf}
+                  possibleDuplicateIds={possibleDuplicateIds}
                   onOpenRequest={openRequest}
                 />
               ) : (
@@ -779,6 +919,7 @@ export function ExpenseRequestList() {
                       <ExpenseRequestRow
                         key={request.Id}
                         request={request}
+                        possibleDuplicate={possibleDuplicateIds.has(request.Id)}
                         onOpen={openRequest}
                       />
                     ))}

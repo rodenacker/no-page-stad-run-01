@@ -13,11 +13,17 @@
  * app's own same-origin address, and owns its loading / empty / failed states.
  * Deciding on a request, bulk actions and export belong to later epics — nothing on
  * this screen changes a request.
+ *
+ * The session's roles are handed to the list because it cannot read the session itself,
+ * and for ONE purpose: the Approver — and only the Approver — is notified when a load
+ * finds possible duplicates (brief R21). The list is otherwise identical for both roles,
+ * so this is not a second gate; who may open the address is settled above.
  */
 import { PermissionDeniedMessage } from '@/components/auth/PermissionDeniedMessage';
 import { ExpenseRequestList } from '@/components/requests/ExpenseRequestList';
 import { REQUESTS_PATH, canAccess } from '@/lib/auth/access-map';
 import { requireSession } from '@/lib/auth/requireSession';
+import { rolesOf } from '@/lib/auth/roles';
 
 import type { Metadata } from 'next';
 
@@ -39,7 +45,7 @@ export default async function ExpenseRequestsPage() {
       <h1 className="text-2xl font-semibold tracking-tight">
         Expense requests
       </h1>
-      <ExpenseRequestList />
+      <ExpenseRequestList roles={rolesOf(session)} />
     </div>
   );
 }

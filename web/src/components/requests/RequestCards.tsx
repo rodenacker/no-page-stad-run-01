@@ -16,6 +16,10 @@
  * - **The reference is the primary identifier** (source UI-23), with three key values
  *   beside it — status, amount and transaction date. Everything else about the request,
  *   the account number included, is in the panel the action overflow opens.
+ * - **The possible-duplicate mark is here too** (brief R8): the mark has to be readable
+ *   in the list itself at every width, so it is the same `PossibleDuplicateMark` the
+ *   table row renders, beside the status. Which requests carry it is decided once per
+ *   load over the whole fetched set, upstream of the page this card is on.
  * - **The account number is not printed here at all.** At this width the reader gets it
  *   by opening the request, where the reveal control lives; nothing masked or unmasked
  *   is in the card's markup, which is the strongest form the POPIA requirement can take
@@ -24,6 +28,7 @@
 
 import { memo } from 'react';
 
+import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RequestActions } from '@/components/requests/RequestActions';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import {
@@ -50,28 +55,34 @@ interface RequestCardProps {
   request: TransactionRead;
   /** How each recognised status reads; the list owns that vocabulary. */
   presentationOf: (request: TransactionRead) => StatusPresentation | undefined;
+  /** Whether this load marked the request a possible duplicate (brief BR2/BR3). */
+  possibleDuplicate: boolean;
   /** Opens this request's read-only detail panel. */
   onOpen: (request: TransactionRead) => void;
 }
 
 /**
  * One request's card. Memoised on stable props, exactly as the table's row is: a card's
- * contents depend on nothing but the request, so narrowing that leaves this page
- * unchanged re-renders no cards at all.
+ * contents depend on nothing but the request and one boolean, so narrowing that leaves
+ * this page unchanged re-renders no cards at all.
  */
 const RequestCard = memo(function RequestCard({
   request,
   presentationOf,
+  possibleDuplicate,
   onOpen,
 }: RequestCardProps) {
   return (
     <Card className="gap-3 py-4">
       <CardHeader className="gap-1">
         <p className="font-medium break-words">{request.Reference}</p>
-        <StatusBadge
-          status={request.Status}
-          presentation={presentationOf(request)}
-        />
+        <div className="flex flex-wrap items-center gap-1">
+          <StatusBadge
+            status={request.Status}
+            presentation={presentationOf(request)}
+          />
+          {possibleDuplicate && <PossibleDuplicateMark />}
+        </div>
         <CardAction>
           <RequestActions
             reference={request.Reference}
@@ -103,6 +114,12 @@ interface RequestCardsProps {
   requests: TransactionRead[];
   /** How each recognised status reads; the list owns that vocabulary. */
   presentationOf: (request: TransactionRead) => StatusPresentation | undefined;
+  /**
+   * The ids of every request this load marked a possible duplicate, decided over the
+   * WHOLE fetched set rather than the page below — which is what keeps a mark on a
+   * request whose match is on another page (brief BR3).
+   */
+  possibleDuplicateIds: ReadonlySet<number>;
   /** Opens one request's read-only detail panel. */
   onOpenRequest: (request: TransactionRead) => void;
 }
@@ -110,6 +127,7 @@ interface RequestCardsProps {
 export function RequestCards({
   requests,
   presentationOf,
+  possibleDuplicateIds,
   onOpenRequest,
 }: RequestCardsProps) {
   return (
@@ -119,6 +137,7 @@ export function RequestCards({
           <RequestCard
             request={request}
             presentationOf={presentationOf}
+            possibleDuplicate={possibleDuplicateIds.has(request.Id)}
             onOpen={onOpenRequest}
           />
         </li>

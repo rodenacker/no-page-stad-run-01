@@ -62,3 +62,17 @@ const list = sel => [...card.querySelectorAll(sel + " .txt")].map(n => n.innerTe
 **Suggested template change.** In the `Editable HTML Review Page` section of `.claude/shared/approval-pattern.md`, require `textContent` rather than `innerText` for reading editable nodes (with an explicit note that `innerText` returns `""` inside a collapsed `<details>`, which is where the spec puts this content), and drop the `.filter(Boolean)` blanket-strip so a genuinely-empty field is distinguishable from an unread one. Belt-and-braces at the orchestrator end: treat a payload whose `acceptanceCriteria` is empty for *every* story as a read failure, not an edit — a user deleting all criteria on all stories is not a real scenario. The same `innerText` pattern should be checked in the epic-plan review page and the manual-test check-off page.
 
 **Affected.** `.claude/shared/approval-pattern.md` (page rules + payload shape), the generated `generated-docs/epics/<slug>/stories-review.html` and `generated-docs/epic-plan-review.html`, `.claude/commands/continue.md` §P2 (pasted-payload handling).
+
+## [template] Vitest's 5s default `testTimeout` is too tight for the whole-screen integration tests the template asks for
+
+**What happened.** Three expense-request-list tests (story 2's applied-summary test, both of story 3's range tests, story 4's page-controls test) fail intermittently with `Test timed out in 5000ms` when `npm test` runs the whole suite in parallel workers on a loaded machine. Each passes in isolation in ~2s, and all pass on an uncontended suite run; which of them times out varies from run to run. Verified as not story-specific: with the story under construction stashed, the same three fail.
+
+**Why.** `web/vitest.config.ts` sets no `testTimeout`, so Vitest's 5s default applies — while `testing-policy.md` asks these tests to render a whole screen and drive it through `userEvent` (story 3's types into eight narrowing controls, each keystroke re-rendering a list). ~2s of real work per test leaves almost no headroom once Vitest fans the files out across workers that compete for cores. The result is a red gate that says nothing about the app.
+
+**Why it will recur.** Any project whose screens are rich enough to need multi-control integration tests will hit this, and it gets likelier as the suite grows — more files, more contention. It also teaches the wrong lesson, because the symptom points at the component rather than at the harness.
+
+**Workaround applied.** None in the app. The affected file is re-run on its own to confirm, and the wobble is recorded in `generated-docs/architecture.md` (Cross-epic debt) so nobody reshapes a component to chase it.
+
+**Suggested fix.** Raise `testTimeout` in the template's `web/vitest.config.ts` to something a whole-screen test can meet under contention (10-15s). A timeout is a runaway-test guard, not an assertion, so raising it weakens no test. Optionally cap worker concurrency (`poolOptions.threads.maxThreads`) so jsdom suites do not oversubscribe the machine.
+
+**Affected.** `web/vitest.config.ts`, `.claude/policies/testing-policy.md`
