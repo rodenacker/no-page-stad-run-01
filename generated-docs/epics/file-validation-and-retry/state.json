@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "file-validation-and-retry",
+    "name": "Rejected rows, retry and cancel",
+    "createdAt": "2026-08-05T06:58:11.162Z",
+    "dependsOn": [
+      "expense-file-upload"
+    ],
+    "introducesSharedSurface": true,
+    "unverifiedAssumptions": [
+      "Verify the rejected rows show your file's real values under the right headings: the app assumes each rejected row arrives shaped like an imported request (reference, date, account number, description, amount, type, currency). The service's own documentation only ever shows an example from an unrelated system, so if the live response names its fields differently you could see blank columns, or values under the wrong heading, with the tests still passing.",
+      "Verify each rejected row says the right thing about what is wrong with it: the app assumes the response identifies which field failed for each row, so it can show its own fixed wording for a missing reference, a bad amount, an unreadable date or an unsupported currency, and the service's own reason for a transaction-type problem. If the response carries only one general message per row, or none, rows could all show the same explanation — or the wrong one.",
+      "Verify each download gives you the file you expect: the app uses one address for your original file and a different one for the error file, chosen from the requirements' own mapping. The service publishes a third, very similar address, and the source contract flags this as a known ambiguity — so if the mapping is wrong you could get the error file when you asked for your original CSV, or the wrong file entirely."
+    ],
+    "manualTestResults": []
+  },
+  "phase": "READY-TO-BUILD",
+  "stories": {
+    "1": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "4": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "5": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-05T07:35:00.000Z"
+}
