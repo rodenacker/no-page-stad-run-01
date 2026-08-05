@@ -81,6 +81,21 @@
  *   read goes back to the first one whenever the set underneath it changes, because
  *   page 7 of a set the user has just narrowed to four requests is not a page anyone
  *   asked for.
+ *
+ * Opening one request, and the narrow-viewport presentation (R5/R15/R16/BR1):
+ *
+ * - **A request opens in a panel OVER the list, one at a time** — the user's own choice
+ *   at the stories approval, over an expandable row. This component holds only WHICH
+ *   request is open (by id); the panel holds the reveal, so closing it returns the
+ *   reader to their place, ordering and page untouched. See `RequestDetailPanel`.
+ * - **Still nothing changes a request** (BR1/R5). The only per-request controls are
+ *   "open it" — offered directly and through an action overflow, the mechanism R16 asks
+ *   for at phone width and the place a later epic's actions will go.
+ * - **At phone width the requests are CARDS, not a table.** Which presentation is
+ *   rendered is decided by the browser's own media query, watched as external state, so
+ *   only one of the two is ever in the markup: a table hidden by CSS would still be read
+ *   by assistive technology and would still be the thing a test finds. A wide table in a
+ *   sideways-scrolling wrapper does not satisfy R16 either way.
  */
 
 import {
@@ -94,6 +109,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import {
+  memo,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -103,6 +119,10 @@ import {
 } from 'react';
 
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
+import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
+import { RequestActions } from '@/components/requests/RequestActions';
+import { RequestCards } from '@/components/requests/RequestCards';
+import { RequestDetailPanel } from '@/components/requests/RequestDetailPanel';
 import { RequestListPagination } from '@/components/requests/RequestListPagination';
 import { RequestNarrowingControls } from '@/components/requests/RequestNarrowingControls';
 import { StatusBadge } from '@/components/status/StatusBadge';
@@ -118,15 +138,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   fetchTransactions,
   transactionListFailureMessage,
 } from '@/lib/api/transactions';
 import { UPLOAD_PATH } from '@/lib/auth/access-map';
 import {
-  lastFourDigitsOf,
-  transactionTypeLabel,
-} from '@/lib/transactions/display';
+  isNarrowViewport,
+  isNarrowViewportOnServer,
+  subscribeToViewportWidth,
+} from '@/lib/layout/viewport';
+import { transactionTypeLabel } from '@/lib/transactions/display';
 import {
   NO_NARROWING,
   appliedNarrowings,
@@ -200,6 +223,13 @@ const NARROWED_EMPTY_MESSAGE =
 const NARROWED_EMPTY_HINT =
   'Change what is applied, or clear it all, to see the requests again.';
 
+/**
+ * Heads the column holding each row's controls. Not sortable — there is no value in it
+ * to order by — and read by a screen reader only, since the controls in it name
+ * themselves.
+ */
+const ACTIONS_COLUMN_LABEL = 'Actions';
+
 /** A stable empty set, so narrowing is not recomputed while the list is not loaded. */
 const NO_REQUESTS: TransactionRead[] = [];
 
@@ -249,28 +279,34 @@ const requestsIn = (
   Array.isArray(body?.Transactions) ? body.Transactions : [];
 
 /**
- * An account number as this screen may show it: its last four digits, and nothing
- * else in the markup. The dots are decoration a screen reader skips; what it reads
- * instead says which four digits these are.
+ * How one request's status reads, or `undefined` for a value this app has never heard
+ * of — which the shared badge shows neutral, in the service's own words.
  */
-function MaskedAccountNumber({ accountNumber }: { accountNumber: string }) {
-  const lastFour = lastFourDigitsOf(accountNumber);
+const presentationOf = (
+  request: TransactionRead,
+): StatusPresentation | undefined =>
+  isKnownTransactionStatus(request.Status)
+    ? STATUS_PRESENTATION[request.Status]
+    : undefined;
 
-  if (lastFour === '') {
-    return <span className="text-muted-foreground">Not available</span>;
-  }
-
-  return (
-    <span className="tabular-nums">
-      <span aria-hidden="true">••••</span>
-      <span className="sr-only">ending in </span>
-      {lastFour}
-    </span>
-  );
-}
-
-/** One request's row: the service's values, its type in plain language, its status. */
-function ExpenseRequestRow({ request }: { request: TransactionRead }) {
+/**
+ * One request's row: the service's values, its type in plain language, its status, and
+ * the controls that open it.
+ *
+ * Memoised, and its props kept stable for that reason — the request itself, and one
+ * callback that takes the request rather than a fresh closure per row. A row's contents
+ * depend on nothing but the request, so a keystroke in the search box or a range bound
+ * that leaves the page unchanged re-renders no rows at all. That is what keeps a page
+ * render inside the feature NFR's 400ms p95 at the 10,000-row ceiling, where every row
+ * carries an action overflow of its own.
+ */
+const ExpenseRequestRow = memo(function ExpenseRequestRow({
+  request,
+  onOpen,
+}: {
+  request: TransactionRead;
+  onOpen: (request: TransactionRead) => void;
+}) {
   return (
     <TableRow>
       <TableCell>{request.FileName}</TableCell>
@@ -289,16 +325,20 @@ function ExpenseRequestRow({ request }: { request: TransactionRead }) {
       <TableCell>
         <StatusBadge
           status={request.Status}
-          presentation={
-            isKnownTransactionStatus(request.Status)
-              ? STATUS_PRESENTATION[request.Status]
-              : undefined
-          }
+          presentation={presentationOf(request)}
+        />
+      </TableCell>
+      <TableCell>
+        <RequestActions
+          reference={request.Reference}
+          onOpen={() => {
+            onOpen(request);
+          }}
         />
       </TableCell>
     </TableRow>
   );
-}
+});
 
 /** The arrow beside a heading. Decoration: the direction is in the name, not here. */
 const SORT_ICONS = {
@@ -385,6 +425,22 @@ export function ExpenseRequestList() {
     PAGINATION.DEFAULT_PAGE_SIZE,
   );
   const [pageIndex, setPageIndex] = useState(0);
+
+  /**
+   * Which request is open, by id — never a copy of the request itself, so what the panel
+   * shows is always the fetched set's own values. `null` is "the reader is on the list".
+   */
+  const [openRequestId, setOpenRequestId] = useState<number | null>(null);
+
+  /**
+   * Whether the reader is at phone width. The browser already knows before React runs,
+   * so it is watched rather than copied into state (see `lib/layout/viewport.ts`).
+   */
+  const narrowViewport = useSyncExternalStore(
+    subscribeToViewportWidth,
+    isNarrowViewport,
+    isNarrowViewportOnServer,
+  );
 
   /**
    * Reads the list and puts what came back on screen.
@@ -507,6 +563,22 @@ export function ExpenseRequestList() {
   };
 
   /**
+   * Opening one request changes nothing else: the narrowing, the ordering and the page
+   * are all left where they are, so closing the panel returns the reader to their place.
+   *
+   * Stable, because every row holds it: a callback rebuilt each render would make the
+   * memoised rows re-render on every keystroke, which is the cost they exist to avoid.
+   */
+  const openRequest = useCallback((request: TransactionRead): void => {
+    setOpenRequestId(request.Id);
+  }, []);
+
+  /** Back to the list. The panel goes away, and with it everything it was holding. */
+  const closeOpenRequest = useCallback((): void => {
+    setOpenRequestId(null);
+  }, []);
+
+  /**
    * What the listed requests and the summary are worked out from. It can trail the
    * controls by a render while React re-filters a large set, which is what keeps typing
    * responsive at the volume ceiling; it always catches up, and both surfaces read the
@@ -556,6 +628,20 @@ export function ExpenseRequestList() {
   const requestsOnPage = useMemo(
     () => pageOf(orderedRequests, currentPageIndex, pageSize),
     [orderedRequests, currentPageIndex, pageSize],
+  );
+
+  /**
+   * The request the panel is showing, resolved from the fetched set rather than kept as
+   * a copy — so the panel can never show a value the list no longer holds. A request
+   * that is no longer there closes the panel rather than freezing an old version of it.
+   */
+  const openedRequest = useMemo(
+    () =>
+      openRequestId === null
+        ? null
+        : (fetchedRequests.find((request) => request.Id === openRequestId) ??
+          null),
+    [fetchedRequests, openRequestId],
   );
 
   return (
@@ -650,33 +736,56 @@ export function ExpenseRequestList() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableCaption className="sr-only">
-                Imported expense payment requests: the file each came from, its
-                reference, transaction date, the last four digits of its account
-                number, its description, amount, transaction type and status.
-                Every heading orders the list by its own column.
-              </TableCaption>
-              <TableHeader>
-                {/* Drawn from the column definitions, so every displayed column
-                    has a sort control (R13) rather than most of them having one. */}
-                <TableRow>
-                  {REQUEST_COLUMNS.map((column) => (
-                    <SortableColumnHeading
-                      key={column.key}
-                      column={column}
-                      sort={sort}
-                      onSort={sortBy}
-                    />
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requestsOnPage.map((request) => (
-                  <ExpenseRequestRow key={request.Id} request={request} />
-                ))}
-              </TableBody>
-            </Table>
+            /* One presentation or the other, never both: see this file's header. The
+               tooltip provider is context only and renders nothing of its own. */
+            <TooltipProvider>
+              {narrowViewport ? (
+                <RequestCards
+                  requests={requestsOnPage}
+                  presentationOf={presentationOf}
+                  onOpenRequest={openRequest}
+                />
+              ) : (
+                <Table>
+                  <TableCaption className="sr-only">
+                    Imported expense payment requests: the file each came from,
+                    its reference, transaction date, the last four digits of its
+                    account number, its description, amount, transaction type
+                    and status, and a control that opens each request. Every
+                    value heading orders the list by its own column.
+                  </TableCaption>
+                  <TableHeader>
+                    {/* Drawn from the column definitions, so every displayed
+                        column has a sort control (R13) rather than most of them
+                        having one. */}
+                    <TableRow>
+                      {REQUEST_COLUMNS.map((column) => (
+                        <SortableColumnHeading
+                          key={column.key}
+                          column={column}
+                          sort={sort}
+                          onSort={sortBy}
+                        />
+                      ))}
+                      {/* The controls column: no value in it, so nothing to
+                          order by. */}
+                      <TableHead scope="col" className="text-right">
+                        <span className="sr-only">{ACTIONS_COLUMN_LABEL}</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {requestsOnPage.map((request) => (
+                      <ExpenseRequestRow
+                        key={request.Id}
+                        request={request}
+                        onOpen={openRequest}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TooltipProvider>
           )}
 
           {/* Always on the screen, whether or not there is anywhere to page to
@@ -689,6 +798,19 @@ export function ExpenseRequestList() {
             pageCount={pageCount}
             onPageChange={setPageIndex}
           />
+
+          {/* One request at a time, over the list. It is MOUNTED only while open, which
+              is what makes its reveal die with it (POPIA — see `RequestDetailPanel`);
+              the list keeps its narrowing, ordering and page underneath, so closing
+              puts the reader back exactly where they were. */}
+          {openedRequest !== null && (
+            <RequestDetailPanel
+              key={openedRequest.Id}
+              request={openedRequest}
+              statusPresentation={presentationOf(openedRequest)}
+              onClose={closeOpenRequest}
+            />
+          )}
         </>
       )}
     </div>

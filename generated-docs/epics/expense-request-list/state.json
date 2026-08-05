@@ -21,7 +21,9 @@
       "An amount bound is typed as a plain number — no currency symbol, no thousands separator (the field accepts digits, a decimal point and a minus sign only, to the cent). If people expect to type 'R1 500' or '1,500', that needs saying.",
       "A date bound is entered as a calendar date and matched on the DAY, so the time of day recorded against a request is deliberately ignored at both ends of the range. Confirm nobody needs to narrow to part of a day.",
       "R13 says a column sorts ascending on the first activation and descending on the second, but not what a third does. Clicking the same heading a third time returns it to ascending (so the two directions keep cycling) rather than clearing the ordering — please confirm that is the behaviour you expect.",
-      "Sorting the Account number column orders by the four digits shown on screen, not by the full account number, because ordering rows by a value POPIA does not let us display would leak the order of those hidden values. For the same reason the Type column sorts by the wording you read ('Credit — money in') rather than the backend's raw code ('C'). Please confirm both readings."
+      "Sorting the Account number column orders by the four digits shown on screen, not by the full account number, because ordering rows by a value POPIA does not let us display would leak the order of those hidden values. For the same reason the Type column sorts by the wording you read ('Credit — money in') rather than the backend's raw code ('C'). Please confirm both readings.",
+      "At phone width a request's card shows its reference, status, amount and transaction date, and NOT its account number — the reader gets that (masked, with the reveal) by opening the request. R16 asks for the identifier plus 'two-to-three key values', so which three was this story's choice; confirm those are the three you want on a phone.",
+      "The detail panel prints LastChangedDate and TransactionDate exactly as the service sends them (e.g. '2026-04-16 11:05:00') rather than in a friendlier local format — deliberate, because this epic does not normalise dates and the format is already carried as an unverified assumption. Worth confirming the raw form is acceptable on a screen a person reads."
     ],
     "manualTestResults": []
   },
@@ -56,11 +58,11 @@
       "completedAt": "2026-08-05T11:57:08.000Z"
     },
     "5": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-05T11:58:17.000Z",
+      "completedAt": "2026-08-05T13:09:20.000Z"
     },
     "6": {
       "status": "pending",

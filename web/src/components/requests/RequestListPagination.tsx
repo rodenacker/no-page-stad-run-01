@@ -29,17 +29,19 @@
  * - **Nothing here is a live region.** The rows themselves are the answer to a page
  *   change; announcing "page 2 of 3" as well would talk over the reader every time
  *   they typed in the search box, since the page count changes as the list narrows.
+ * - **The page controls are NOT a list.** The primitive's `PaginationContent` /
+ *   `PaginationItem` slots are a `ul`/`li` pair, and at phone width the list's own
+ *   requests are the screen's list — one `listitem` per request (R16). Three more
+ *   `listitem`s down here would make "one card per request" untrue for anything reading
+ *   the page by role, so these three controls sit in a plain row inside the primitive's
+ *   labelled landmark.
  */
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-} from '@/components/ui/pagination';
+import { Pagination } from '@/components/ui/pagination';
 import {
   Select,
   SelectContent,
@@ -129,39 +131,35 @@ export function RequestListPagination({
           "pagination": the signed-in shell already has a navigation landmark, and
           two landmarks called the same thing tell a screen-reader user nothing. */}
       <Pagination aria-label={PAGES_LABEL} className="mx-0 w-auto justify-end">
-        <PaginationContent>
-          <PaginationItem>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!hasPreviousPage}
-              onClick={() => {
-                onPageChange(pageIndex - 1);
-              }}
-            >
-              <ChevronLeft aria-hidden="true" />
-              {PREVIOUS_LABEL}
-            </Button>
-          </PaginationItem>
-          <PaginationItem className="text-muted-foreground px-2 text-sm whitespace-nowrap">
+        <div className="flex flex-row items-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!hasPreviousPage}
+            onClick={() => {
+              onPageChange(pageIndex - 1);
+            }}
+          >
+            <ChevronLeft aria-hidden="true" />
+            {PREVIOUS_LABEL}
+          </Button>
+          <span className="text-muted-foreground px-2 text-sm whitespace-nowrap">
             {`Page ${String(pageIndex + 1)} of ${String(pageCount)}`}
-          </PaginationItem>
-          <PaginationItem>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!hasNextPage}
-              onClick={() => {
-                onPageChange(pageIndex + 1);
-              }}
-            >
-              {NEXT_LABEL}
-              <ChevronRight aria-hidden="true" />
-            </Button>
-          </PaginationItem>
-        </PaginationContent>
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!hasNextPage}
+            onClick={() => {
+              onPageChange(pageIndex + 1);
+            }}
+          >
+            {NEXT_LABEL}
+            <ChevronRight aria-hidden="true" />
+          </Button>
+        </div>
       </Pagination>
     </div>
   );
