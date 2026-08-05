@@ -81,10 +81,11 @@
  *   renders.
  * - AC-7: an address with no screen must be answered INSIDE the signed-in shell — a
  *   `not-found.tsx` in `app/(authenticated)/`, so that group's layout (and therefore
- *   `AppHeader` and its navigation) still renders. Today there is no `not-found.tsx`
- *   anywhere in `app/`, so `notFound()` bubbles past that layout to Next's root
- *   fallback and the user is stranded with only the browser's Back button — exactly
- *   what R11 was added to eliminate (story §Reconciled test contracts).
+ *   `AppHeader` and its navigation) still renders, rather than Next's root fallback,
+ *   which renders outside every layout and strands the user with only the browser's
+ *   Back button — exactly what R11 was added to eliminate (story §Reconciled test
+ *   contracts). Since every registered address now has a screen, the case is reached
+ *   with a MISTYPED address, which that group answers through its catch-all segment.
  * - AC-7's WORDING CONTRACT, deliberately loose because the developer owns that copy
  *   and it has to serve genuinely mistyped addresses too: the page's own content must
  *   say the address has no screen, in words containing "not found" / "could not be
@@ -127,12 +128,14 @@ const LANDING_PATH = '/';
 const UPLOAD_PATH = '/upload';
 
 /**
- * The review-and-decide address: registered in the access map and offered to an
- * Approver, but its screen belongs to a later epic, so reaching it lands on not-found
- * for now (story §Reconciled test contracts — user-accepted). That makes it this
- * project's one real "permitted address with no screen", which is what AC-7 is about.
+ * An address inside the app that matches no screen — a mistyped or stale one, which is
+ * what AC-7 is about now that every registered address has a screen of its own. It used
+ * to be the review-and-decide address, whose screen belonged to a later epic; that
+ * screen has since shipped (`expense-request-list`), so the "no screen" case is reached
+ * the way a real user reaches it: by getting the address wrong. Deliberately not
+ * registered in the access map, and never a real route.
  */
-const REQUESTS_PATH = '/requests';
+const ADDRESS_WITH_NO_SCREEN = '/expense-reqeusts';
 
 /**
  * The app's name as the header shows it — the accessible name of the link that takes
@@ -489,23 +492,21 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     page,
     context,
   }) => {
-    // The Approver, because this is the role the menu deliberately offers the
-    // not-yet-built review-and-decide screen to.
     await seedSession(context, ROLE_APPROVER);
     await mockBrowserIdentityCall(page, ROLE_APPROVER);
     await mockFileLogList(page);
     await mockFileSettingList(page);
     await blockLiveBackends(page);
 
-    const arrival = await page.goto(REQUESTS_PATH);
-    await expect(page).toHaveURL(REQUESTS_PATH);
+    const arrival = await page.goto(ADDRESS_WITH_NO_SCREEN);
+    await expect(page).toHaveURL(ADDRESS_WITH_NO_SCREEN);
 
     // The address genuinely has no screen — answered as not found, not with a page that
     // reads like a working one. Asserted on the status rather than on copy, so this part
     // cannot be satisfied by wording alone.
     expect(
       arrival?.status(),
-      `a permitted-but-unbuilt address must still be answered as not found, so ${REQUESTS_PATH} cannot look like a screen that works`,
+      `an address with no screen must still be answered as not found, so ${ADDRESS_WITH_NO_SCREEN} cannot look like a screen that works`,
     ).toBe(404);
 
     // THE POINT OF THIS TEST: the signed-in shell is still around the not-found page, so

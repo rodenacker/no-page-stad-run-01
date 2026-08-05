@@ -8,6 +8,14 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    // Vitest's 5s default is a runaway guard, not an assertion — and it is too
+    // tight for whole-screen integration tests. These render a full screen and
+    // drive Radix controls through userEvent, which costs ~1-2s per test alone
+    // but several times that when the whole suite runs in parallel alongside a
+    // production build on a loaded machine. At 5s they failed intermittently
+    // with `Test timed out in 5000ms` while passing in isolation — a flake that
+    // says nothing about the code. Raising the ceiling changes no expectation.
+    testTimeout: 15000,
     include: [
       'src/**/__tests__/**/*.[jt]s?(x)',
       'src/**/?(*.)+(test).[jt]s?(x)',

@@ -21,22 +21,58 @@
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
-import { ROLE_APPROVER, ROLE_IMPORTER } from './role';
-import { createUserWithRoles } from './user';
+import { ROLE_APPROVER, ROLE_IMPORTER, createRole } from './role';
+import { createUser, createUserWithRoles } from './user';
 
 import type { UserInfoRead } from './user';
+
+/**
+ * A role name this project does NOT recognise — the OpenAPI spec's own `"Viewer"`
+ * example, which is not this project's role set (see the note above).
+ *
+ * It exists because "a signed-in account this project grants nothing" is a real
+ * state the app models deliberately (`lib/auth/roles.ts`: an unrecognised role name
+ * grants nothing; `RoleEntryPoints` and `HeaderNav` both answer it explicitly), and
+ * it is the only exclusion left now that every registered address is open to both
+ * real roles. It is what the hidden-never-disabled and in-page-denial criteria are
+ * exercised with.
+ */
+export const UNRECOGNISED_ROLE = 'Viewer';
+
+/**
+ * The userinfo body for a signed-in account whose only role this project does not
+ * recognise ({@link UNRECOGNISED_ROLE}).
+ *
+ * The role is built directly rather than through `roleNamed`, which refuses any name
+ * outside the project's two on purpose — the point of this identity is to carry a
+ * name the app has to grant nothing for, exactly as the auth service could return
+ * one.
+ */
+export const userInfoWithUnrecognisedRole = (): UserInfoRead =>
+  createUser({
+    Id: 303,
+    Email: 'vusi.dlamini@example.co.za',
+    FirstName: 'Vusi',
+    LastName: 'Dlamini',
+    RolesString: UNRECOGNISED_ROLE,
+    Roles: [createRole({ Id: 99, Name: UNRECOGNISED_ROLE })],
+  });
 
 /**
  * The userinfo body for a signed-in user holding the named role.
  *
  * Each role gets its own stable identity (distinct `Id`, name and email), so a
  * test asserting "the header shows who I am signed in as" (brief R3) can tell
- * the two roles apart. Throws on an unknown role name.
+ * the two roles apart. Throws on an unknown role name — {@link UNRECOGNISED_ROLE}
+ * being the one deliberate exception, so both test layers can sign in as an account
+ * this project grants nothing.
  *
  * @example userInfoFor('Approver')
  */
 export const userInfoFor = (roleName: string): UserInfoRead => {
   switch (roleName) {
+    case UNRECOGNISED_ROLE:
+      return userInfoWithUnrecognisedRole();
     case ROLE_IMPORTER:
       return createUserWithRoles([ROLE_IMPORTER], {
         Id: 101,
@@ -54,7 +90,8 @@ export const userInfoFor = (roleName: string): UserInfoRead => {
     default:
       throw new Error(
         `Unknown role "${roleName}". userInfoFor accepts this project's two roles: ` +
-          `${ROLE_IMPORTER}, ${ROLE_APPROVER} ` +
+          `${ROLE_IMPORTER}, ${ROLE_APPROVER}, plus "${UNRECOGNISED_ROLE}" for the ` +
+          `account this project grants nothing ` +
           `(see generated-docs/project.md §Roles & Permissions).`,
       );
   }
