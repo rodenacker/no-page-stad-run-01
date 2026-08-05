@@ -16,3 +16,11 @@ Notable decisions and knock-on effects recorded as each story was built.
 - "Clear all" sits with the box that lists what you have applied, so it is available the moment anything is narrowing the list — not only once the narrowing has hidden everything.
 - When your narrowing hides every request, the screen says so, still shows what is applied, and offers "Clear all" — but deliberately does not offer the "submit an expense file" link. That link belongs only to the case where nothing has ever been imported; offering it to someone whose own filter hid their requests would send them off to upload a file they do not need.
 - The three filters only ever offer values that are actually in the data that came back, so there is nothing to choose that would give you an empty list for no reason. A transaction type the app has plain wording for is offered under that wording, and a type it has never seen is offered exactly as the service sent it — the same wording used in the table, from one shared place, so a row and its filter choice can never read differently.
+
+## Story 3 — Filter by amount range and date range
+
+- The list can now be narrowed to an amount range and a transaction date range as well as by search and the three pick-one filters. You can give just a lower bound, just an upper bound, or both, and a request sitting exactly on a bound is kept.
+- Amounts are compared as numbers, so 9.99 is correctly left out of a 100-to-200 range instead of sneaking in on alphabetical order, and dates are compared by calendar day, so a request recorded at 3pm on the last day of your range still counts as inside it.
+- If you enter a range back-to-front (say a minimum of 200 and a maximum of 100) the screen tells you the range is the wrong way round and simply does not apply it — the list stays exactly as it was rather than going mysteriously empty — and the values you typed stay in the boxes so you can correct whichever one was wrong.
+- Both ranges show up in the same "What is currently applied" panel as everything else and are cleared by the same single Clear all button; there is still only one reset on the screen.
+- The four bound boxes are ordinary typeable fields (a number box for amounts, a date box for dates) rather than calendar-only pickers, so they can be completed entirely from the keyboard.

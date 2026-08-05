@@ -16,7 +16,10 @@
       "Confirm the request-list link now reads 'Expense requests' in the header for both people, and that a Finance Uploader seeing that link (they could not before) is what you want — they can read every request but are offered nothing to decide.",
       "Confirm what should happen when a signed-out person types an address that does not exist: they are now sent to the sign-in screen rather than shown a 'page not found'. Signed in, a mistyped address shows 'not found' with the app header still on it, so there is a way out.",
       "Search treats what you type as plain text, ignoring capitals, and matches the amount exactly as the table prints it — so searching 15750 finds the R15,750 request but searching '15,750' or 'R15750' does not. If finance staff expect to search formatted amounts, that needs saying.",
-      "If the service ever returned a request with a blank status, file name or transaction type, that blank is not offered as a filter choice (there would be nothing to name it with, and the picker cannot hold an empty choice). The sample data has no blanks, so this has never been exercised against the real service."
+      "If the service ever returned a request with a blank status, file name or transaction type, that blank is not offered as a filter choice (there would be nothing to name it with, and the picker cannot hold an empty choice). The sample data has no blanks, so this has never been exercised against the real service.",
+      "The amount range compares the plain number and ignores which currency a request is in. Every request carries a Currency and the sample data is all ZAR, so if your live data ever mixes currencies, a range of 100 to 200 will match amounts between 100 and 200 in any of them. Confirm that is what finance staff expect.",
+      "An amount bound is typed as a plain number — no currency symbol, no thousands separator (the field accepts digits, a decimal point and a minus sign only, to the cent). If people expect to type 'R1 500' or '1,500', that needs saying.",
+      "A date bound is entered as a calendar date and matched on the DAY, so the time of day recorded against a request is deliberately ignored at both ends of the range. Confirm nobody needs to narrow to part of a day."
     ],
     "manualTestResults": []
   },
@@ -37,11 +40,11 @@
       "completedAt": "2026-08-05T09:14:49.000Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-05T09:15:54.000Z",
+      "completedAt": "2026-08-05T10:51:05.000Z"
     },
     "4": {
       "status": "pending",

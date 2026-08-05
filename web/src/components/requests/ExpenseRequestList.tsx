@@ -40,10 +40,15 @@
  *
  * The narrowing layer (R2/R3/R6/R7/R10/R18) sits on top of that one fetched set:
  *
- * - **Nothing narrows on the server and nothing re-reads.** The search term and the
- *   three filters are component state, narrowing the set already in memory. They are
- *   deliberately NOT in the URL: the endpoint takes no parameters, and nothing in this
- *   screen asks for a shareable narrowed address.
+ * - **Nothing narrows on the server and nothing re-reads.** The search term, the three
+ *   pick-one filters and the four range bounds are component state, narrowing the set
+ *   already in memory. They are deliberately NOT in the URL: the endpoint takes no
+ *   parameters, and nothing in this screen asks for a shareable narrowed address.
+ * - **A range entered the wrong way round is reported, never applied.** The report sits
+ *   with the controls and the range stops narrowing entirely — neither bound — so the
+ *   list is left exactly as it was instead of going unexplainedly empty, and the range
+ *   contributes nothing to the summary of what is applied. The bounds the user typed stay
+ *   in their fields: the screen reports, it never swaps, clamps or blanks a value.
  * - **The term narrows as it is typed, with no timer in the way.** Responsiveness at the
  *   feature NFR's 10,000-row ceiling is React's to manage (`useDeferredValue`, which
  *   re-filters at a lower priority than the keystrokes) rather than a delay the user
@@ -93,6 +98,7 @@ import {
   NO_NARROWING,
   appliedNarrowings,
   narrowRequests,
+  rangeReports,
   withFilterValue,
 } from '@/lib/transactions/narrowing';
 import {
@@ -104,7 +110,7 @@ import {
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
 import type {
-  PickOneFilterField,
+  NarrowingField,
   RequestNarrowing,
 } from '@/lib/transactions/narrowing';
 import type {
@@ -340,8 +346,12 @@ export function ExpenseRequestList() {
     setNarrowing((current) => ({ ...current, search: value.trim() }));
   };
 
-  /** A choice from a pick-one filter applies as it is made — nothing to commit. */
-  const changeFilter = (field: PickOneFilterField, value: string): void => {
+  /**
+   * A filter choice, or one end of a range, applies as it is made — nothing to commit.
+   * A range bound is kept exactly as it was typed; whether it can be used as a bound at
+   * all is the narrowing layer's decision, not this screen's.
+   */
+  const changeFilter = (field: NarrowingField, value: string): void => {
     setNarrowing((current) => withFilterValue(current, field, value));
   };
 
@@ -369,6 +379,15 @@ export function ExpenseRequestList() {
   );
   const applied = useMemo(
     () => appliedNarrowings(appliedNarrowing),
+    [appliedNarrowing],
+  );
+  /**
+   * A range the user has entered the wrong way round. Read from the SAME value the rows
+   * and the summary are, so the screen can never report a range it is quietly applying —
+   * or apply one it says it has not.
+   */
+  const reports = useMemo(
+    () => rangeReports(appliedNarrowing),
     [appliedNarrowing],
   );
 
@@ -432,6 +451,22 @@ export function ExpenseRequestList() {
             narrowing={narrowing}
             onFilterChange={changeFilter}
           />
+
+          {/* A range the wrong way round is reported here and applied nowhere: the list
+              stays as it was, which is the whole point (R7 against R10/R18). The report
+              is announced as it appears, so it is not something only a sighted user
+              notices when the list fails to change. */}
+          {reports.map((report) => (
+            <Alert key={report.id}>
+              <TriangleAlert aria-hidden="true" />
+              <AlertTitle className="line-clamp-none">
+                {report.field}
+              </AlertTitle>
+              <AlertDescription className="text-foreground">
+                <p>{report.message}</p>
+              </AlertDescription>
+            </Alert>
+          ))}
 
           {applied.length > 0 && (
             <AppliedNarrowingSummary

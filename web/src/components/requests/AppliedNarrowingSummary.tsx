@@ -7,8 +7,11 @@
  * Three things here are deliberate:
  *
  * - **One item per active narrowing**, from a list handed in rather than from a fixed
- *   set of chips. Story 3's amount and date ranges join it by appearing in
- *   `appliedNarrowings()`, with no change here.
+ *   set of chips. That is how the amount and transaction-date ranges appear here at all:
+ *   `appliedNarrowings()` states them as entries like "100 to 200", and nothing in this
+ *   component knows a range from a pick-one filter. A range entered the wrong way round
+ *   is not applied, so it contributes no entry — it is reported beside the controls
+ *   instead.
  * - **Clear all is offered whenever anything is applied**, not only once the narrowing
  *   has emptied the list: R18 is about restoring the whole set from an ordinary narrowed
  *   list as much as from an empty one. It is the only reset on the screen, so there is
