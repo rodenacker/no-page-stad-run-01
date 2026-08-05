@@ -76,12 +76,18 @@ export const SESSION_TIMED_OUT_REASON = 'session-timed-out';
 export const SIGN_IN_TIMED_OUT_ROUTE = `${SIGN_IN_ROUTE}?${SESSION_ENDED_PARAM}=${SESSION_TIMED_OUT_REASON}`;
 
 /**
- * Default pagination settings
- * Customize based on your application's needs
+ * How a paged list of records behaves: a page holds 20 records until the reader
+ * chooses otherwise, from the fixed choice of 5, 10, 20 and 50 (brief R12).
+ *
+ * These REPLACE the starter template's values (a page size of 25, chosen from
+ * 10/25/50/100). The project's own requirement overrides template code, and it is
+ * stated in one place rather than left here alongside a second, real set somewhere
+ * else — two page-size vocabularies on one screen is exactly how a selector and the
+ * rows it sizes end up disagreeing.
  */
 export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 25,
-  PAGE_SIZE_OPTIONS: [10, 25, 50, 100],
+  DEFAULT_PAGE_SIZE: 20,
+  PAGE_SIZE_OPTIONS: [5, 10, 20, 50],
 } as const;
 
 /**

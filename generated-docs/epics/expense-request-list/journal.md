@@ -24,3 +24,10 @@ Notable decisions and knock-on effects recorded as each story was built.
 - If you enter a range back-to-front (say a minimum of 200 and a maximum of 100) the screen tells you the range is the wrong way round and simply does not apply it — the list stays exactly as it was rather than going mysteriously empty — and the values you typed stay in the boxes so you can correct whichever one was wrong.
 - Both ranges show up in the same "What is currently applied" panel as everything else and are cleared by the same single Clear all button; there is still only one reset on the screen.
 - The four bound boxes are ordinary typeable fields (a number box for amounts, a date box for dates) rather than calendar-only pickers, so they can be completed entirely from the keyboard.
+
+## Story 4 — Sort and page through the request list
+
+- The list now shows 20 requests a page, with a 5 / 10 / 20 / 50 choice. The starter project came with different numbers (25 a page, chosen from 10/25/50/100); those were replaced outright rather than left sitting beside the real ones, so there is only one set of page sizes in the code.
+- The ordering you choose is remembered by the browser for the rest of your session, so leaving the request list and coming back brings it back exactly as you left it. It is deliberately not remembered any longer than that, and it is not part of the address — the backend has no way to be asked for a sorted list, so all the ordering happens on your machine.
+- Every column heading is now a button rather than plain text. That is what lets you sort with the keyboard alone, and it also fixed something the accessibility scan would have caught anyway: a wide table you can scroll sideways has to contain something you can Tab to.
+- Changing a filter, the search term, the ordering or the page size takes you back to page one. Page seven of a list you have just narrowed to four requests is not a page anyone asked for.

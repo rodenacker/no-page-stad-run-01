@@ -58,9 +58,40 @@
  *   upload action (R10/R18 against R9/R17). Offering "submit a file" to someone whose
  *   own filter hid their requests is the failure mode those requirements exist to
  *   prevent.
+ *
+ * Ordering and paging (R12/R13) sit on top of the narrowing, in one pipeline:
+ *
+ * - **Narrow, then order, then slice — in that order.** What is ordered and paged is
+ *   what the search and filters LEFT, never the whole fetched set. Slicing first and
+ *   narrowing afterwards is the regression this order prevents: a request the user
+ *   filtered out would come back on a later page.
+ * - **The whole set is ordered once and the page is a slice of it.** Nothing
+ *   re-derives the narrowed set per row, which is what the feature NFR's 400ms p95
+ *   per-page render at the 10,000-row ceiling needs.
+ * - **The heading row is rendered FROM the column definitions**, so every displayed
+ *   column has a sort control (R13) by construction. Each one is a real button inside
+ *   its `columnheader`, the active column carries `aria-sort`, and the direction is in
+ *   the control's own accessible name — the arrow beside it is decoration, and R15
+ *   does not let an icon carry state on its own.
+ * - **The chosen ordering belongs to the session, not to this component.** It is read
+ *   from `lib/transactions/sortPreference.ts` as external state, so it survives leaving
+ *   the screen and returning (R13) without being copied into component state.
+ * - **The page controls are never taken away.** When the narrowed set fits one page
+ *   they are disabled, not removed (R12) — see `RequestListPagination`. The page being
+ *   read goes back to the first one whenever the set underneath it changes, because
+ *   page 7 of a set the user has just narrowed to four requests is not a page anyone
+ *   asked for.
  */
 
-import { CircleCheck, CircleX, Inbox, TriangleAlert } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  CircleCheck,
+  CircleX,
+  Inbox,
+  TriangleAlert,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   useCallback,
@@ -68,9 +99,11 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
+import { RequestListPagination } from '@/components/requests/RequestListPagination';
 import { RequestNarrowingControls } from '@/components/requests/RequestNarrowingControls';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -102,6 +135,21 @@ import {
   withFilterValue,
 } from '@/lib/transactions/narrowing';
 import {
+  REQUEST_COLUMNS,
+  nextSortFor,
+  orderRequests,
+  pageCountOf,
+  pageOf,
+  sortStateOf,
+} from '@/lib/transactions/ordering';
+import {
+  rememberSort,
+  rememberedSort,
+  rememberedSortOnServer,
+  subscribeToSort,
+} from '@/lib/transactions/sortPreference';
+import { PAGINATION } from '@/lib/utils/constants';
+import {
   TRANSACTION_STATUS_APPROVED,
   TRANSACTION_STATUS_IMPORTED,
   TRANSACTION_STATUS_REJECTED,
@@ -113,6 +161,11 @@ import type {
   NarrowingField,
   RequestNarrowing,
 } from '@/lib/transactions/narrowing';
+import type {
+  RequestColumn,
+  RequestColumnDefinition,
+  RequestSort,
+} from '@/lib/transactions/ordering';
 import type {
   TransactionRead,
   TransactionReadList,
@@ -247,6 +300,62 @@ function ExpenseRequestRow({ request }: { request: TransactionRead }) {
   );
 }
 
+/** The arrow beside a heading. Decoration: the direction is in the name, not here. */
+const SORT_ICONS = {
+  ascending: ArrowUp,
+  descending: ArrowDown,
+  none: ArrowUpDown,
+};
+
+/**
+ * One column's heading and the control that orders the list by it (R13/R15).
+ *
+ * The `columnheader` carries the state (`aria-sort`) and the button carries the
+ * action, which is the standard accessible sorting pattern: a clickable `<th>` would be
+ * unreachable by keyboard, and an arrow on its own would leave the direction to
+ * eyesight alone. Only the column in force reports a direction — ordering is
+ * single-field, so every other column says `none`.
+ */
+function SortableColumnHeading({
+  column,
+  sort,
+  onSort,
+}: {
+  column: RequestColumnDefinition;
+  sort: RequestSort | null;
+  onSort: (column: RequestColumn) => void;
+}) {
+  const direction = sortStateOf(sort, column.key);
+  const SortIcon = SORT_ICONS[direction];
+
+  return (
+    <TableHead
+      scope="col"
+      aria-sort={direction}
+      className={column.numeric === true ? 'text-right' : undefined}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="-mx-2"
+        onClick={() => {
+          onSort(column.key);
+        }}
+      >
+        {column.label}
+        {direction !== 'none' && (
+          <span className="sr-only">, sorted {direction}</span>
+        )}
+        <SortIcon
+          aria-hidden="true"
+          className={direction === 'none' ? 'opacity-50' : undefined}
+        />
+      </Button>
+    </TableHead>
+  );
+}
+
 export function ExpenseRequestList() {
   const [state, setState] = useState<ListState>(LOADING);
   /** Bumped by Try again; asking for the list again is what re-runs the read. */
@@ -259,6 +368,23 @@ export function ExpenseRequestList() {
   const [narrowing, setNarrowing] = useState<RequestNarrowing>(NO_NARROWING);
   /** What the search box holds, spaces and all; the term applied is the trimmed one. */
   const [searchInput, setSearchInput] = useState('');
+
+  /**
+   * The ordering in force. It belongs to the SESSION, not to this component, so it
+   * survives leaving the screen and coming back (R13) — watched as external state
+   * rather than copied into a `useState` an effect would have to fill in.
+   */
+  const sort = useSyncExternalStore(
+    subscribeToSort,
+    rememberedSort,
+    rememberedSortOnServer,
+  );
+
+  /** How many requests a page holds, and which page is being read (from 0). */
+  const [pageSize, setPageSize] = useState<number>(
+    PAGINATION.DEFAULT_PAGE_SIZE,
+  );
+  const [pageIndex, setPageIndex] = useState(0);
 
   /**
    * Reads the list and puts what came back on screen.
@@ -344,6 +470,7 @@ export function ExpenseRequestList() {
   const changeSearchInput = (value: string): void => {
     setSearchInput(value);
     setNarrowing((current) => ({ ...current, search: value.trim() }));
+    setPageIndex(0);
   };
 
   /**
@@ -353,12 +480,30 @@ export function ExpenseRequestList() {
    */
   const changeFilter = (field: NarrowingField, value: string): void => {
     setNarrowing((current) => withFilterValue(current, field, value));
+    setPageIndex(0);
   };
 
   /** R18: the search term and every filter go at once, and the whole set is back. */
   const clearAllNarrowing = (): void => {
     setSearchInput('');
     setNarrowing(NO_NARROWING);
+    setPageIndex(0);
+  };
+
+  /**
+   * R13: ascending the first time a column is asked for, descending the second. The
+   * reader goes back to the first page, because the request that was at the top of page
+   * three is not where they were looking once the whole list has been re-ordered.
+   */
+  const sortBy = (column: RequestColumn): void => {
+    rememberSort(nextSortFor(sort, column));
+    setPageIndex(0);
+  };
+
+  /** A different page size re-cuts the set, so it starts again from the first page. */
+  const changePageSize = (size: number): void => {
+    setPageSize(size);
+    setPageIndex(0);
   };
 
   /**
@@ -389,6 +534,28 @@ export function ExpenseRequestList() {
   const reports = useMemo(
     () => rangeReports(appliedNarrowing),
     [appliedNarrowing],
+  );
+
+  /**
+   * The one pipeline: narrow → order → slice. The narrowed set is ordered ONCE per
+   * change and the page is a slice of that array, which is what keeps a page render
+   * inside the feature NFR's 400ms p95 at the 10,000-row ceiling.
+   */
+  const orderedRequests = useMemo(
+    () => orderRequests(visibleRequests, sort),
+    [visibleRequests, sort],
+  );
+  const pageCount = pageCountOf(orderedRequests.length, pageSize);
+  /**
+   * The page actually shown. Every control that changes the set underneath already
+   * returns the reader to the first page; this keeps them on a real page even when the
+   * set shrinks from somewhere else (the deferred narrowing catching up, a re-read
+   * returning fewer requests), without a render-time state update to do it.
+   */
+  const currentPageIndex = Math.min(pageIndex, pageCount - 1);
+  const requestsOnPage = useMemo(
+    () => pageOf(orderedRequests, currentPageIndex, pageSize),
+    [orderedRequests, currentPageIndex, pageSize],
   );
 
   return (
@@ -488,28 +655,40 @@ export function ExpenseRequestList() {
                 Imported expense payment requests: the file each came from, its
                 reference, transaction date, the last four digits of its account
                 number, its description, amount, transaction type and status.
+                Every heading orders the list by its own column.
               </TableCaption>
               <TableHeader>
+                {/* Drawn from the column definitions, so every displayed column
+                    has a sort control (R13) rather than most of them having one. */}
                 <TableRow>
-                  <TableHead scope="col">File</TableHead>
-                  <TableHead scope="col">Reference</TableHead>
-                  <TableHead scope="col">Transaction date</TableHead>
-                  <TableHead scope="col">Account number</TableHead>
-                  <TableHead scope="col">Description</TableHead>
-                  <TableHead scope="col" className="text-right">
-                    Amount
-                  </TableHead>
-                  <TableHead scope="col">Type</TableHead>
-                  <TableHead scope="col">Status</TableHead>
+                  {REQUEST_COLUMNS.map((column) => (
+                    <SortableColumnHeading
+                      key={column.key}
+                      column={column}
+                      sort={sort}
+                      onSort={sortBy}
+                    />
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleRequests.map((request) => (
+                {requestsOnPage.map((request) => (
                   <ExpenseRequestRow key={request.Id} request={request} />
                 ))}
               </TableBody>
             </Table>
           )}
+
+          {/* Always on the screen, whether or not there is anywhere to page to
+              (R12) — including when the narrowing has left nothing listed. */}
+          <RequestListPagination
+            total={orderedRequests.length}
+            pageSize={pageSize}
+            onPageSizeChange={changePageSize}
+            pageIndex={currentPageIndex}
+            pageCount={pageCount}
+            onPageChange={setPageIndex}
+          />
         </>
       )}
     </div>
