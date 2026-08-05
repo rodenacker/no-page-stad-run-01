@@ -89,7 +89,10 @@ import { AppHeader } from '@/components/layout/AppHeader';
 import { entryPointsFor } from '@/lib/auth/access-map';
 
 // Project-wide identity + role sources, shared with the Playwright layer.
-import { userInfoFor } from '@/mocks/data/identity';
+import {
+  userInfoFor,
+  userInfoWithUnrecognisedRole,
+} from '@/mocks/data/identity';
 import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
@@ -261,48 +264,69 @@ describe('Epic expense-file-upload, Story 4: getting between screens from the he
   });
 
   // AC-2
-  it('does not render the review-and-decide destination at all for an Importer, while offering it to an Approver', () => {
-    const approverView = render(
-      <AppHeader session={userInfoFor(ROLE_APPROVER)} />,
-    );
+  // The excluded account is one whose role the access map does not recognise
+  // (`hasRole` grants an unknown name nothing) — the only exclusion left now that
+  // both real roles may read both feature screens: `expense-file-upload` R9 opened
+  // the expense files screen to each of them, and `expense-request-list` R20 opened
+  // the request list. The criterion itself is unchanged: an excluded destination is
+  // ABSENT, never present-but-disabled.
+  it('does not render a destination at all for a session whose role the access map does not recognise, while offering an Approver every screen it permits', () => {
+    const approver = userInfoFor(ROLE_APPROVER);
+    const permitted = entryPointsFor(approver);
+    // The control case is real: there is something to be excluded FROM, and the
+    // same queries below DO find it for a role that may open it.
+    expect(permitted.length).toBeGreaterThan(0);
 
-    // The control case: the same queries below DO find it for the role that may
-    // open it, so the absence assertions afterwards mean something.
+    const approverView = render(<AppHeader session={approver} />);
+
+    permitted.forEach((destination) => {
+      expect(allHeaderDestinationsIncludingHidden()).toContain(
+        destination.path,
+      );
+      expect(
+        within(header()).getByRole('link', { name: destination.label }),
+      ).toHaveAttribute('href', destination.path);
+    });
     expect(allHeaderDestinationsIncludingHidden()).toContain(
       REVIEW_REQUESTS_PATH,
     );
-    expect(
-      within(header()).getByRole('link', { name: /review/i }),
-    ).toHaveAttribute('href', REVIEW_REQUESTS_PATH);
 
     approverView.unmount();
 
-    render(<AppHeader session={userInfoFor(ROLE_IMPORTER)} />);
+    render(<AppHeader session={userInfoWithUnrecognisedRole()} />);
 
     // Absent from the markup — not hidden from the accessibility tree, not a
-    // disabled button or menu item, and its wording nowhere in the header.
-    expect(allHeaderDestinationsIncludingHidden()).not.toContain(
-      REVIEW_REQUESTS_PATH,
-    );
-    expect(
-      within(header()).queryByRole('link', { name: /review/i, hidden: true }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(header()).queryByRole('button', { name: /review/i, hidden: true }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(header()).queryByRole('menuitem', {
-        name: /review/i,
-        hidden: true,
-      }),
-    ).not.toBeInTheDocument();
-    expect(within(header()).queryAllByText(/review/i)).toHaveLength(0);
+    // disabled button or menu item, and no destination's wording in the header.
+    permitted.forEach((destination) => {
+      expect(allHeaderDestinationsIncludingHidden()).not.toContain(
+        destination.path,
+      );
+      expect(
+        within(header()).queryByRole('link', {
+          name: destination.label,
+          hidden: true,
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(header()).queryByRole('button', {
+          name: destination.label,
+          hidden: true,
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(header()).queryByRole('menuitem', {
+          name: destination.label,
+          hidden: true,
+        }),
+      ).not.toBeInTheDocument();
+      expect(within(header()).queryAllByText(destination.label)).toHaveLength(
+        0,
+      );
+    });
 
-    // The screen this role MAY open is still offered, so the absence above is
-    // about permission rather than an empty header.
-    expect(allHeaderDestinationsIncludingHidden()).toContain(
-      EXPENSE_FILES_PATH,
-    );
+    // The app's own name still links home, so the absence above is about
+    // permission rather than a header that failed to render.
+    expect(allHeaderDestinationsIncludingHidden()).toContain(LANDING_PATH);
   });
 
   // AC-3

@@ -36,9 +36,9 @@
  *   that way.
  *
  * The status chip pairs an intent colour with the status TEXT and an icon, never
- * colour alone (brief §Feature NFRs, source UI-21). Every colour is a token from
- * `globals.css` with a value in both themes, so the chip reads in light and dark
- * without per-screen work (styling-centralisation.md).
+ * colour alone (brief §Feature NFRs, source UI-21). It is the shared
+ * `components/status/StatusBadge`, which owns the intents and their tokens; all this
+ * screen supplies is what each FILE status means.
  */
 
 import {
@@ -50,8 +50,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -77,8 +77,7 @@ import {
   isKnownFileStatus,
 } from '@/types/files';
 
-import type { LucideIcon } from 'lucide-react';
-
+import type { StatusPresentation } from '@/components/status/StatusBadge';
 import type { FileLog, FileLogList, FileStatus } from '@/types/files';
 
 /** What the section is called, and what ties its heading to it. */
@@ -123,60 +122,34 @@ const IMPORTED_TITLE = 'File imported';
 const importedMessage = (file: FileLog): string =>
   `${file.CurrentFileName} finished importing. Records imported: ${file.RecordCount}.`;
 
-/** How each recognised status is shown: an intent colour and an icon, beside its text. */
-interface StatusPresentation {
-  /** Token-based surface + paired foreground; both themes are covered in globals.css. */
-  tone: string;
-  icon: LucideIcon;
-}
-
 /**
- * Intent per status, following the mapping already settled at project level
- * (project.md §Semantic status colors, brief §Feature NFRs): in-progress and
- * finished-well states are informational and successful, a failed validation is a
- * warning the user acts on, and a cancelled file is neutral.
+ * What each recognised file status MEANS, following the mapping settled at project
+ * level (project.md §Semantic status colors, brief §Feature NFRs): in-progress and
+ * finished-well states are informational and successful, a failed validation is
+ * something the user acts on, and a cancelled file is inert. The colours those
+ * intents wear belong to the shared badge, not to this screen.
  */
 const STATUS_PRESENTATION: Record<FileStatus, StatusPresentation> = {
-  [FILE_STATUS_UPLOADED]: {
-    tone: 'bg-info text-info-foreground',
-    icon: FileUp,
-  },
-  [FILE_STATUS_VALIDATING]: {
-    tone: 'bg-info text-info-foreground',
-    icon: LoaderCircle,
-  },
-  [FILE_STATUS_VALIDATION_FAILED]: {
-    tone: 'bg-warning text-warning-foreground',
-    icon: TriangleAlert,
-  },
-  [FILE_STATUS_IMPORTED]: {
-    tone: 'bg-success text-success-foreground',
-    icon: CircleCheck,
-  },
-  [FILE_STATUS_CANCELLED]: {
-    tone: 'bg-muted text-muted-foreground border-border',
-    icon: CircleSlash,
-  },
+  [FILE_STATUS_UPLOADED]: { intent: 'informational', icon: FileUp },
+  [FILE_STATUS_VALIDATING]: { intent: 'informational', icon: LoaderCircle },
+  [FILE_STATUS_VALIDATION_FAILED]: { intent: 'attention', icon: TriangleAlert },
+  [FILE_STATUS_IMPORTED]: { intent: 'positive', icon: CircleCheck },
+  [FILE_STATUS_CANCELLED]: { intent: 'neutral', icon: CircleSlash },
 };
 
 /**
- * A status this app has no name for: shown in neutral, with no icon claiming to know
- * what it means, and — above all — with the service's own words (brief BR5).
+ * The status as the service sent it. A status this app has no name for is left without
+ * a presentation, so the shared badge shows it neutral and iconless — with the
+ * service's own words (brief BR5).
  */
-const UNRECOGNISED_STATUS_TONE = 'bg-muted text-muted-foreground border-border';
-
-/** The status as the service sent it, carried by a colour AND readable as text. */
 function FileStatusBadge({ status }: { status: string }) {
-  const presentation = isKnownFileStatus(status)
-    ? STATUS_PRESENTATION[status]
-    : undefined;
-  const StatusIcon = presentation?.icon;
-
   return (
-    <Badge className={presentation?.tone ?? UNRECOGNISED_STATUS_TONE}>
-      {StatusIcon ? <StatusIcon aria-hidden="true" /> : null}
-      {status}
-    </Badge>
+    <StatusBadge
+      status={status}
+      presentation={
+        isKnownFileStatus(status) ? STATUS_PRESENTATION[status] : undefined
+      }
+    />
   );
 }
 

@@ -1,0 +1,10 @@
+# Journal — The shared expense request list
+
+Notable decisions and knock-on effects recorded as each story was built.
+
+## Story 1 — The shared expense request list
+
+- The status chip that lived inside the submitted-files table is now a shared component both screens use, so a status looks and reads the same wherever it appears. It gained one more meaning for this story — "refused" — which is what a rejected request wears.
+- Opening the request list to the Finance Uploader had a knock-on nobody had spotted: it was the last screen only one role could open, so the app now has no screen that shuts a role out. Four tests from the two earlier epics were checking "this person is not offered that screen" using exactly that pair, so they had nothing left to check. They now use a signed-in account whose role the app doesn't recognise — a real situation (the sign-in service can return any role name, and the app deliberately grants unknown ones nothing) — so the same behaviour is still being proved: an excluded screen is absent from the page rather than shown greyed out, and reaching its address explains what permission is missing.
+- The word "review" has gone from the request-list link in the header and on the home screen; it now reads "Expense requests", because the link is offered to the Finance Uploader too and they cannot decide anything. The permission the screen names when someone is refused changed with it, from "Review and decide on a transaction" to "Read the expense requests" — the read is what this screen actually needs, and deciding stays the Approver's, checked inside the decision flow when that epic ships.
+- A mistyped address inside the app now keeps the app header, so you can leave by the navigation instead of the browser's Back button. That already worked for the request-list address while it had no screen; shipping the screen would have removed the only way to see it, so the behaviour is now general. One trade-off: if you are signed out and mistype an address, you are sent to the sign-in screen rather than shown a "not found" page.

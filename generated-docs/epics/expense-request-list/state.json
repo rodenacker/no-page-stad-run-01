@@ -11,18 +11,21 @@
     "unverifiedAssumptions": [
       "Verify that requests from a cancelled file never appear in this list: the app marks possible duplicates by comparing every request the service returns (minus the rejected ones), on the understanding that a cancelled file's requests are never sent at all. If the service does return them, you will see requests marked as possible duplicates that should not have been compared.",
       "Verify that transaction dates all come back written the same way (e.g. `2026-04-15 15:00:00`): the app orders by date, matches possible duplicates on date, and now also compares dates against an earliest/latest range using the way the service writes them. If the same date can arrive written differently — or with a time of day on some rows and not others — ordering can look wrong, two genuine duplicates may be missed, and a date range can leave out requests that really do fall inside it. A request dated on the last day of your range is the one most likely to go missing.",
-      "Verify how many requests come back in one go: the service sends every imported request in a single response with no paging, and this screen is built for up to ten thousand. If your live data is much larger, the first load will be slow or may not finish — and no test would show that."
+      "Verify how many requests come back in one go: the service sends every imported request in a single response with no paging, and this screen is built for up to ten thousand. If your live data is much larger, the first load will be slow or may not finish — and no test would show that.",
+      "Check the Type column against your live data: the app spells out 'Credit — money in' and 'Debit — money out' for the codes C and D, which is what the sample file uses. The service's own documentation spells 'Debit' out in full instead, and anything the app has no wording for is shown exactly as the service sent it (deliberately, not a bug). If your Type column shows raw values, that is which convention your service uses.",
+      "Confirm the request-list link now reads 'Expense requests' in the header for both people, and that a Finance Uploader seeing that link (they could not before) is what you want — they can read every request but are offered nothing to decide.",
+      "Confirm what should happen when a signed-out person types an address that does not exist: they are now sent to the sign-in screen rather than shown a 'page not found'. Signed in, a mistyped address shows 'not found' with the app header still on it, so there is a way out."
     ],
     "manualTestResults": []
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "BUILD",
   "stories": {
     "1": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-05T08:03:26.000Z",
+      "completedAt": "2026-08-05T08:31:01.000Z"
     },
     "2": {
       "status": "pending",

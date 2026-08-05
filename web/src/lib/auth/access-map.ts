@@ -16,17 +16,22 @@
  * source documents (`documentation/requirements-application.md` §6.5) name actions,
  * not URLs. Roles come from the §6.5 roles-×-resources matrix.
  *
- * KNOWN, DELIBERATE INTERIM STATE. Addresses are registered before their screens
- * exist, so permission denial is real and testable from the first epic onward. Until
- * an epic ships its screen, a PERMITTED user following that entry point reaches a
- * not-found page — accepted and temporary. `/upload` has since shipped (the expense
- * files screen); `/requests` has not.
+ * EVERY REGISTERED ADDRESS NOW HAS A SCREEN. Addresses were registered before their
+ * screens existed, so permission denial was real and testable from the first epic
+ * onward; `/upload` (the expense files screen) and `/requests` (the shared expense
+ * request list) have both since shipped.
  *
- * KNOWN FUTURE ADJUSTMENT, not a regression. `/requests` is seeded Approver-only
- * because §6.5 grants the review-and-decide flow to the Approver. Requirements R86
- * and R87 give BOTH roles read access to the request list and its export, so the
- * `expense-request-list` epic widens `/requests` to both roles while keeping the
- * decide actions themselves Approver-only inside the screen.
+ * WHY EVERY ADDRESS ALLOWS BOTH ROLES. §6.5 grants both roles READ on `Transaction`
+ * and `ExpenseFile`, and each address below is a screen someone READS. What only one
+ * role may DO is checked inside the screen that offers it — submitting a file is the
+ * Importer's alone, deciding on a request is the Approver's — never by withholding the
+ * address, which would take the whole screen away from a role entitled to read it.
+ * That is why the wording of each entry point describes the screen rather than
+ * promising the visitor an action.
+ *
+ * A signed-in account whose roles this project does not recognise is still excluded
+ * from everything by the same rule (`hasRole` grants nothing for an unknown name): it
+ * is offered no entry point and any address answers it with the in-page denial.
  */
 import { ROLE_APPROVER, ROLE_IMPORTER } from '@/types/auth';
 
@@ -101,13 +106,22 @@ export const ACCESS_MAP: readonly AccessMapEntry[] = [
     },
   },
   {
+    /**
+     * BOTH roles, deliberately: §6.5 grants `Transaction` READ to the Finance
+     * Uploader as well as the Approver, and requirements R86/R87 give both of them
+     * the request list and its export (brief R20). Recording a DECISION on a request
+     * is the Approver's alone and is a role check inside that flow, not on this
+     * address — so the permission named here is the read this screen actually needs,
+     * and the wording below describes the screen rather than promising the visitor a
+     * decision they may not make.
+     */
     path: REQUESTS_PATH,
-    permission: 'Review and decide on a transaction',
-    allowedRoles: [ROLE_APPROVER],
+    permission: 'Read the expense requests',
+    allowedRoles: [ROLE_IMPORTER, ROLE_APPROVER],
     entryPoint: {
-      label: 'Review and decide expense requests',
+      label: 'Expense requests',
       description:
-        'Work through the imported expense payment requests and record a decision on each one.',
+        'See every imported employee expense payment request with its current status, and open one for the full detail. Account numbers show only their last four digits.',
     },
   },
 ] as const;

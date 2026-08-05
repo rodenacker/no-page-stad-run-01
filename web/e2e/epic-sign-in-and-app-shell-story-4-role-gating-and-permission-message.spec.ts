@@ -41,23 +41,25 @@
  *   - The excluded address is registered in this story's single route access map
  *     (`designChoices.roleDenialRegistration: "register-now"`), so reaching it
  *     renders the in-page denial instead of falling through to not-found. This
- *     spec does not hardcode that path: it reads it from the review-and-decide
- *     entry point a permitted user is offered, so it follows whatever path the
- *     access map seeds and cannot drift from it. That entry point must therefore be
- *     a real navigational link with an `href` (the same contract this story's Vitest
- *     file asserts), not a click handler on a button.
- *   - WHICH PAIR OF ROLES. The denial is walked on the review-and-decide address,
- *     which the access map grants to the Approver and withholds from the Finance
- *     Uploader. It used to be walked the other way round, on the upload address, but
- *     the `expense-file-upload` epic widened that one to BOTH roles (its R9 — both
- *     roles read the expense files), so it can no longer deny anybody. The criterion
- *     is unchanged: an address the session's roles exclude explains itself in place.
+ *     spec hardcodes neither the path nor the permission wording: it reads both from
+ *     the access map itself, so it follows whatever that map registers and cannot
+ *     drift from it.
+ *   - WHO IS DENIED, AND WHY IT IS NOT A ROLE ANY MORE. The denial used to be walked
+ *     with one real role on an address seeded for the other. Both feature addresses
+ *     have since been widened to BOTH roles, because §6.5 grants both of them READ on
+ *     what those screens show (`expense-file-upload` R9 for the expense files,
+ *     `expense-request-list` R20 for the request list) — what only one role may DO is
+ *     checked inside the screen, not by withholding the address. So neither address
+ *     can deny a real role now, and the account this project excludes is one whose
+ *     role it does not recognise (`hasRole` grants an unknown name nothing — a state
+ *     the auth service can really produce). The criterion is unchanged: an address the
+ *     session's roles exclude explains itself in place.
  *   - The permission message renders as the Shadcn `alert` primitive
  *     (`role="alert"`, per the story's implementation notes), inside story 3's
  *     normal shell (`<header>` → `role="banner"`), naming the missing permission —
- *     requirements §6.5 labels it "Review and decide on a transaction" — and how to
- *     ask for access ("Request the missing access from the account holder",
- *     requirements §6.4 recovery).
+ *     worded as requirements §6.5 names it, read here from the access map entry
+ *     rather than restated — and how to ask for access ("Request the missing access
+ *     from the account holder", requirements §6.4 recovery).
  * - Cookie assumptions: the mock `session` cookie carries production-like
  *   attributes (HttpOnly, SameSite=Strict). `Secure` is omitted because the E2E
  *   server is plain http on localhost; the real cookie's full attribute set is
@@ -82,16 +84,30 @@ import { test, expect } from '@playwright/test';
 // cookie seeded below is the one it recognises for that role. Never an invented
 // literal: a token the stub does not know 401s the server-side gate.
 import { sessionCookieFor, sessionTokenFor } from './support/auth-api-stub';
+// The ONE place that says which roles may open which address, and how the denial is
+// worded — read here instead of restating either, so this spec cannot drift from it.
+import { REQUESTS_PATH, accessEntryFor } from '../src/lib/auth/access-map';
 // The ONE project-wide identity source both test layers share — never inline a
 // userinfo body here. Relative import (not `@/`) so Playwright's runtime resolves
 // it without alias plumbing.
-import { userInfoFor, loginSuccessResponse } from '../src/mocks/data/identity';
-import { ROLE_APPROVER, ROLE_IMPORTER } from '../src/mocks/data/role';
+import {
+  UNRECOGNISED_ROLE,
+  userInfoFor,
+  loginSuccessResponse,
+} from '../src/mocks/data/identity';
+import { ROLE_APPROVER } from '../src/mocks/data/role';
 
 import type { BrowserContext, Page } from '@playwright/test';
 
 /** The signed-in landing screen — the one screen both roles may view. */
 const LANDING_PATH = '/';
+
+/**
+ * The permission the denied address needs, worded exactly as the access map words it
+ * (requirements §6.5). Read from the map so rewording the permission cannot leave
+ * this assertion passing against stale copy.
+ */
+const REQUIRED_PERMISSION = accessEntryFor(REQUESTS_PATH)?.permission ?? '';
 
 /**
  * Seed the mock `session` cookie the app gates on for the named role, and mock
@@ -159,7 +175,7 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
   });
 
   // AC-3
-  test('an Importer opening the review-and-decide address gets the permission message in the app shell, not a not-found page', async ({
+  test('a session whose role the access map does not recognise gets the permission message in the app shell, not a not-found page', async ({
     page,
     context,
   }) => {
@@ -169,38 +185,32 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
     await seedMockSession(page, context, ROLE_APPROVER);
     await mockUserInfoFor(page, ROLE_APPROVER);
 
-    // The address the app itself offers for reviewing and deciding, read from the
-    // landing screen of a role the access map permits — so this spec targets whatever
-    // path the map seeds instead of duplicating a guess at it. `.first()` because
-    // the shell may also offer the same destination in its navigation.
+    // The address is a registered one, read from the access map rather than guessed
+    // at, and it really is offered to a permitted session — which is what makes the
+    // denial below about permission rather than about a screen that does not exist.
+    // `.first()` because the shell offers the same destination in its navigation as
+    // well as on the landing screen.
     await page.goto(LANDING_PATH);
-    const reviewEntryPoint = page
-      .getByRole('link', { name: /review/i })
+    const permittedEntryPoint = page
+      .locator(`a[href="${REQUESTS_PATH}"]`)
       .first();
-    await expect(reviewEntryPoint).toBeVisible();
-    const reviewPath = await reviewEntryPoint.getAttribute('href');
-    if (!reviewPath) {
-      throw new Error(
-        'The review-and-decide entry point must be a navigational link with an ' +
-          "href — the access map path is read from it (see this spec's Mocking " +
-          'strategy).',
-      );
-    }
+    await expect(permittedEntryPoint).toBeVisible();
+    expect(REQUIRED_PERMISSION).not.toBe('');
 
-    // Now go straight to that same address as an Importer (the requirements'
-    // "Finance Uploader"), whom the access map excludes from it — as if the address
-    // had been typed in or bookmarked. Both layers switch role together: re-seeding
-    // overwrites the cookie with the token the auth stub resolves to the Importer,
-    // and the browser-side userinfo follows.
-    await seedMockSession(page, context, ROLE_IMPORTER);
-    await mockUserInfoFor(page, ROLE_IMPORTER);
-    const deniedUser = userInfoFor(ROLE_IMPORTER);
-    const response = await page.goto(reviewPath);
+    // Now go straight to that same address as an account whose role this project does
+    // not recognise, so the access map excludes it from everything — as if the
+    // address had been typed in or bookmarked. Both layers switch identity together:
+    // re-seeding overwrites the cookie with the token the auth stub resolves to that
+    // account, and the browser-side userinfo follows.
+    await seedMockSession(page, context, UNRECOGNISED_ROLE);
+    await mockUserInfoFor(page, UNRECOGNISED_ROLE);
+    const deniedUser = userInfoFor(UNRECOGNISED_ROLE);
+    const response = await page.goto(REQUESTS_PATH);
 
     // A rendered screen, not a not-found (404) or a generic error (5xx) response.
     expect(response?.status()).toBe(200);
     // The denial explains itself in place — the user is not bounced elsewhere.
-    await expect(page).toHaveURL(new RegExp(`${reviewPath}$`));
+    await expect(page).toHaveURL(new RegExp(`${REQUESTS_PATH}$`));
 
     // The in-page permission message (Shadcn `alert` → role="alert"), scoped to the
     // screen's own content: Next.js renders its route announcer as a second,
@@ -209,9 +219,9 @@ test.describe('Epic 1, Story 4: Role-aware entry points and the permission messa
     // the denial is part of the page rather than floating chrome.
     const permissionMessage = page.getByRole('main').getByRole('alert');
     await expect(permissionMessage).toBeVisible();
-    // It names the missing permission (requirements §6.5: "Review and decide on a
-    // transaction") rather than saying only that access was denied.
-    await expect(permissionMessage).toContainText(/review and decide/i);
+    // It names the missing permission, worded as the access map words it
+    // (requirements §6.5), rather than saying only that access was denied.
+    await expect(permissionMessage).toContainText(REQUIRED_PERMISSION);
     // ...and states how to get that access (requirements §6.4 recovery:
     // "Request the missing access from the account holder").
     await expect(permissionMessage).toContainText(

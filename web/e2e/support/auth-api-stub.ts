@@ -37,6 +37,7 @@ import { createServer } from 'node:http';
 
 import { credentialFor } from '../fixtures/credentials';
 import {
+  UNRECOGNISED_ROLE,
   loginErrorResponse,
   loginSuccessResponse,
   logoutSuccessResponse,
@@ -58,10 +59,16 @@ export const AUTH_API_STUB_URL = `http://127.0.0.1:${AUTH_API_STUB_PORT}`;
  * Opaque session values, one per role. The value is what lets the Node boundary
  * answer `GET /v1/auth/userinfo` for whichever role a spec signed in as, without
  * the spec having to hand-write a userinfo body.
+ *
+ * The third entry is a signed-in account whose role this project does NOT recognise
+ * — a real state the auth service can produce and the app answers deliberately (it
+ * is granted nothing). It is how a spec reaches the in-page permission message now
+ * that both real roles may open every registered address.
  */
 const SESSION_TOKENS: Record<string, string> = {
   [ROLE_IMPORTER]: 'mock-session-importer',
   [ROLE_APPROVER]: 'mock-session-approver',
+  [UNRECOGNISED_ROLE]: 'mock-session-unrecognised-role',
 };
 
 const COOKIE_NAME = 'session';
@@ -73,7 +80,8 @@ export const sessionTokenFor = (roleName: string): string => {
     throw new Error(
       `No mock session for role "${roleName}". This project has two roles: ` +
         `${ROLE_IMPORTER}, ${ROLE_APPROVER} ` +
-        `(generated-docs/project.md §Roles & Permissions).`,
+        `(generated-docs/project.md §Roles & Permissions), plus ` +
+        `"${UNRECOGNISED_ROLE}" for the account it grants nothing.`,
     );
   }
   return token;
