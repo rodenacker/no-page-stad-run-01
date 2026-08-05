@@ -5,14 +5,31 @@ import { Tooltip as TooltipPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * `disableHoverableContent` is defaulted ON, unlike the primitive's own default.
+ *
+ * A tooltip here only ever holds the wording of an icon-only control — never a link or
+ * anything else to point at — so there is nothing in it for a pointer to travel INTO,
+ * which is the only thing Radix's hoverable content buys. Left at its default, leaving
+ * the trigger does not close the tooltip: Radix instead draws a "grace area" between the
+ * trigger and the content and waits for a LATER pointer move outside it. A pointer that
+ * leaves in one movement and stops — off the control, off the window, or onto something
+ * that does not move again — never sends that second move, so the wording stays on screen
+ * over the rest of the page indefinitely. Turning hoverable content off makes leaving the
+ * trigger close it, there and then, which is what an icon-only control's name has to do.
+ *
+ * A tooltip that needs to be pointed INTO is the wrong primitive (that is a popover).
+ */
 function TooltipProvider({
   delayDuration = 0,
+  disableHoverableContent = true,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
       delayDuration={delayDuration}
+      disableHoverableContent={disableHoverableContent}
       {...props}
     />
   );

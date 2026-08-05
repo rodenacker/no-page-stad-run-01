@@ -34,42 +34,42 @@
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-05T08:03:26.000Z",
       "completedAt": "2026-08-05T08:31:01.000Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-05T08:32:37.000Z",
       "completedAt": "2026-08-05T09:14:49.000Z"
     },
     "3": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-05T09:15:54.000Z",
       "completedAt": "2026-08-05T10:51:05.000Z"
     },
     "4": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-05T10:52:28.000Z",
       "completedAt": "2026-08-05T11:57:08.000Z"
     },
     "5": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed-after-fix",
       "startedAt": "2026-08-05T11:58:17.000Z",
       "completedAt": "2026-08-05T13:09:20.000Z"
     },
     "6": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-05T13:10:35.000Z",
       "completedAt": "2026-08-05T13:28:56.000Z"
     }
