@@ -21,8 +21,8 @@
  * else through untouched (epic brief §Notes & Caveats — a user-confirmed decision at
  * INTAKE; do not turn this into validation).
  */
-export const TRANSACTION_TYPE_CREDIT = 'C';
-export const TRANSACTION_TYPE_DEBIT = 'D';
+const TRANSACTION_TYPE_CREDIT = 'C';
+const TRANSACTION_TYPE_DEBIT = 'D';
 
 /** Plain language for the codes above, in the user's terms rather than the file's. */
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
