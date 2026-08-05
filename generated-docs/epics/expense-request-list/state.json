@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "expense-request-list",
+    "name": "The shared expense request list",
+    "createdAt": "2026-08-05T05:38:10.288Z",
+    "dependsOn": [
+      "sign-in-and-app-shell"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [
+      "Verify that requests from a cancelled file never appear in this list: the app marks possible duplicates by comparing every request the service returns (minus the rejected ones), on the understanding that a cancelled file's requests are never sent at all. If the service does return them, you will see requests marked as possible duplicates that should not have been compared.",
+      "Verify that transaction dates all come back written the same way (e.g. `2026-04-15 15:00:00`): the app orders by date, matches possible duplicates on date, and now also compares dates against an earliest/latest range using the way the service writes them. If the same date can arrive written differently — or with a time of day on some rows and not others — ordering can look wrong, two genuine duplicates may be missed, and a date range can leave out requests that really do fall inside it. A request dated on the last day of your range is the one most likely to go missing.",
+      "Verify how many requests come back in one go: the service sends every imported request in a single response with no paging, and this screen is built for up to ten thousand. If your live data is much larger, the first load will be slow or may not finish — and no test would show that."
+    ],
+    "manualTestResults": []
+  },
+  "phase": "READY-TO-BUILD",
+  "stories": {
+    "1": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "4": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "5": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "6": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-05T05:38:10.288Z"
+}

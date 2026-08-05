@@ -42,3 +42,23 @@ Type error: Cannot find module './e2e/support/auth-api-stub' or its correspondin
 **Fix applied in this project.** Added `web/playwright.config.ts` to `.dockerignore` beside `web/e2e`, with a comment explaining the coupling.
 
 **Suggested template change.** Ship `web/playwright.config.ts` in `.dockerignore` by default, next to `web/e2e`, with that comment. It costs nothing when the config has no `e2e/` imports and prevents a late, confusing CI-only failure when it does.
+
+## [template] The stories review page returns empty acceptance criteria and manual tests for every collapsed story — silently deleting the plan's detail
+
+**What happened.** At the `expense-request-list` stories approval, the user edited one story's plain summary on the review page and pressed Approve. The pasted payload carried all five stories with correct titles, scopes, roles and plain summaries — and `acceptanceCriteria: []` and `manualTestChecklist: []` on *every one of them*, despite the page having rendered 29 criteria and 29 manual tests.
+
+**Why.** `readStory()` (in the generated `stories-review.html`) reads editable text with `innerText`:
+
+```js
+const list = sel => [...card.querySelectorAll(sel + " .txt")].map(n => n.innerText.trim()).filter(Boolean);
+```
+
+`innerText` is layout-dependent — it returns `""` for elements that are not being rendered. Per the approval-pattern spec, acceptance criteria and manual tests live **inside a collapsed `<details>` disclosure** ("Lead with goals; collapse the detail"), so unless the user happens to expand every story's disclosure before approving, those nodes have no layout and every list comes back empty. The `.filter(Boolean)` then strips the empty strings, so the payload looks like a deliberate deletion rather than a read failure. The same bug hits the `.scope-tag`/`.tag.role`/`.summary` reads only when they are inside a collapsed region, which they are not — which is exactly why the corruption is partial and easy to miss.
+
+**Why it is dangerous.** The two fields it silently empties are the ones that become the story files the `test-generator` and `developer` agents work from. An orchestrator that trusts the payload writes stories with no acceptance criteria at all, and the epic gets built against titles and summaries alone — with no error anywhere, and the user believing they approved the plan they read. The spec's own "collapse the detail" rule guarantees the trigger condition on the default view, so this fires on essentially every stories approval where the user edits anything.
+
+**Workaround applied.** Kept the planner's `acceptanceCriteria` / `manualTestChecklist` for all five stories and applied only the fields that came back populated (the edited plain summary), then told the user plainly what had been ignored and why.
+
+**Suggested template change.** In the `Editable HTML Review Page` section of `.claude/shared/approval-pattern.md`, require `textContent` rather than `innerText` for reading editable nodes (with an explicit note that `innerText` returns `""` inside a collapsed `<details>`, which is where the spec puts this content), and drop the `.filter(Boolean)` blanket-strip so a genuinely-empty field is distinguishable from an unread one. Belt-and-braces at the orchestrator end: treat a payload whose `acceptanceCriteria` is empty for *every* story as a read failure, not an edit — a user deleting all criteria on all stories is not a real scenario. The same `innerText` pattern should be checked in the epic-plan review page and the manual-test check-off page.
+
+**Affected.** `.claude/shared/approval-pattern.md` (page rules + payload shape), the generated `generated-docs/epics/<slug>/stories-review.html` and `generated-docs/epic-plan-review.html`, `.claude/commands/continue.md` §P2 (pasted-payload handling).
