@@ -69,15 +69,26 @@
  *    second mechanism. Neither call's answer says anything about the file's new state
  *    (both are the generic `DefaultResponse` envelope), so:
  *    - a successful retry is followed by a re-read of the page's OWN calls (the
- *      file-logs list it resolves the file from, and `GET /v1/file-process-logs/<id>`);
+ *      file-logs list it resolves the file from, `GET /v1/file-process-logs/<id>`, and
+ *      the file's validation errors);
  *    - while the file is in an in-progress status (`isFileInProgress`) those same
  *      calls are re-read on ONE interval, and the page catches up in place with
  *      nobody touching it;
+ *    - AN ACCEPTED RETRY IS ITSELF A REASON TO KEEP ASKING, whatever the file's status
+ *      says at that moment. The list the file is resolved from may not have caught up
+ *      when the page looks, and a retry that FAILS AGAIN puts the file back into the
+ *      status it already had — so the file need never look in-progress to this page at
+ *      all, and a watch that only starts on catching an in-progress status in one
+ *      sample would never start. The new attempt's rejected rows and error file still
+ *      have to reach the screen (brief FR4, Key Workflow step 5);
  *    - a re-read that FAILS changes nothing on screen: the last known values stay,
  *      the page is not replaced by a failed-load or file-not-available state, and
  *      watching continues (a failed re-read is not a reason to stop);
- *    - once nothing is in progress the interval stops.
- *    No test here knows or asserts the interval — any sensible value satisfies them.
+ *    - once there is nothing left to find out the interval stops.
+ *    No test here knows or asserts the interval, or how long an accepted retry is
+ *    watched for — any sensible values satisfy them. What IS pinned is that ONE timer
+ *    drives every section of the page: each section that has to catch up takes a signal
+ *    from whoever owns that timer rather than growing one of its own.
  * 6. THE CANCEL CONFIRMATION is the Shadcn `alert-dialog` (already installed;
  *    do NOT regenerate it from the CLI, which reinstates a raw colour keyword over
  *    its `bg-overlay/60` token). Radix renders it with `role="alertdialog"`. Per the
@@ -148,6 +159,7 @@ import {
 } from '@/mocks/data/file-log';
 import {
   FILE_PROCESS_LOG_FAILURE_MESSAGE,
+  OUTCOME_VALIDATION_FAILED,
   fileProcessHistory,
   fileProcessHistoryAfterRetry,
   fileProcessHistoryWithRetryRunning,
@@ -156,8 +168,13 @@ import {
 } from '@/mocks/data/file-process-log';
 import { userInfoFor } from '@/mocks/data/identity';
 // A sibling section of this page (the rejected rows) reads the validation errors on
-// mount; answered from the shared factory so it renders harmlessly here.
-import { validationErrorsResponse } from '@/mocks/data/validation-error';
+// mount, and again whenever the page asks its calls again — answered from the shared
+// factories, whose per-defect rows are what tell one attempt's rows from another's.
+import {
+  invalidRowWithNonNumericAmount,
+  invalidRowWithUnsupportedCurrency,
+  validationErrorsResponse,
+} from '@/mocks/data/validation-error';
 import { ROLE_IMPORTER } from '@/types/auth';
 
 import type { APIError, APIRequestConfig, DefaultResponse } from '@/types/api';
@@ -166,6 +183,8 @@ import type {
   FileLogList,
   FileProcessLog,
   FileProcessLogList,
+  ValidationErrorRow,
+  ValidationErrors,
 } from '@/types/files';
 
 vi.mock('@/lib/api/client', () => ({
@@ -268,9 +287,25 @@ const READ_FAILED = refusal(
 /** One scripted answer to a call: the body the service sends, or the failure it throws. */
 type Scripted<T> = { readonly body: T } | { readonly failure: APIError };
 
+/** The three reads this page makes, as the scripting below names them. */
+type PageRead = 'files' | 'history' | 'rejectedRows';
+
+/**
+ * How many more times each read must FAIL before it answers as scripted again.
+ *
+ * This is how a test refuses one read without depending on WHEN that read happens: a
+ * re-read the page makes as soon as a retry is accepted lands on a failure whether it
+ * arrives immediately or a moment later, so what the test pins is the page's behaviour
+ * rather than the order two microtasks happened to run in.
+ */
+let readFailuresOwed: Record<PageRead, number>;
+
 let fileLogsScript: Scripted<FileLogList> = { body: fileLogListResponse([]) };
 let historyScript: Scripted<FileProcessLogList> = {
   body: fileProcessLogListResponse([]),
+};
+let rejectedRowsScript: Scripted<ValidationErrors> = {
+  body: validationErrorsResponse([]),
 };
 let retryScript: Scripted<DefaultResponse> = { body: retrySuccessResponse() };
 let cancelScript: Scripted<DefaultResponse> = { body: cancelSuccessResponse() };
@@ -287,6 +322,21 @@ const deliver = async <T,>(scripted: Scripted<T>): Promise<T> => {
   return scripted.body;
 };
 
+/** One of the page's reads: refused while it still owes a failure, else as scripted. */
+const deliverRead = async <T,>(
+  read: PageRead,
+  scripted: Scripted<T>,
+): Promise<T> => {
+  if (readFailuresOwed[read] > 0) {
+    readFailuresOwed = {
+      ...readFailuresOwed,
+      [read]: readFailuresOwed[read] - 1,
+    };
+    throw READ_FAILED;
+  }
+  return deliver(scripted);
+};
+
 /** What the file-logs read (the page's way of resolving the file) answers from now on. */
 const serveFile = (file: FileLog): void => {
   fileLogsScript = { body: fileLogListResponse([file]) };
@@ -297,10 +347,28 @@ const serveHistory = (activities: FileProcessLog[]): void => {
   historyScript = { body: fileProcessLogListResponse(activities) };
 };
 
+/** Which rejected rows the file's validation-errors read answers with from now on. */
+const serveRejectedRows = (rows: ValidationErrorRow[]): void => {
+  rejectedRowsScript = { body: validationErrorsResponse(rows) };
+};
+
 /** Every read the page makes now fails — the background-refresh-failed case. */
 const refuseReads = (): void => {
   fileLogsScript = { failure: READ_FAILED };
   historyScript = { failure: READ_FAILED };
+  rejectedRowsScript = { failure: READ_FAILED };
+};
+
+/**
+ * The NEXT read of each of the page's calls fails, and every read after that answers
+ * whatever is scripted by then.
+ *
+ * That is what pins a page that does not decide on ONE sample: its immediate re-read
+ * after a retry lands on a failure, so only a LATER read can bring the new attempt's
+ * rows to the screen.
+ */
+const refuseTheNextReadOfEverything = (): void => {
+  readFailuresOwed = { files: 1, history: 1, rejectedRows: 1 };
 };
 
 /** One recorded mutating call: which file it named, and who it was attributed to. */
@@ -367,16 +435,17 @@ const route = async (
     return deliver(retryScript);
   }
   if (path.includes('/v1/files/validation-errors')) {
-    // The rejected-rows section of this page reads this on mount. It is another
-    // story's surface: answered with no rows so it renders its own empty state, and
-    // nothing here asserts anything about it.
-    return validationErrorsResponse([]);
+    // The rejected-rows section of this page reads this on mount, and again whenever
+    // the page asks its calls again. It is another story's surface — answered with no
+    // rows by default so it renders its own empty state harmlessly — but WHICH
+    // attempt's rows are on screen after a retry is this story's business (AC-3).
+    return deliverRead('rejectedRows', rejectedRowsScript);
   }
   if (path.includes('/v1/file-process-logs')) {
-    return deliver(historyScript);
+    return deliverRead('history', historyScript);
   }
   if (path.includes('/v1/file-logs')) {
-    return deliver(fileLogsScript);
+    return deliverRead('files', fileLogsScript);
   }
 
   throw new Error(
@@ -444,6 +513,26 @@ const openFile = async (
 const offeredControl = (name: RegExp): HTMLElement | null =>
   screen.queryByRole('button', { name, hidden: true });
 
+/**
+ * The value a rejected row was rejected FOR, as it appears in its cell — read off the
+ * fixture rather than restated, so this file states no expense value of its own.
+ *
+ * Refused loudly if the factory stops carrying it: an absent value would make an
+ * "these rows are the new attempt's" assertion pass against an empty screen.
+ */
+const rejectedValue = (
+  value: string | number | undefined,
+  what: string,
+): string => {
+  if (value === undefined || value === '') {
+    throw new Error(
+      `The rejected-row fixture carries no ${what}, which this test identifies the ` +
+        'row by — see invalidRowWithDefectOn in @/mocks/data/validation-error.',
+    );
+  }
+  return String(value);
+};
+
 describe('Epic file-validation-and-retry, Story 4: retrying validation or cancelling the file', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -451,6 +540,8 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
 
     fileLogsScript = { body: fileLogListResponse([]) };
     historyScript = { body: fileProcessLogListResponse(fileProcessHistory()) };
+    rejectedRowsScript = { body: validationErrorsResponse([]) };
+    readFailuresOwed = { files: 0, history: 0, rejectedRows: 0 };
     retryScript = { body: retrySuccessResponse() };
     cancelScript = { body: cancelSuccessResponse() };
     retryRequests = [];
@@ -621,6 +712,118 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
     expect(
       await screen.findByText(resolvedAt, {}, { timeout: REFRESH_WINDOW_MS }),
     ).toBeInTheDocument();
+
+    close();
+  });
+
+  // AC-3 — the criterion's OTHER outcome: the retry fails again. The service reports the
+  // file with the status it already had, so nothing about the file changes on screen and
+  // this page never sees it look busy; the new attempt's rejected rows and error file
+  // must reach the screen anyway (brief FR4, and Key Workflows step 5 — "if it fails
+  // again, the invalid-row list and error file are refreshed for the new attempt").
+  it("shows the new attempt's rejected rows when a retried validation fails again, even though the file's status never changes", async () => {
+    // One file, one status, throughout: `Validation failed` before the retry and
+    // `Validation failed` after it.
+    const failed = fileLogWithStatus(FILE_STATUS_VALIDATION_FAILED);
+
+    // Two attempts' worth of rejected rows, told apart by the very value each row was
+    // rejected for — the amount that is not a number on the first attempt, the currency
+    // the service does not accept on the second. Both come from the shared factory, so
+    // nothing here restates a value or a sentence the screen writes for itself.
+    const firstAttemptRow = invalidRowWithNonNumericAmount();
+    const newAttemptRow = invalidRowWithUnsupportedCurrency();
+    const firstAttemptValue = rejectedValue(firstAttemptRow.Amount, 'amount');
+    const newAttemptValue = rejectedValue(newAttemptRow.Currency, 'currency');
+
+    // The new attempt as the history records it once it has resolved — failed again.
+    // Its end time belongs to that attempt alone, so it is how "the history caught up"
+    // is told from "the history it already had".
+    const historyAfterFailingAgain = fileProcessHistoryAfterRetry(
+      OUTCOME_VALIDATION_FAILED,
+    );
+    const [, , newAttempt] = historyAfterFailingAgain;
+    const newAttemptResolvedAt = newAttempt.EndDate;
+    if (newAttemptResolvedAt === undefined) {
+      throw new Error(
+        'The fixture for a RESOLVED retry must carry an end time — check ' +
+          'fileProcessHistoryAfterRetry in @/mocks/data/file-process-log.',
+      );
+    }
+
+    const user = setupUser();
+    serveHistory(fileProcessHistory());
+    serveRejectedRows([firstAttemptRow]);
+    const close = await openFile(failed, ACTING_UPLOADER);
+
+    // What the user is looking at when they retry: the first attempt's rejected rows.
+    expect(
+      await screen.findByText(
+        firstAttemptValue,
+        {},
+        { timeout: REFRESH_WINDOW_MS },
+      ),
+    ).toBeInTheDocument();
+
+    // From here the service has the new attempt: recorded, resolved, and failed a second
+    // time — with the file in the SAME status it was in before, which is the only thing
+    // about the file that a page watching its status would have to go on.
+    serveFile(failed);
+    serveHistory(historyAfterFailingAgain);
+    serveRejectedRows([newAttemptRow]);
+    // But the page's own immediate re-read after the retry is REFUSED, whenever it
+    // lands. So one re-read cannot be what brings the new attempt to the screen: the
+    // page has to ask again after a read that told it nothing.
+    refuseTheNextReadOfEverything();
+
+    await user.click(screen.getByRole('button', { name: RETRY }));
+
+    await waitFor(() => {
+      expect(retryRequests).toEqual([
+        { logId: String(LOG_ID), lastChangedUser: undefined },
+      ]);
+    });
+    // That failed re-read changed nothing: the rows stayed, and neither the service's
+    // failure nor the client's own placeholder was put in their place.
+    expect(screen.getByText(firstAttemptValue)).toBeInTheDocument();
+    expect(
+      screen.queryByText(FILE_PROCESS_LOG_FAILURE_MESSAGE),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(CLIENT_FALLBACK_MESSAGES.serverError),
+    ).not.toBeInTheDocument();
+
+    // Nobody touches the page. It catches up on its own, and what it shows is the NEW
+    // attempt's rejected rows...
+    expect(
+      await screen.findByText(
+        newAttemptValue,
+        {},
+        { timeout: REFRESH_WINDOW_MS },
+      ),
+    ).toBeInTheDocument();
+    // ...instead of the previous attempt's, which are gone rather than sitting there
+    // describing a file the user has already corrected and resubmitted.
+    expect(screen.queryByText(firstAttemptValue)).not.toBeInTheDocument();
+    // The history caught up on the same signal: the new attempt is recorded, with the
+    // time it finished.
+    expect(
+      await screen.findByText(
+        newAttemptResolvedAt,
+        {},
+        { timeout: REFRESH_WINDOW_MS },
+      ),
+    ).toBeInTheDocument();
+    // And the file is still a failed one, so the uploader can correct it and retry
+    // again, or cancel it (Key Workflows step 5).
+    expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    // Every refusal was actually handed out, so the reads above really were a second
+    // round of asking rather than one lucky sample.
+    expect(readFailuresOwed).toEqual({
+      files: 0,
+      history: 0,
+      rejectedRows: 0,
+    });
 
     close();
   });

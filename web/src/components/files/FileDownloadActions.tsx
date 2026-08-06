@@ -33,7 +33,13 @@
  *   failed read on this same screen and must not be reused).
  * - **Neither control is disabled while its file is on its way.** Disabling the control
  *   a keyboard user has just activated takes the focus out from under them; the wait is
- *   announced in its own right instead.
+ *   announced in its own right instead. Which is exactly why **EACH DOWNLOAD KEEPS ITS
+ *   OWN WAIT AND ITS OWN REFUSAL**: with both controls usable, both files can be on
+ *   their way at once, and one shared state would let whichever answered first clear the
+ *   other's announced wait or overwrite the other's refusal. A single in-flight guard is
+ *   NOT the answer here — it would make the second control silently do nothing, which is
+ *   worse than the interference. So the state is per download, and each download's wait
+ *   and refusal name the file they are about.
  */
 
 import { Download, TriangleAlert } from 'lucide-react';
@@ -86,7 +92,10 @@ const preparingMessageFor = (subject: string): string =>
 
 /** One of the downloads on offer for this file. */
 interface OfferedDownload {
-  /** The control's own wording. */
+  /**
+   * The control's own wording — and, because the two on offer are always worded
+   * differently, what tells this download's own wait and refusal from the other's.
+   */
   label: string;
   /** How this download reads inside a sentence. */
   subject: string;
@@ -96,13 +105,14 @@ interface OfferedDownload {
   read: () => Promise<Blob>;
 }
 
-/** Where a download is: none asked for, one on its way, or one refused. */
+/** Where ONE download is: not asked for, on its way, or refused. */
 type DownloadState =
   | { phase: 'idle' }
-  | { phase: 'asking'; subject: string }
-  | { phase: 'refused'; subject: string; message: string };
+  | { phase: 'asking' }
+  | { phase: 'refused'; message: string };
 
 const IDLE: DownloadState = { phase: 'idle' };
+const ASKING: DownloadState = { phase: 'asking' };
 
 /**
  * The downloads this file actually has. The error file is absent from the list — and so
@@ -134,25 +144,45 @@ const downloadsFor = (file: FileLog): OfferedDownload[] => {
 };
 
 export function FileDownloadActions({ file }: { file: FileLog }) {
-  const [state, setState] = useState<DownloadState>(IDLE);
+  /**
+   * Where EACH download is, by its own label. Absent means nobody has asked for it, so
+   * the initial state is simply empty rather than one entry per download — and a `Map`,
+   * whose answer for a key it does not hold cannot be anything but `undefined`.
+   */
+  const [states, setStates] = useState<ReadonlyMap<string, DownloadState>>(
+    new Map(),
+  );
 
   const offered = downloadsFor(file);
 
+  const stateOf = (download: OfferedDownload): DownloadState =>
+    states.get(download.label) ?? IDLE;
+
+  /** Moves ONE download along, leaving every other download's state untouched. */
+  const moveDownloadTo = (
+    download: OfferedDownload,
+    next: DownloadState,
+  ): void => {
+    setStates((current) => new Map(current).set(download.label, next));
+  };
+
   const startDownload = (download: OfferedDownload): void => {
-    setState({ phase: 'asking', subject: download.subject });
+    // No in-flight guard: choosing a control that appears usable must never be a no-op
+    // (see this file's header). Asking twice asks the service twice, which is what the
+    // reader just asked for.
+    moveDownloadTo(download, ASKING);
 
     void download
       .read()
       .then((contents) => {
         deliverFile(contents, download.fileName);
-        setState(IDLE);
+        moveDownloadTo(download, IDLE);
       })
       .catch((error: unknown) => {
         // One state change, not two: the refusal being reported and the wait being
         // over are the same moment, and a reader must never meet one without the other.
-        setState({
+        moveDownloadTo(download, {
           phase: 'refused',
-          subject: download.subject,
           // The service's own wording whenever it sent one, from EITHER place a
           // failure can carry it; never the client's own placeholder.
           message: downloadFailureMessage(error),
@@ -168,18 +198,27 @@ export function FileDownloadActions({ file }: { file: FileLog }) {
 
       <p className="text-muted-foreground max-w-prose text-sm">{DESCRIPTION}</p>
 
-      {state.phase === 'refused' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {failedTitleFor(state.subject)}
-          </AlertTitle>
-          <AlertDescription className="text-foreground">
-            <p>{state.message}</p>
-            <p>{ASK_AGAIN_MESSAGE}</p>
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* One refusal per download that was refused, each naming its own file — so a
+          refusal on one download can never be overwritten, or explained away, by what
+          happened to the other. */}
+      {offered.map((download) => {
+        const state = stateOf(download);
+        if (state.phase !== 'refused') {
+          return null;
+        }
+        return (
+          <Alert key={download.label}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className="line-clamp-none">
+              {failedTitleFor(download.subject)}
+            </AlertTitle>
+            <AlertDescription className="text-foreground">
+              <p>{state.message}</p>
+              <p>{ASK_AGAIN_MESSAGE}</p>
+            </AlertDescription>
+          </Alert>
+        );
+      })}
 
       <div className="flex flex-wrap items-center gap-2">
         {offered.map((download) => (
@@ -197,10 +236,18 @@ export function FileDownloadActions({ file }: { file: FileLog }) {
         ))}
       </div>
 
-      {state.phase === 'asking' && (
-        <p role="status" className="text-muted-foreground text-sm">
-          {preparingMessageFor(state.subject)}
-        </p>
+      {/* And one announced wait per download that is on its way, for the same reason:
+          the first file to arrive must not take the other's wait off the screen. */}
+      {offered.map((download) =>
+        stateOf(download).phase === 'asking' ? (
+          <p
+            key={download.label}
+            role="status"
+            className="text-muted-foreground text-sm"
+          >
+            {preparingMessageFor(download.subject)}
+          </p>
+        ) : null,
       )}
     </section>
   );

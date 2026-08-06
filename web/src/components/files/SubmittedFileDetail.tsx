@@ -9,7 +9,7 @@
  * anything renders; from here down, everything reads from the browser and owns its own
  * states — which is what lets a wait be announced and a failed read be asked for again.
  *
- * Four things here are deliberate and easy to break:
+ * Six things here are deliberate and easy to break:
  *
  * - **THERE IS NO GET-ONE-FILE ENDPOINT.** The file is resolved by reading the ACTIVE
  *   file list (`GET /v1/file-logs?IsActive=Yes`, the same call the Expense files screen
@@ -30,11 +30,24 @@
  *   file is still working (`isFileInProgress`) — which is where a retry puts it — the
  *   page's OWN calls are re-read on ONE interval and it catches up in place with nobody
  *   touching it; once nothing is in progress the interval stops. That single interval
- *   drives the file AND its processing history together, which is why the history is
- *   given a signal to re-read rather than owning a timer of its own. A re-read that
- *   FAILS changes nothing on screen: the last known values stay, because the failed
- *   state belongs to a read that left the user with nothing. This is the pattern
- *   `SubmittedFilesList` established — there is no second polling mechanism in this app.
+ *   drives the file, its processing history AND its rejected rows together, which is why
+ *   both of those are given a signal to re-read rather than owning a timer of their own.
+ *   A re-read that FAILS changes nothing on screen: the last known values stay, because
+ *   the failed state belongs to a read that left the user with nothing. This is the
+ *   pattern `SubmittedFilesList` established — there is no second polling mechanism in
+ *   this app.
+ * - **AN ACCEPTED RETRY IS ITSELF A REASON TO KEEP ASKING**, whatever the file's status
+ *   says at that moment. The service's answer to a retry says nothing about the file, and
+ *   the list it is resolved from may not have caught up yet — it can still report
+ *   `Validation failed` from the PREVIOUS attempt, or already report it again from the
+ *   new one. Either way the file does not look busy, so a single re-read decided nothing
+ *   and an interval keyed only on "does it look busy" would never start at all: the
+ *   screen would sit on the previous attempt's rejected rows for good. So an accepted
+ *   retry buys a fixed number of further reads on that same one interval
+ *   ({@link RETRY_SETTLING_READS}), on top of the immediate one. If the file does turn
+ *   out to be working, `isFileInProgress` takes the watch over from there and holds it
+ *   until the file settles; when the reads run out and nothing is in progress, the page
+ *   goes quiet rather than asking a settled question forever.
  */
 
 import { CircleSlash, TriangleAlert } from 'lucide-react';
@@ -106,6 +119,21 @@ const SUMMARY_HEADING = 'File details';
  * the file is actually in progress, and no test asserts the value itself.
  */
 const REFRESH_INTERVAL_MS = 15_000;
+
+/**
+ * How many further reads an ACCEPTED RETRY buys, on the same one interval, over and
+ * above the immediate one it triggers.
+ *
+ * This is what makes the outcome of a retry arrive even when the file never looks busy
+ * to this page (see the header): the retry itself is the reason to keep asking, so the
+ * page asks for a little while rather than deciding on one sample. Four reads is a
+ * minute at the interval above — long enough for the service to record the new attempt
+ * and, when it fails again straight away, for the new attempt's rejected rows to be
+ * read; short enough that a file the service never moves stops being asked about. Once
+ * the file DOES report an in-progress status the watch is held by that instead, for as
+ * long as it lasts. No test asserts the number itself.
+ */
+const RETRY_SETTLING_READS = 4;
 
 /** Where the file is: being resolved, resolved, absent, or unreadable. */
 type FileState =
@@ -188,11 +216,26 @@ export function SubmittedFileDetail({
    * blanked first, and a failure changes nothing.
    */
   const [refreshes, setRefreshes] = useState(0);
+  /**
+   * How many further reads are still owed to a retry the service accepted — the reason
+   * to keep asking that does not depend on the file looking busy (see the header).
+   */
+  const [settlingReads, setSettlingReads] = useState(0);
 
   /** Asks the page's own calls again, in place. Stable, so it can be handed down. */
   const refresh = useCallback((): void => {
     setRefreshes((count) => count + 1);
   }, []);
+
+  /**
+   * A retry the service accepted: ask everything again at once, and keep asking for a
+   * while, because the answer said nothing about the file and the list it is resolved
+   * from may report either attempt's status when we look.
+   */
+  const handleRetried = useCallback((): void => {
+    refresh();
+    setSettlingReads(RETRY_SETTLING_READS);
+  }, [refresh]);
 
   /**
    * Resolves the file from the active list.
@@ -251,25 +294,36 @@ export function SubmittedFileDetail({
     state.phase === 'resolved' && isFileInProgress(state.file.CurrentStatus);
 
   /**
-   * While the file is in progress, everything this page reads is asked again on ONE
-   * interval and the page catches up in place. Once it is not, this effect stops
+   * Whether there is anything left to find out: the file is still working, or a retry
+   * this page asked for has reads still owed to it. Either is a reason to keep asking;
+   * neither being true is what makes the page go quiet.
+   */
+  const keepingUp = fileIsInProgress || settlingReads > 0;
+
+  /**
+   * While there is something to find out, everything this page reads is asked again on
+   * ONE interval and the page catches up in place. Once there is not, this effect stops
    * running, which clears the interval: the page goes quiet rather than asking a
    * settled question forever. One interval at most — it is tied to that single fact,
-   * not to every render — and it goes away with the component.
+   * not to every render, and not to the countdown, which is why a tick does not restart
+   * the period — and it goes away with the component.
    */
   useEffect(() => {
-    if (!fileIsInProgress) {
+    if (!keepingUp) {
       return;
     }
 
     const keepingCurrent = setInterval(() => {
       refresh();
+      // Each read spends one of the reads a retry bought; the file being in progress
+      // is what keeps the watch going beyond them.
+      setSettlingReads((owed) => (owed > 0 ? owed - 1 : 0));
     }, REFRESH_INTERVAL_MS);
 
     return () => {
       clearInterval(keepingCurrent);
     };
-  }, [fileIsInProgress, refresh]);
+  }, [keepingUp, refresh]);
 
   const readAgain = (): void => {
     setState(LOADING);
@@ -378,26 +432,32 @@ export function SubmittedFileDetail({
 
       {/* Retry and cancel — nothing at all unless the session may act on this file AND
           the file's status leaves something to do, which that component decides for
-          itself. A retry asks every call on this page again, since the service's answer
-          to it says nothing about the file's new state. */}
+          itself. A retry asks every call on this page again, and keeps asking for a
+          while, since the service's answer to it says nothing about the file's new
+          state. */}
       <SubmittedFileActions
         file={file}
         actingUploader={actingUploader}
-        onRetried={refresh}
+        onRetried={handleRetried}
       />
 
       {/* What the user may take away from this file: the file as it was submitted, and
           the generated error file when the service reported one. Both are offered to
-          both roles, which is why this section carries no session or role. */}
+          both roles, which is why this section carries no session or role. Both read
+          the file's OWN values, so a re-read is all it takes for the error file of a
+          new attempt to be the one on offer. */}
       <FileDownloadActions file={file} />
 
       {/* Which rows were rejected, and why — nothing at all unless this file's
-          validation failed, which that component decides for itself. */}
-      <RejectedRows file={file} />
+          validation failed, which that component decides for itself. It takes the same
+          signal as the history, because a file that fails validation AGAIN keeps the
+          status it already had: without it the rows of the previous attempt would stay
+          on screen for good. */}
+      <RejectedRows file={file} refreshSignal={refreshes} />
 
       {/* The history is re-read by the same signal that re-reads the file, so the two
           never disagree about how far the file has got — and so there is one interval
-          on this page rather than two. */}
+          on this page rather than three. */}
       <FileProcessingHistory logId={file.Id} refreshSignal={refreshes} />
     </div>
   );

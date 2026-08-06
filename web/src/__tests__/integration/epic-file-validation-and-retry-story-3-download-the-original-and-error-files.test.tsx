@@ -54,6 +54,15 @@
  *    (file.HasBulkErrorFile)` is true for `'No'` too. When there is no error file
  *    the control is LEFT OUT of the markup, never rendered disabled (source UI-24,
  *    the same rule as every other conditional action in this app).
+ * 5b. NEITHER CONTROL IS DISABLED while its own file is on its way (the announced-wait,
+ *    keyboard-focus convention this epic applies everywhere: disabling the control a
+ *    keyboard user just activated takes the focus out from under them). Which is exactly
+ *    why EACH DOWNLOAD KEEPS ITS OWN WAIT AND ITS OWN REFUSAL — with both controls
+ *    usable, both files can be on their way at once, and one shared state would let
+ *    whichever answered first clear the other's announced wait or overwrite the other's
+ *    refusal. An in-flight guard that made the second control silently do nothing is NOT
+ *    the answer; the state is per download. Each download's wait and refusal name the
+ *    file they are about, so a reader meeting one knows which download it belongs to.
  * 6. A refused download shows the SERVICE's own wording, in an `alert` (the error
  *    toast this app already uses is one, so is the Shadcn `alert`). Mind the trap:
  *    the transactions service reports a refusal as a 500 carrying a
@@ -104,7 +113,7 @@
  *
  * These tests WILL FAIL until the story is implemented (TDD red).
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -253,6 +262,28 @@ const downloadedBytes = (): Blob =>
   new Blob(['Reference,Amount\nEXP-0001,1250.00\n'], {
     type: 'application/octet-stream',
   });
+
+/**
+ * A download the service has NOT answered yet, plus the way to answer it — so a test can
+ * hold one download in flight while the other resolves, which is the only way to see
+ * whether the two interfere with each other.
+ */
+const downloadStillOnItsWay = (): {
+  body: Promise<Blob>;
+  arrive: (contents: Blob) => void;
+} => {
+  let arrive: ((contents: Blob) => void) | undefined;
+  const body = new Promise<Blob>((resolve) => {
+    arrive = resolve;
+  });
+  if (arrive === undefined) {
+    throw new Error(
+      'A Promise executor runs synchronously, so this cannot happen — but the ' +
+        'compiler cannot know that.',
+    );
+  }
+  return { body, arrive };
+};
 
 /**
  * The wording the SERVICE itself gives for a refused download — sourced from the
@@ -563,5 +594,70 @@ describe('Epic file-validation-and-retry, Story 3: Download the original file an
     expect(
       screen.getByRole('button', { name: ORIGINAL_DOWNLOAD_NAME }),
     ).toBeEnabled();
+  });
+
+  // AC-5, the other half of it: with both controls deliberately left usable while a file
+  // is on its way (contract note 5b), both files can be on their way at once — so what
+  // one download reports must never be the other download's business.
+  it('keeps each download’s announced wait and its own refusal to itself while both are in flight', async () => {
+    const user = userEvent.setup();
+    // The original file is asked for and simply has not arrived yet; the error file is
+    // refused while it is still out.
+    const original = downloadStillOnItsWay();
+    stubTransactionsService({
+      originalDownload: () => original.body,
+      errorFileDownload: () =>
+        Promise.reject(refusedDownload(ERROR_FILE_DOWNLOAD_ENDPOINT)),
+    });
+
+    renderDownloadActions(FAILED_FILE);
+
+    await user.click(
+      screen.getByRole('button', { name: ORIGINAL_DOWNLOAD_NAME }),
+    );
+
+    // The wait is announced, and it says WHICH file is being prepared.
+    const announcedWait = await screen.findByRole('status');
+    expect(announcedWait).toHaveTextContent(/original file/i);
+
+    // The reader takes the other download while the first is still out — which they can,
+    // because neither control is disabled.
+    expect(
+      screen.getByRole('button', { name: ERROR_FILE_DOWNLOAD_NAME }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole('button', { name: ERROR_FILE_DOWNLOAD_NAME }),
+    );
+
+    // The error file's refusal is reported in the service's own words, naming the
+    // download that failed...
+    const refusal = await screen.findByRole('alert');
+    expect(refusal).toHaveTextContent(REFUSED_DOWNLOAD_REASON);
+    expect(refusal).toHaveTextContent(/error file/i);
+    // ...and the original file is still on its way: its announced wait was not taken off
+    // the screen by what happened to the other download.
+    expect(screen.getByRole('status')).toHaveTextContent(/original file/i);
+
+    // The original file then arrives. That ends its OWN wait...
+    await act(async () => {
+      original.arrive(downloadedBytes());
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+    // ...and leaves the other download's refusal exactly where it was, rather than
+    // clearing it as though the error file had been delivered too.
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      REFUSED_DOWNLOAD_REASON,
+    );
+
+    // Both controls are still there and still usable, so either can be asked again.
+    expect(
+      screen.getByRole('button', { name: ORIGINAL_DOWNLOAD_NAME }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: ERROR_FILE_DOWNLOAD_NAME }),
+    ).toBeEnabled();
+    expect(linksAddressingTheService()).toEqual([]);
   });
 });

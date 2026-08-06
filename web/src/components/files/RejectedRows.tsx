@@ -44,6 +44,16 @@
  * - **This section is read-only.** No row can be edited here or anywhere else in this
  *   project (brief §Out of Scope) — the user corrects their source data outside the
  *   app and retries validation.
+ *
+ * KEEPING CURRENT is the caller's decision, not this section's — the same arrangement
+ * `FileProcessingHistory` has, and for the same reason: whoever renders it knows whether
+ * the file is working (this list does not), so it hands down `refreshSignal` and a new
+ * value means "ask again". That is what makes a RE-VALIDATED file's rows the ones on
+ * screen: a file that fails validation again keeps the status it already had, so nothing
+ * about it changes here and no remount happens — without the signal, the previous
+ * attempt's rows would stay up for good (brief FR4, Key Workflow step 5). One timer on
+ * the file's page drives this list, the history and the file together; this section
+ * grows none of its own.
  */
 
 import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
@@ -139,13 +149,19 @@ const NO_REASON_GIVEN = 'No reason was given for this row.';
  * service's own words.
  *
  * `TransactionType` is absent on purpose and must stay absent (FR3).
+ *
+ * A `Map`, not an object literal, because `ErrorColumn` is a string that came out of
+ * parsing an UNTRUSTED payload: looking an arbitrary name up on an object literal can
+ * answer with something inherited rather than nothing (`toString`, `constructor`), and
+ * this section's whole contract is that a body it cannot make sense of is a handled
+ * state and never a crash. A `Map` answers `undefined` for every key but the four.
  */
-const APP_OWNED_DEFECT_WORDING: Record<string, string> = {
-  Reference: 'This request has no reference and cannot be imported.',
-  Amount: 'Amount must be a number, for example 1245.67.',
-  TransactionDate: 'Transaction date must be a valid date and time.',
-  Currency: 'Currency must be a supported currency code.',
-};
+const APP_OWNED_DEFECT_WORDING = new Map<string, string>([
+  ['Reference', 'This request has no reference and cannot be imported.'],
+  ['Amount', 'Amount must be a number, for example 1245.67.'],
+  ['TransactionDate', 'Transaction date must be a valid date and time.'],
+  ['Currency', 'Currency must be a supported currency code.'],
+]);
 
 /** What each recorded value is called in the heading row. */
 const COLUMN = {
@@ -169,14 +185,12 @@ const COLUMN = {
 const defectWordingFor = (row: ValidationErrorRow): string | undefined => {
   const { ErrorColumn, ErrorMessage } = row;
 
-  if (ErrorColumn !== undefined) {
-    const appOwned = APP_OWNED_DEFECT_WORDING[ErrorColumn];
-    if (appOwned !== undefined) {
-      return appOwned;
-    }
-  }
+  const appOwned =
+    ErrorColumn === undefined
+      ? undefined
+      : APP_OWNED_DEFECT_WORDING.get(ErrorColumn);
 
-  return ErrorMessage;
+  return appOwned ?? ErrorMessage;
 };
 
 /** Where the rejected rows are: being read, read, unreadable, or unreachable. */
@@ -212,15 +226,37 @@ function RecordedValue({ value }: { value: string | number | undefined }) {
  * The whole section, but only for a file whose validation failed (contract: nothing
  * at all otherwise — including no read).
  */
-export function RejectedRows({ file }: { file: FileLog }) {
+export function RejectedRows({
+  file,
+  refreshSignal = 0,
+}: {
+  file: FileLog;
+  /**
+   * Changed by the caller when this file's rows may have moved on — a retry it accepted,
+   * or its own interval while the file is still working. Every value is as good as any
+   * other; only CHANGING it means anything.
+   *
+   * These reads happen behind what the reader is already looking at: nothing is blanked
+   * first, and a failure leaves the last known rows exactly where they are.
+   */
+  refreshSignal?: number;
+}) {
   if (file.CurrentStatus !== FILE_STATUS_VALIDATION_FAILED) {
     return null;
   }
 
-  return <RejectedRowsSection fileLogId={file.Id} />;
+  return (
+    <RejectedRowsSection fileLogId={file.Id} refreshSignal={refreshSignal} />
+  );
 }
 
-function RejectedRowsSection({ fileLogId }: { fileLogId: number }) {
+function RejectedRowsSection({
+  fileLogId,
+  refreshSignal,
+}: {
+  fileLogId: number;
+  refreshSignal: number;
+}) {
   const [state, setState] = useState<RejectedRowsState>(LOADING);
   /** Bumped by the ask-again action; asking for the rows is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
@@ -246,7 +282,10 @@ function RejectedRowsSection({ fileLogId }: { fileLogId: number }) {
           setState(
             rows === undefined
               ? UNREADABLE
-              : { phase: 'loaded', rows, revealed: new Set<number>() },
+              : // A fresh answer starts fully masked, including a re-read of a file
+                // that was validated again: which rows were revealed belongs to the
+                // answer that was on screen, not to the section (POPIA).
+                { phase: 'loaded', rows, revealed: new Set<number>() },
           );
         })
         .catch((error: unknown) => {
@@ -279,7 +318,7 @@ function RejectedRowsSection({ fileLogId }: { fileLogId: number }) {
     return () => {
       watching = false;
     };
-  }, [readsRequested, readRejectedRows]);
+  }, [readsRequested, refreshSignal, readRejectedRows]);
 
   const readAgain = (): void => {
     setState(LOADING);

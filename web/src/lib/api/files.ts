@@ -25,6 +25,20 @@ import type {
   ValidationErrors,
 } from '@/types/files';
 
+/**
+ * The wording the SERVICE itself sent about a refused call, or `undefined` when all
+ * that came back was a client-side placeholder no user should read.
+ *
+ * Every `*FailureMessage` below reads BOTH places a failure can carry the service's
+ * words, because this project's transactions service describes a refusal as a 500
+ * carrying `Messages[]` — which the shared client keeps on `details` while putting its
+ * own placeholder on `message`, so `serviceMessageOf` alone would find nothing. The
+ * pairing is stated once here rather than repeated per call, so a screen's fallback
+ * wording is the only thing each function below actually decides.
+ */
+const serviceWordingOf = (error: unknown): string | undefined =>
+  serviceMessageOf(error) ?? serviceDetailOf(error);
+
 /** `GET /v1/file-logs` — the submitted expense files. */
 export const FILE_LOGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-logs`;
 
@@ -120,16 +134,9 @@ export const fetchSubmittedFiles = (): Promise<FileLogList> =>
 export const FILE_LOOKUP_FAILED_MESSAGE =
   'This file could not be opened. Please try again.';
 
-/**
- * What to tell the user when the read that resolves one file failed.
- *
- * Both places a failure can carry the service's own wording are read, for the same
- * reason {@link uploadFailureMessage} reads both.
- */
+/** What to tell the user when the read that resolves one file failed. */
 export const fileLookupFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ??
-  serviceDetailOf(error) ??
-  FILE_LOOKUP_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? FILE_LOOKUP_FAILED_MESSAGE;
 
 /** One file's processing-history address — `LogId` as a path segment. */
 export const fileProcessingHistoryEndpoint = (logId: number): string =>
@@ -157,16 +164,9 @@ export const fetchFileProcessingHistory = (
 export const PROCESSING_HISTORY_FAILED_MESSAGE =
   'The processing history could not be loaded. Please try again.';
 
-/**
- * What to tell the user when a history read was refused. Same two-place lookup as
- * {@link uploadFailureMessage}: the transactions service reports a refusal as a 500
- * carrying `Messages[]`, which the shared client keeps on `details` while putting its
- * own placeholder on `message`, so `serviceMessageOf` alone would find nothing.
- */
+/** What to tell the user when a history read was refused. */
 export const processingHistoryFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ??
-  serviceDetailOf(error) ??
-  PROCESSING_HISTORY_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? PROCESSING_HISTORY_FAILED_MESSAGE;
 
 /**
  * The rows validation rejected for one file, still in the envelope the service sends
@@ -238,15 +238,9 @@ export const rejectedRowsIn = (
 export const VALIDATION_ERRORS_FAILED_MESSAGE =
   'The rejected rows could not be loaded. Please ask for them again.';
 
-/**
- * What to tell the user when the rejected-rows read was refused. Same two-place
- * lookup as {@link uploadFailureMessage}: the transactions service reports a refusal
- * as a 500 carrying `Messages[]`, which the shared client keeps on `details`.
- */
+/** What to tell the user when the rejected-rows read was refused. */
 export const validationErrorsFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ??
-  serviceDetailOf(error) ??
-  VALIDATION_ERRORS_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? VALIDATION_ERRORS_FAILED_MESSAGE;
 
 /**
  * Every named file setting the service holds — active and retired alike.
@@ -313,17 +307,12 @@ export const UPLOAD_FAILED_MESSAGE =
   'The file could not be submitted. Please try again.';
 
 /**
- * What to tell the user when a submission was refused.
- *
- * The service's own reason wins whenever it sent one. It has to be looked for in
- * BOTH places a failure can carry it: the transactions service answers a refused
- * upload with a 500 + `DefaultResponse` body, and for a 500 the shared client keeps
- * its own placeholder on `message` and the service's `Messages[]` on `details` — so
- * `serviceMessageOf` alone would find nothing here and the user would be shown
- * plumbing. Same gap epic 1 closed for sign-in.
+ * What to tell the user when a submission was refused — the service's own reason
+ * whenever it sent one (see {@link serviceWordingOf}; the same gap epic 1 closed for
+ * sign-in), else this module's own plain wording.
  */
 export const uploadFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ?? serviceDetailOf(error) ?? UPLOAD_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? UPLOAD_FAILED_MESSAGE;
 
 /**
  * One file's bytes, from the endpoint that holds that particular file.
@@ -361,14 +350,9 @@ export const downloadGeneratedErrorFile = (fileLogId: number): Promise<Blob> =>
 export const DOWNLOAD_FAILED_MESSAGE =
   'This file could not be downloaded. Please ask for it again.';
 
-/**
- * What to tell the user when a download was refused. Same two-place lookup as
- * {@link uploadFailureMessage}: the transactions service reports a refusal as a 500
- * carrying `Messages[]`, which the shared client keeps on `details` while putting its
- * own placeholder on `message`, so `serviceMessageOf` alone would find nothing.
- */
+/** What to tell the user when a download was refused. */
 export const downloadFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ?? serviceDetailOf(error) ?? DOWNLOAD_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? DOWNLOAD_FAILED_MESSAGE;
 
 /**
  * Sends one file back for another validation attempt (brief FR4).
@@ -420,14 +404,9 @@ export const cancelSubmittedFile = (
 export const RETRY_FAILED_MESSAGE =
   'Validation could not be started again for this file. Please ask for it again.';
 
-/**
- * What to tell the user when a retry was refused. Same two-place lookup as
- * {@link uploadFailureMessage}: the transactions service reports a refusal as a 500
- * carrying `Messages[]`, which the shared client keeps on `details` while putting its
- * own placeholder on `message`, so `serviceMessageOf` alone would find nothing.
- */
+/** What to tell the user when a retry was refused. */
 export const retryFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ?? serviceDetailOf(error) ?? RETRY_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? RETRY_FAILED_MESSAGE;
 
 /**
  * Shown when a cancel was refused and the service said nothing readable about why —
@@ -436,6 +415,6 @@ export const retryFailureMessage = (error: unknown): string =>
 export const CANCEL_FAILED_MESSAGE =
   'This file could not be cancelled. Please ask for it again.';
 
-/** What to tell the user when a cancel was refused (see {@link retryFailureMessage}). */
+/** What to tell the user when a cancel was refused. */
 export const cancelFailureMessage = (error: unknown): string =>
-  serviceMessageOf(error) ?? serviceDetailOf(error) ?? CANCEL_FAILED_MESSAGE;
+  serviceWordingOf(error) ?? CANCEL_FAILED_MESSAGE;
