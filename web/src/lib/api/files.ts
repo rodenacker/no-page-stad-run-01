@@ -21,6 +21,8 @@ import type {
   FileProcessLogList,
   FileSettingRead,
   FileSettingReadList,
+  ValidationErrorRow,
+  ValidationErrors,
 } from '@/types/files';
 
 /** `GET /v1/file-logs` — the submitted expense files. */
@@ -35,6 +37,17 @@ export const FILE_LOGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-logs`;
  * a finished address.
  */
 export const FILE_PROCESS_LOGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-process-logs`;
+
+/**
+ * `GET /v1/files/validation-errors?FileLogId={id}` — the rows of one file that
+ * validation rejected.
+ *
+ * There is a second, similarly-named operation in the contract
+ * (`/v1/files/validation-errors/columns`, `FileValidationErrorColumnGetList`) whose
+ * only example is generic (`Name`, `Age`); nothing in this app reads it, and the
+ * column labels come from the app instead.
+ */
+export const FILE_VALIDATION_ERRORS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/validation-errors`;
 
 /** `GET /v1/file-settings` — the named settings a file can be submitted against. */
 export const FILE_SETTINGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-settings`;
@@ -114,6 +127,86 @@ export const processingHistoryFailureMessage = (error: unknown): string =>
   serviceMessageOf(error) ??
   serviceDetailOf(error) ??
   PROCESSING_HISTORY_FAILED_MESSAGE;
+
+/**
+ * The rows validation rejected for one file, still in the envelope the service sends
+ * them in — `{ ValidationErrors: { JsonArray: "<json string>" } }`. Read them with
+ * {@link rejectedRowsIn}, which is where that wire quirk is answered.
+ *
+ * The file is named by `FileLogId`, a query parameter (not a path segment as the
+ * processing-history read uses).
+ */
+export const fetchFileValidationErrors = (
+  fileLogId: number,
+): Promise<ValidationErrors> =>
+  get<ValidationErrors>(FILE_VALIDATION_ERRORS_ENDPOINT, {
+    FileLogId: fileLogId,
+  });
+
+/**
+ * The rejected rows inside a validation-errors body, or `undefined` when the body
+ * cannot be read as rows at all.
+ *
+ * WIRE QUIRK: `ValidationErrors.JsonArray` is a JSON array delivered AS A STRING
+ * (`@/types/files`), so it has to be parsed — and there are three separate ways that
+ * can fail, all of which a caller must be able to report as a handled state rather
+ * than throw on:
+ *
+ * 1. the property is not a string at all (an envelope shaped differently);
+ * 2. the string will not parse (a truncated payload — the most likely way this
+ *    endpoint fails without failing);
+ * 3. the string parses into something that is NOT a list of rows — the case a bare
+ *    `try { JSON.parse } catch {}` sails straight past, because a lone object parses
+ *    perfectly well and would then be rendered as an empty table.
+ *
+ * An EMPTY array is not a failure: it is the service reporting no rejected rows.
+ */
+export const rejectedRowsIn = (
+  body: ValidationErrors | undefined,
+): ValidationErrorRow[] | undefined => {
+  const jsonArray = body?.ValidationErrors?.JsonArray;
+  if (typeof jsonArray !== 'string') {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonArray);
+  } catch {
+    return undefined;
+  }
+
+  if (!Array.isArray(parsed)) {
+    return undefined;
+  }
+  // Every element has to be an object for the row to have values to show; a list of
+  // strings or numbers is as unreadable as a body that never parsed.
+  const rows = parsed.filter(
+    (element): element is ValidationErrorRow =>
+      typeof element === 'object' &&
+      element !== null &&
+      !Array.isArray(element),
+  );
+  return rows.length === parsed.length ? rows : undefined;
+};
+
+/**
+ * Shown when a file's rejected rows could not be read and the service said nothing
+ * readable about why — the client's internal placeholders never reach a user
+ * (project.md NFR-base-5).
+ */
+export const VALIDATION_ERRORS_FAILED_MESSAGE =
+  'The rejected rows could not be loaded. Please ask for them again.';
+
+/**
+ * What to tell the user when the rejected-rows read was refused. Same two-place
+ * lookup as {@link uploadFailureMessage}: the transactions service reports a refusal
+ * as a 500 carrying `Messages[]`, which the shared client keeps on `details`.
+ */
+export const validationErrorsFailureMessage = (error: unknown): string =>
+  serviceMessageOf(error) ??
+  serviceDetailOf(error) ??
+  VALIDATION_ERRORS_FAILED_MESSAGE;
 
 /**
  * Every named file setting the service holds — active and retired alike.

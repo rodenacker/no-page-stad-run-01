@@ -34,6 +34,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { FileProcessingHistory } from '@/components/files/FileProcessingHistory';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
+import { RejectedRows } from '@/components/files/RejectedRows';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -296,6 +297,10 @@ export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
           </DetailField>
         </dl>
       </section>
+
+      {/* Which rows were rejected, and why — nothing at all unless this file's
+          validation failed, which that component decides for itself. */}
+      <RejectedRows file={file} />
 
       <FileProcessingHistory logId={file.Id} />
     </div>
