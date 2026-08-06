@@ -26,6 +26,15 @@
  *   fourth branch that has to answer the same sentence as the other three.
  * - **A read that FAILED is a different answer** from a file that is not there. Only
  *   then is the service's own wording shown, with a way to ask for the file again.
+ * - **The page keeps itself current, and only while that is worth doing.** While the
+ *   file is still working (`isFileInProgress`) — which is where a retry puts it — the
+ *   page's OWN calls are re-read on ONE interval and it catches up in place with nobody
+ *   touching it; once nothing is in progress the interval stops. That single interval
+ *   drives the file AND its processing history together, which is why the history is
+ *   given a signal to re-read rather than owning a timer of its own. A re-read that
+ *   FAILS changes nothing on screen: the last known values stay, because the failed
+ *   state belongs to a read that left the user with nothing. This is the pattern
+ *   `SubmittedFilesList` established — there is no second polling mechanism in this app.
  */
 
 import { CircleSlash, TriangleAlert } from 'lucide-react';
@@ -36,11 +45,13 @@ import { FileDownloadActions } from '@/components/files/FileDownloadActions';
 import { FileProcessingHistory } from '@/components/files/FileProcessingHistory';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
 import { RejectedRows } from '@/components/files/RejectedRows';
+import { SubmittedFileActions } from '@/components/files/SubmittedFileActions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSubmittedFiles, fileLookupFailureMessage } from '@/lib/api/files';
 import { UPLOAD_PATH } from '@/lib/auth/access-map';
+import { isFileInProgress } from '@/types/files';
 
 import type { ReactNode } from 'react';
 
@@ -86,6 +97,15 @@ const FIELD = {
 /** What ties the file's own values to their heading. */
 const SUMMARY_HEADING_ID = 'submitted-file-summary-heading';
 const SUMMARY_HEADING = 'File details';
+
+/**
+ * How long the page waits before asking the service again while the file is still being
+ * processed — the value its sibling `SubmittedFilesList` uses, for the same reason:
+ * short enough that a file finishing is news rather than history, long enough that a
+ * screen left open all afternoon is not a load on the service. It only ever runs while
+ * the file is actually in progress, and no test asserts the value itself.
+ */
+const REFRESH_INTERVAL_MS = 15_000;
 
 /** Where the file is: being resolved, resolved, absent, or unreadable. */
 type FileState =
@@ -137,7 +157,23 @@ function BackToFilesLink() {
   );
 }
 
-export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
+export function SubmittedFileDetail({
+  logId,
+  actingUploader,
+}: {
+  logId: string | undefined;
+  /**
+   * The signed-in Finance Uploader's own name, decided on the SERVER
+   * (`hasRole(session, ROLE_IMPORTER) ? displayNameOf(session) : undefined`), or
+   * `undefined` for a session that may not act on this file.
+   *
+   * One value doing two jobs: it gates the uploader-only actions — so an Approver's
+   * browser never receives their markup at all (source UI-24) — and it is the audit
+   * identity the cancel call must carry, which is what keeps the name the service
+   * records from ever being something a user typed.
+   */
+  actingUploader?: string;
+}) {
   /** The identifier as it arrived, with nothing but surrounding space removed. */
   const requestedLogId = logId?.trim() ?? '';
   const [state, setState] = useState<FileState>(
@@ -145,6 +181,18 @@ export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
   );
   /** Bumped by the read-again action; asking again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
+  /**
+   * Bumped whenever what is on screen may have moved on at the service — by the
+   * interval below, and by a retry being accepted. Separate from `readsRequested`
+   * because these reads happen BEHIND what the user is already reading: nothing is
+   * blanked first, and a failure changes nothing.
+   */
+  const [refreshes, setRefreshes] = useState(0);
+
+  /** Asks the page's own calls again, in place. Stable, so it can be handed down. */
+  const refresh = useCallback((): void => {
+    setRefreshes((count) => count + 1);
+  }, []);
 
   /**
    * Resolves the file from the active list.
@@ -192,7 +240,36 @@ export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
     return () => {
       watching = false;
     };
-  }, [requestedLogId, readsRequested, readFile]);
+  }, [requestedLogId, readsRequested, refreshes, readFile]);
+
+  /**
+   * Whether the file is still working, which is the only reason to keep asking the
+   * service anything. Read straight off what is on screen, so it cannot disagree with
+   * the status the user is looking at.
+   */
+  const fileIsInProgress =
+    state.phase === 'resolved' && isFileInProgress(state.file.CurrentStatus);
+
+  /**
+   * While the file is in progress, everything this page reads is asked again on ONE
+   * interval and the page catches up in place. Once it is not, this effect stops
+   * running, which clears the interval: the page goes quiet rather than asking a
+   * settled question forever. One interval at most — it is tied to that single fact,
+   * not to every render — and it goes away with the component.
+   */
+  useEffect(() => {
+    if (!fileIsInProgress) {
+      return;
+    }
+
+    const keepingCurrent = setInterval(() => {
+      refresh();
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(keepingCurrent);
+    };
+  }, [fileIsInProgress, refresh]);
 
   const readAgain = (): void => {
     setState(LOADING);
@@ -299,6 +376,16 @@ export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
         </dl>
       </section>
 
+      {/* Retry and cancel — nothing at all unless the session may act on this file AND
+          the file's status leaves something to do, which that component decides for
+          itself. A retry asks every call on this page again, since the service's answer
+          to it says nothing about the file's new state. */}
+      <SubmittedFileActions
+        file={file}
+        actingUploader={actingUploader}
+        onRetried={refresh}
+      />
+
       {/* What the user may take away from this file: the file as it was submitted, and
           the generated error file when the service reported one. Both are offered to
           both roles, which is why this section carries no session or role. */}
@@ -308,7 +395,10 @@ export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
           validation failed, which that component decides for itself. */}
       <RejectedRows file={file} />
 
-      <FileProcessingHistory logId={file.Id} />
+      {/* The history is re-read by the same signal that re-reads the file, so the two
+          never disagree about how far the file has got — and so there is one interval
+          on this page rather than two. */}
+      <FileProcessingHistory logId={file.Id} refreshSignal={refreshes} />
     </div>
   );
 }

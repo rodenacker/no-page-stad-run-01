@@ -27,6 +27,12 @@
  *
  * The file is identified by its own `Id`, resolved by whatever renders this — there is
  * no get-one-file endpoint, so a file that cannot be resolved never gets this far.
+ *
+ * KEEPING CURRENT is the caller's decision, not this component's: whoever renders it
+ * knows the file's status (this list does not), so it hands down `refreshSignal` and a
+ * new value means "ask again". That way one interval on the file's page re-reads the file
+ * and its history together, instead of each growing a timer of its own — and a retry,
+ * which is not a timer at all, uses the same channel.
  */
 
 import { TriangleAlert } from 'lucide-react';
@@ -93,7 +99,21 @@ const activitiesIn = (
   body: FileProcessLogList | undefined,
 ): FileProcessLog[] => (Array.isArray(body?.FileLog) ? body.FileLog : []);
 
-export function FileProcessingHistory({ logId }: { logId: number }) {
+export function FileProcessingHistory({
+  logId,
+  refreshSignal = 0,
+}: {
+  logId: number;
+  /**
+   * Changed by the caller when the history may have moved on — a retry it accepted, or
+   * its own interval while the file is still working. Every value is as good as any
+   * other; only CHANGING it means anything.
+   *
+   * These reads happen behind what the reader is already looking at, so nothing is
+   * blanked first and a failure leaves the last known activities exactly where they are.
+   */
+  refreshSignal?: number;
+}) {
   const [state, setState] = useState<HistoryState>(LOADING);
   /** Bumped by Try again; asking for the history again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
@@ -147,7 +167,7 @@ export function FileProcessingHistory({ logId }: { logId: number }) {
     return () => {
       watching = false;
     };
-  }, [readsRequested, readHistory]);
+  }, [readsRequested, refreshSignal, readHistory]);
 
   const readAgain = (): void => {
     setState(LOADING);

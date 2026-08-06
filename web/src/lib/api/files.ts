@@ -77,6 +77,25 @@ export const FILE_DOWNLOAD_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/do
 export const FILE_BULK_ERRORS_DOWNLOAD_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/bulk-errors/download`;
 
 /**
+ * `POST /v1/files/retry-validation?LogId={id}` — sends a file whose validation failed
+ * back for another attempt (`FilesRetryValidation`, brief FR4).
+ *
+ * The spec declares NO `LastChangedUser` header on this operation, unlike the cancel
+ * below. That asymmetry is as-documented (brief §Notes & Caveats) — do not add one
+ * speculatively to make the two calls look alike.
+ */
+export const FILE_RETRY_VALIDATION_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/retry-validation`;
+
+/**
+ * `DELETE /v1/files?LogId={id}` — cancels a submitted file (`FilesDelete`, brief FR5).
+ *
+ * This is the BARE `/v1/files` path — the parent of the upload, download and
+ * retry-validation operations above. Nothing else in this app addresses it, and only
+ * `DELETE` is defined on it, so a call here is always a cancel.
+ */
+export const FILE_CANCEL_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files`;
+
+/**
  * `IsActive` is a required query parameter on the list call, and `Yes` is the value
  * that returns the files still in play — a cancelled (inactive) file is the next
  * epic's concern (brief §Notes & Caveats).
@@ -350,3 +369,73 @@ export const DOWNLOAD_FAILED_MESSAGE =
  */
 export const downloadFailureMessage = (error: unknown): string =>
   serviceMessageOf(error) ?? serviceDetailOf(error) ?? DOWNLOAD_FAILED_MESSAGE;
+
+/**
+ * Sends one file back for another validation attempt (brief FR4).
+ *
+ * The file is named by `LogId`, a QUERY parameter — not the `FileLogId` the two
+ * download operations use, and not a path segment as the processing-history read uses.
+ * There is no request body, and — per {@link FILE_RETRY_VALIDATION_ENDPOINT} — no
+ * `LastChangedUser` header.
+ *
+ * The answer is the generic `DefaultResponse` envelope, which says nothing about the
+ * file's new status: a caller learns the outcome only by re-reading
+ * {@link fetchSubmittedFiles} and {@link fetchFileProcessingHistory}.
+ */
+export const retryFileValidation = (logId: number): Promise<DefaultResponse> =>
+  apiClient<DefaultResponse>(FILE_RETRY_VALIDATION_ENDPOINT, {
+    method: 'POST',
+    params: { LogId: logId },
+  });
+
+/**
+ * Cancels one submitted file, deactivating it and clearing its rows from staging
+ * (brief FR5, BR2).
+ *
+ * `actingUploader` is the AUTHENTICATED person's own name, decided on the server from
+ * the session — never anything the user typed, and never a value read from the page.
+ * The service requires it as a `LastChangedUser` header on this call alone, which is
+ * why it is a required argument here rather than an option a caller can forget.
+ *
+ * The answer is the generic `DefaultResponse` envelope. Once this succeeds the file is
+ * inactive, so it leaves `GET /v1/file-logs?IsActive=Yes` and its own page stops
+ * resolving — which is why a caller sends the user back to the Expense files list
+ * rather than re-reading the file.
+ */
+export const cancelSubmittedFile = (
+  logId: number,
+  actingUploader: string,
+): Promise<DefaultResponse> =>
+  apiClient<DefaultResponse>(FILE_CANCEL_ENDPOINT, {
+    method: 'DELETE',
+    params: { LogId: logId },
+    lastChangedUser: actingUploader,
+  });
+
+/**
+ * Shown when a retry was refused and the service said nothing readable about why —
+ * the client's internal placeholders ("Internal Server Error: …") never reach a user
+ * (project.md NFR-base-5).
+ */
+export const RETRY_FAILED_MESSAGE =
+  'Validation could not be started again for this file. Please ask for it again.';
+
+/**
+ * What to tell the user when a retry was refused. Same two-place lookup as
+ * {@link uploadFailureMessage}: the transactions service reports a refusal as a 500
+ * carrying `Messages[]`, which the shared client keeps on `details` while putting its
+ * own placeholder on `message`, so `serviceMessageOf` alone would find nothing.
+ */
+export const retryFailureMessage = (error: unknown): string =>
+  serviceMessageOf(error) ?? serviceDetailOf(error) ?? RETRY_FAILED_MESSAGE;
+
+/**
+ * Shown when a cancel was refused and the service said nothing readable about why —
+ * the client's internal placeholders never reach a user (project.md NFR-base-5).
+ */
+export const CANCEL_FAILED_MESSAGE =
+  'This file could not be cancelled. Please ask for it again.';
+
+/** What to tell the user when a cancel was refused (see {@link retryFailureMessage}). */
+export const cancelFailureMessage = (error: unknown): string =>
+  serviceMessageOf(error) ?? serviceDetailOf(error) ?? CANCEL_FAILED_MESSAGE;

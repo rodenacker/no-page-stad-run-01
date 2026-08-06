@@ -27,10 +27,14 @@
 import { PermissionDeniedMessage } from '@/components/auth/PermissionDeniedMessage';
 import { SubmittedFileDetail } from '@/components/files/SubmittedFileDetail';
 import { SUBMITTED_FILE_PATH, canAccess } from '@/lib/auth/access-map';
+import { displayNameOf } from '@/lib/auth/identity';
 import { requireSession } from '@/lib/auth/requireSession';
+import { hasRole } from '@/lib/auth/roles';
 import { FILE_ID_PARAM } from '@/lib/files/fileAddress';
+import { ROLE_IMPORTER } from '@/types/auth';
 
 import type { Metadata } from 'next';
+import type { UserInfoRead } from '@/types/auth';
 
 export const metadata: Metadata = {
   title: 'Submitted file',
@@ -51,6 +55,22 @@ const requestedLogId = (params: FileSearchParams): string | undefined => {
   return Array.isArray(value) ? value[0] : value;
 };
 
+/**
+ * Who may retry or cancel this file, and under whose name — decided HERE, on the server,
+ * from the session (brief BR3, source UI-24).
+ *
+ * `undefined` for anyone but the Finance Uploader, and that is what leaves the two
+ * actions out of the markup entirely rather than rendering them disabled. The same value
+ * is the audit identity the cancel call sends, so the name the service records comes
+ * from `GET /v1/auth/userinfo` and never from anything the user typed.
+ *
+ * The match is on `ROLE_IMPORTER` — the auth service's own wire name for the role the
+ * requirements call the "Finance Uploader"; matching on the requirements' wording would
+ * recognise nobody.
+ */
+const actingUploaderIn = (session: UserInfoRead): string | undefined =>
+  hasRole(session, ROLE_IMPORTER) ? displayNameOf(session) : undefined;
+
 export default async function SubmittedFilePage({
   searchParams,
 }: {
@@ -66,7 +86,10 @@ export default async function SubmittedFilePage({
 
   return (
     <div className="grid gap-8">
-      <SubmittedFileDetail logId={requestedLogId(params)} />
+      <SubmittedFileDetail
+        logId={requestedLogId(params)}
+        actingUploader={actingUploaderIn(session)}
+      />
     </div>
   );
 }
