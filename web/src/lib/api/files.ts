@@ -18,12 +18,23 @@ import { TRANSACTIONS_API_BASE_PATH } from '@/lib/utils/constants';
 import type { DefaultResponse } from '@/types/api';
 import type {
   FileLogList,
+  FileProcessLogList,
   FileSettingRead,
   FileSettingReadList,
 } from '@/types/files';
 
 /** `GET /v1/file-logs` — the submitted expense files. */
 export const FILE_LOGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-logs`;
+
+/**
+ * `GET /v1/file-process-logs/{LogId}` — one file's recorded processing activities.
+ *
+ * The identifier is a PATH SEGMENT here, not a query parameter
+ * (`documentation/transactions-api.yaml` → `FileProcessLogGetList`), which is why
+ * this is a prefix that {@link fileProcessingHistoryEndpoint} completes rather than
+ * a finished address.
+ */
+export const FILE_PROCESS_LOGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-process-logs`;
 
 /** `GET /v1/file-settings` — the named settings a file can be submitted against. */
 export const FILE_SETTINGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-settings`;
@@ -47,6 +58,62 @@ const ACTIVE_FILES_ONLY = 'Yes';
  */
 export const fetchSubmittedFiles = (): Promise<FileLogList> =>
   get<FileLogList>(FILE_LOGS_ENDPOINT, { IsActive: ACTIVE_FILES_ONLY });
+
+/**
+ * Shown when a file could not be resolved because the list read itself failed —
+ * which is a different answer from a file that is simply not in the list (that one
+ * is not a failure at all, and says so in its own words on the file's page).
+ */
+export const FILE_LOOKUP_FAILED_MESSAGE =
+  'This file could not be opened. Please try again.';
+
+/**
+ * What to tell the user when the read that resolves one file failed.
+ *
+ * Both places a failure can carry the service's own wording are read, for the same
+ * reason {@link uploadFailureMessage} reads both.
+ */
+export const fileLookupFailureMessage = (error: unknown): string =>
+  serviceMessageOf(error) ??
+  serviceDetailOf(error) ??
+  FILE_LOOKUP_FAILED_MESSAGE;
+
+/** One file's processing-history address — `LogId` as a path segment. */
+export const fileProcessingHistoryEndpoint = (logId: number): string =>
+  `${FILE_PROCESS_LOGS_ENDPOINT}/${String(logId)}`;
+
+/**
+ * Every processing activity the service has recorded for one submitted file, in the
+ * service's own words and order — the frontend neither sorts nor reformats them
+ * (brief BR5, FR8).
+ *
+ * WIRE QUIRK: the body is `FileProcessLogList`, whose array property is `FileLog`,
+ * NOT `FileProcessLog` (`@/types/files`). That is what the contract declares; do not
+ * "correct" it.
+ */
+export const fetchFileProcessingHistory = (
+  logId: number,
+): Promise<FileProcessLogList> =>
+  get<FileProcessLogList>(fileProcessingHistoryEndpoint(logId));
+
+/**
+ * Shown when a file's processing history could not be read and the service said
+ * nothing readable about why — the client's internal placeholders ("Internal Server
+ * Error: …") never reach a user (project.md NFR-base-5).
+ */
+export const PROCESSING_HISTORY_FAILED_MESSAGE =
+  'The processing history could not be loaded. Please try again.';
+
+/**
+ * What to tell the user when a history read was refused. Same two-place lookup as
+ * {@link uploadFailureMessage}: the transactions service reports a refusal as a 500
+ * carrying `Messages[]`, which the shared client keeps on `details` while putting its
+ * own placeholder on `message`, so `serviceMessageOf` alone would find nothing.
+ */
+export const processingHistoryFailureMessage = (error: unknown): string =>
+  serviceMessageOf(error) ??
+  serviceDetailOf(error) ??
+  PROCESSING_HISTORY_FAILED_MESSAGE;
 
 /**
  * Every named file setting the service holds — active and retired alike.

@@ -36,21 +36,22 @@
  *   that way.
  *
  * The status chip pairs an intent colour with the status TEXT and an icon, never
- * colour alone (brief §Feature NFRs, source UI-21). It is the shared
- * `components/status/StatusBadge`, which owns the intents and their tokens; all this
- * screen supplies is what each FILE status means.
+ * colour alone (brief §Feature NFRs, source UI-21). It is `components/files/
+ * FileStatusBadge` — the one file-status vocabulary in the project, shared with a
+ * file's own page, and itself built on the shared `components/status/StatusBadge`,
+ * which owns the intents and their tokens.
+ *
+ * Each row also offers the way INTO that file's own page, as a real navigational link
+ * carrying the file's identifier (`file-validation-and-retry` FR8): a link, not a
+ * button that pushes a route, so it can be opened in a new tab and is announced as a
+ * link.
  */
 
-import {
-  CircleCheck,
-  CircleSlash,
-  FileUp,
-  LoaderCircle,
-  TriangleAlert,
-} from 'lucide-react';
+import { PanelRightOpen, TriangleAlert } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { StatusBadge } from '@/components/status/StatusBadge';
+import { FileStatusBadge } from '@/components/files/FileStatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,19 +67,11 @@ import {
 import { useToast } from '@/contexts/ToastContext';
 import { serviceDetailOf, serviceMessageOf } from '@/lib/api/errors';
 import { fetchSubmittedFiles } from '@/lib/api/files';
+import { submittedFileAddress } from '@/lib/files/fileAddress';
 import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
-import {
-  FILE_STATUS_CANCELLED,
-  FILE_STATUS_IMPORTED,
-  FILE_STATUS_UPLOADED,
-  FILE_STATUS_VALIDATING,
-  FILE_STATUS_VALIDATION_FAILED,
-  isFileInProgress,
-  isKnownFileStatus,
-} from '@/types/files';
+import { FILE_STATUS_IMPORTED, isFileInProgress } from '@/types/files';
 
-import type { StatusPresentation } from '@/components/status/StatusBadge';
-import type { FileLog, FileLogList, FileStatus } from '@/types/files';
+import type { FileLog, FileLogList } from '@/types/files';
 
 /** What the section is called, and what ties its heading to it. */
 const HEADING_ID = 'submitted-files-heading';
@@ -123,35 +116,17 @@ const importedMessage = (file: FileLog): string =>
   `${file.CurrentFileName} finished importing. Records imported: ${file.RecordCount}.`;
 
 /**
- * What each recognised file status MEANS, following the mapping settled at project
- * level (project.md §Semantic status colors, brief §Feature NFRs): in-progress and
- * finished-well states are informational and successful, a failed validation is
- * something the user acts on, and a cancelled file is inert. The colours those
- * intents wear belong to the shared badge, not to this screen.
+ * How a row offers the way into that file's own page.
+ *
+ * The visible wording is short because it sits in a column of its own on every row;
+ * the file's name follows it for a screen reader, so the links are told apart by more
+ * than their position. That extra wording is deliberately NOT the bare file name: the
+ * name already has its own cell, and a second element carrying exactly the same text
+ * would make the row's own file ambiguous to anything that reads by text.
  */
-const STATUS_PRESENTATION: Record<FileStatus, StatusPresentation> = {
-  [FILE_STATUS_UPLOADED]: { intent: 'informational', icon: FileUp },
-  [FILE_STATUS_VALIDATING]: { intent: 'informational', icon: LoaderCircle },
-  [FILE_STATUS_VALIDATION_FAILED]: { intent: 'attention', icon: TriangleAlert },
-  [FILE_STATUS_IMPORTED]: { intent: 'positive', icon: CircleCheck },
-  [FILE_STATUS_CANCELLED]: { intent: 'neutral', icon: CircleSlash },
-};
-
-/**
- * The status as the service sent it. A status this app has no name for is left without
- * a presentation, so the shared badge shows it neutral and iconless — with the
- * service's own words (brief BR5).
- */
-function FileStatusBadge({ status }: { status: string }) {
-  return (
-    <StatusBadge
-      status={status}
-      presentation={
-        isKnownFileStatus(status) ? STATUS_PRESENTATION[status] : undefined
-      }
-    />
-  );
-}
+const OPEN_LABEL = 'Open';
+const openLabelFor = (file: FileLog): string =>
+  `the file ${file.CurrentFileName}`;
 
 /** Where the list is: being read, read, or unreadable. */
 type ListState =
@@ -372,7 +347,7 @@ export function SubmittedFilesList() {
             <TableCaption className="sr-only">
               Submitted expense files, with the setting each was sent against,
               when it was processed, its status, its most recent processing
-              activity and how many records it holds.
+              activity, how many records it holds and the way to open it.
             </TableCaption>
             <TableHeader>
               <TableRow>
@@ -383,6 +358,9 @@ export function SubmittedFilesList() {
                 <TableHead scope="col">Most recent activity</TableHead>
                 <TableHead scope="col" className="text-right">
                   Records
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  <span className="sr-only">Open the file</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -400,6 +378,18 @@ export function SubmittedFilesList() {
                   <TableCell>{file.LastExecutedActivityName}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {file.RecordCount}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {/* A real link, so the file's page can be opened in a new tab
+                        and is announced as somewhere to go — never a button that
+                        pushes a route. */}
+                    <Button asChild variant="ghost" size="sm">
+                      <Link href={submittedFileAddress(file)}>
+                        <PanelRightOpen aria-hidden="true" />
+                        {OPEN_LABEL}{' '}
+                        <span className="sr-only">{openLabelFor(file)}</span>
+                      </Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
