@@ -15,7 +15,8 @@
       "Check the wording a refused user sees on a file's page reads the way you would expect: it says the missing permission is \"Read a file's processing history\". Your requirements name the resource and whether each role may read it, but not the words to show someone who lacks it, so that phrasing is ours — worth a glance to confirm it matches what whoever grants access would recognise.",
       "Check that a rejected row's explanation is the RIGHT one when the problem is an unusual one: for the four fields this app owns a rule for (reference, amount, date, currency) the app replaces the service's technical text with its own fixed sentence. If your service can also reject one of those same fields for a DIFFERENT reason — say an amount that is a valid number but over a limit — you would read the app's wording for a missing-or-unreadable value instead of the real reason. Worth trying against a live failed file.",
       "Check the column headings on the rejected-rows table read the way your team names those fields: they are this app's own wording (Reference, Transaction date, Account number, Description, Amount, Transaction type, Currency, What is wrong). The service does publish a list of column names, but its only documented example comes from an unrelated system, so we did not use it.",
-      "Check what you see if a failed file comes back with an EMPTY list of rejected rows. The app treats that as the service reporting nothing to show and says so plainly, rather than as something having gone wrong. Nothing in your requirements says whether that combination can actually happen."
+      "Check what you see if a failed file comes back with an EMPTY list of rejected rows. The app treats that as the service reporting nothing to show and says so plainly, rather than as something having gone wrong. Nothing in your requirements says whether that combination can actually happen.",
+      "Glance at the NAME the downloaded error file is saved under. The app saves it under whatever the service holds against the file as its error-file reference, assuming that is a plain file name. Your requirements call it a \"reference\", so if the live service puts a path or an identifier there instead, that text becomes the saved file's name."
     ],
     "manualTestResults": []
   },
@@ -36,11 +37,11 @@
       "completedAt": "2026-08-06T06:51:41.437Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-06T06:53:00.000Z",
+      "completedAt": "2026-08-06T07:04:21.160Z"
     },
     "4": {
       "status": "pending",

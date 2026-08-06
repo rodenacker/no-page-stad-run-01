@@ -16,3 +16,10 @@ What changed, in plain language, as each story was built.
 - Two cases the service's contract does not describe were decided rather than guessed at: if the service names a problem without saying which column it is on, its own sentence is shown; if it names no problem at all for a row, the row is still listed and says no reason was given, rather than the app making one up or hiding the row.
 - If the rejected rows come back in a form the app cannot read as a list of rows, the page says so plainly and offers to ask for them again, instead of drawing an empty table. The rest of the file's page (its details and its processing history) keeps working either way.
 - Account numbers on the rejected rows are masked, with a per-row reveal, using the same masking the request list already uses. Asking for the rows again starts them all masked again.
+
+## Story 3 — Download the original file and the error file
+
+- A file's page now offers both downloads: the CSV you originally submitted, and the error file the service generated for a file that failed validation. The error-file button only appears when that file actually has one.
+- Both downloads are ordinary buttons, not links to the backend. The page fetches the file itself and then hands it to the browser to save. That is what lets a refusal be explained on the page in the service's own words instead of dumping you on a raw error page — and it is also why the file arrives under the name the service holds for it rather than a random one.
+- Neither download button is greyed out while its file is on its way. Greying out the button you have just pressed with the keyboard throws away your place on the page, so instead a short "Preparing the original file…" line is announced while you wait, and the button stays ready if you want to ask again.
+- The two downloads use two different addresses, and the service publishes a third very similar one that this app deliberately never calls. Getting that mapping wrong would silently hand you the wrong file, so both the automated checks assert the actual bytes you received, not merely that something downloaded.

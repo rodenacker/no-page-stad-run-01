@@ -56,6 +56,27 @@ export const FILE_SETTINGS_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/file-set
 export const FILE_UPLOAD_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/upload`;
 
 /**
+ * `GET /v1/files/download?FileLogId={id}` — one submitted file, exactly as it was
+ * submitted (`FilesDownload`, brief FR6).
+ *
+ * THE TWO DOWNLOADS ARE TWO DIFFERENT ENDPOINTS, and the contract publishes a THIRD
+ * operation shaped just like them — `GET /v1/file-logs/data?LogId={id}`
+ * (`FileLogDataDownload`), which no requirement in this project maps to and which
+ * neither download may use (brief §Notes & Caveats resolves the ambiguity via the
+ * requirements' §6.10 mapping). Transposing the two below, or reaching for the third,
+ * hands the user the wrong file with no error to show for it — which is why nothing
+ * outside this module chooses a download endpoint.
+ */
+export const FILE_DOWNLOAD_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/download`;
+
+/**
+ * `GET /v1/files/bulk-errors/download?FileLogId={id}` — the error file the service
+ * GENERATED for a file that failed validation (`FilesBulkErrorsDownload`, brief FR7).
+ * A different file, on a different endpoint, from {@link FILE_DOWNLOAD_ENDPOINT}.
+ */
+export const FILE_BULK_ERRORS_DOWNLOAD_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/bulk-errors/download`;
+
+/**
  * `IsActive` is a required query parameter on the list call, and `Yes` is the value
  * that returns the files still in play — a cancelled (inactive) file is the next
  * epic's concern (brief §Notes & Caveats).
@@ -284,3 +305,48 @@ export const UPLOAD_FAILED_MESSAGE =
  */
 export const uploadFailureMessage = (error: unknown): string =>
   serviceMessageOf(error) ?? serviceDetailOf(error) ?? UPLOAD_FAILED_MESSAGE;
+
+/**
+ * One file's bytes, from the endpoint that holds that particular file.
+ *
+ * Both download operations stream `application/octet-stream`, so the client is asked
+ * for the BINARY body (`isBinaryResponse`) — left to content-type sniffing, a file
+ * whose response is labelled anything else would be read as JSON and arrive empty.
+ * `get` cannot carry that flag, which is why this goes through `apiClient` directly.
+ *
+ * The file is named by `FileLogId`, a query parameter, on both endpoints.
+ */
+const downloadFileFrom = (endpoint: string, fileLogId: number): Promise<Blob> =>
+  apiClient<Blob>(endpoint, {
+    method: 'GET',
+    params: { FileLogId: fileLogId },
+    isBinaryResponse: true,
+  });
+
+/** The file exactly as it was submitted (brief FR6) — {@link FILE_DOWNLOAD_ENDPOINT}. */
+export const downloadSubmittedFile = (fileLogId: number): Promise<Blob> =>
+  downloadFileFrom(FILE_DOWNLOAD_ENDPOINT, fileLogId);
+
+/**
+ * The error file the service generated for a file that failed validation (brief FR7)
+ * — {@link FILE_BULK_ERRORS_DOWNLOAD_ENDPOINT}, never the submitted-file endpoint.
+ */
+export const downloadGeneratedErrorFile = (fileLogId: number): Promise<Blob> =>
+  downloadFileFrom(FILE_BULK_ERRORS_DOWNLOAD_ENDPOINT, fileLogId);
+
+/**
+ * Shown when a download was refused and the service said nothing readable about why
+ * — the client's internal placeholders ("Internal Server Error: …") never reach a
+ * user (project.md NFR-base-5).
+ */
+export const DOWNLOAD_FAILED_MESSAGE =
+  'This file could not be downloaded. Please ask for it again.';
+
+/**
+ * What to tell the user when a download was refused. Same two-place lookup as
+ * {@link uploadFailureMessage}: the transactions service reports a refusal as a 500
+ * carrying `Messages[]`, which the shared client keeps on `details` while putting its
+ * own placeholder on `message`, so `serviceMessageOf` alone would find nothing.
+ */
+export const downloadFailureMessage = (error: unknown): string =>
+  serviceMessageOf(error) ?? serviceDetailOf(error) ?? DOWNLOAD_FAILED_MESSAGE;

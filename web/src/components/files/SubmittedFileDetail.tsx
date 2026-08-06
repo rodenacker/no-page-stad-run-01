@@ -32,6 +32,7 @@ import { CircleSlash, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
+import { FileDownloadActions } from '@/components/files/FileDownloadActions';
 import { FileProcessingHistory } from '@/components/files/FileProcessingHistory';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
 import { RejectedRows } from '@/components/files/RejectedRows';
@@ -297,6 +298,11 @@ export function SubmittedFileDetail({ logId }: { logId: string | undefined }) {
           </DetailField>
         </dl>
       </section>
+
+      {/* What the user may take away from this file: the file as it was submitted, and
+          the generated error file when the service reported one. Both are offered to
+          both roles, which is why this section carries no session or role. */}
+      <FileDownloadActions file={file} />
 
       {/* Which rows were rejected, and why — nothing at all unless this file's
           validation failed, which that component decides for itself. */}
