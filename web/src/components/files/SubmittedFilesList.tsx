@@ -34,6 +34,13 @@
  *   values keeps them rather than losing them to one unanswered request (story 3
  *   AC-5). Every re-read — the timer's and the one a submission asks for — behaves
  *   that way.
+ * - **What just happened is announced once, on the transition.** A file reaching
+ *   `Imported` and a file reaching `Validation failed` are each told to the user
+ *   through the root layout's one notification surface, from the previous status per
+ *   file id — so a file that already had that outcome when the screen opened is never
+ *   announced, and a file that keeps it across every later re-read is not announced
+ *   twice. The rejected-rows one does not fade and carries the way to the file's own
+ *   rejected rows (`file-validation-and-retry` FR9 / NFR-3).
  *
  * The status chip pairs an intent colour with the status TEXT and an icon, never
  * colour alone (brief §Feature NFRs, source UI-21). It is `components/files/
@@ -69,7 +76,12 @@ import { serviceDetailOf, serviceMessageOf } from '@/lib/api/errors';
 import { fetchSubmittedFiles } from '@/lib/api/files';
 import { submittedFileAddress } from '@/lib/files/fileAddress';
 import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
-import { FILE_STATUS_IMPORTED, isFileInProgress } from '@/types/files';
+import { ROLE_IMPORTER } from '@/types/auth';
+import {
+  FILE_STATUS_IMPORTED,
+  FILE_STATUS_VALIDATION_FAILED,
+  isFileInProgress,
+} from '@/types/files';
 
 import type { FileLog, FileLogList } from '@/types/files';
 
@@ -116,6 +128,34 @@ const importedMessage = (file: FileLog): string =>
   `${file.CurrentFileName} finished importing. Records imported: ${file.RecordCount}.`;
 
 /**
+ * Said when a submitted file finishes validating and some of its rows were rejected
+ * (`file-validation-and-retry` FR9, source R91). The status the service reported is
+ * the title, so the notification and the file's own row say the same word.
+ */
+const REJECTED_ROWS_TITLE = FILE_STATUS_VALIDATION_FAILED;
+
+/**
+ * Names the file, and nothing else: which file it was is the whole point — a
+ * notification that does not name it leaves the user hunting. How MANY rows were
+ * rejected is not in the list response, and the screen invents no number.
+ */
+const rejectedRowsMessage = (file: FileLog): string =>
+  `Some rows in ${file.CurrentFileName} were rejected. Open the file to see which rows, and why.`;
+
+/** Where the notification takes the user: that file's own page and its rejected rows. */
+const REJECTED_ROWS_LINK_LABEL = 'Open the rejected rows';
+
+/**
+ * A notification that never fades on its own.
+ *
+ * `0` is how the existing toast machinery expresses that — the 5s default applies
+ * only when a duration is OMITTED — and it keeps its dismiss control, because state
+ * the user must act on stays until they act on it or dismiss it (this epic's NFR-3,
+ * source UI-19).
+ */
+const STAYS_UNTIL_ACTED_ON = 0;
+
+/**
  * How a row offers the way into that file's own page.
  *
  * The visible wording is short because it sits in a column of its own on every row;
@@ -143,7 +183,23 @@ const LOADING: ListState = { phase: 'loading' };
 const filesIn = (body: FileLogList | undefined): FileLog[] =>
   Array.isArray(body?.FileLog) ? body.FileLog : [];
 
-export function SubmittedFilesList() {
+/**
+ * What the screen may tell this list about who is watching it.
+ *
+ * `viewerRoles` is the signed-in person's role names, which the `/upload` page fills
+ * from the session (`rolesOf(session)`) — nothing here reads a session in the
+ * browser. It is OPTIONAL, and a list rendered without it still speaks up: this
+ * component's original contract carries no session prop at all
+ * (`expense-file-upload` story 3), so withholding a notification from a caller that
+ * has not said who is watching would silently change that behaviour.
+ */
+interface SubmittedFilesListProps {
+  viewerRoles?: string[];
+}
+
+export function SubmittedFilesList({
+  viewerRoles,
+}: SubmittedFilesListProps = {}) {
   const [state, setState] = useState<ListState>(LOADING);
   /** Bumped by Try again; asking for the list again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
@@ -151,23 +207,46 @@ export function SubmittedFilesList() {
   const { showToast } = useToast();
 
   /**
+   * Whether the person watching this list is the one the rejected-rows notification
+   * is addressed to — the Finance Uploader, which the auth service calls
+   * `Importer` (`types/auth.ts`; matching on "Finance Uploader" recognises nobody).
+   *
+   * An Approver watching the same list is not told about rejected rows (this epic's
+   * AC-5) — their rows still keep themselves current, which is what they came for.
+   * A caller that has not said who is watching is told, per the contract above.
+   *
+   * Derived as a plain boolean rather than read from the array inside the callback
+   * below, so a caller handing in a fresh array on every render cannot restart the
+   * read or the refresh timer.
+   */
+  const tellsTheUploaderAboutRejectedRows =
+    viewerRoles === undefined || viewerRoles.includes(ROLE_IMPORTER);
+
+  /**
    * What status each listed file was last seen in, by file id. This is a record of
    * what the user has already been told — not something rendered — so it lives in a
-   * ref, and it is what makes a file ARRIVING at `Imported` tellable from a file that
-   * was already imported when the screen opened: only the first is news.
+   * ref, and it is what makes a file ARRIVING at an outcome tellable from a file that
+   * already had that outcome when the screen opened: only the first is news.
    */
   const statusesAlreadySeen = useRef<Map<number, string>>(new Map());
 
   /**
-   * Tells the user about every file that has just finished importing, and remembers
+   * Tells the user about every file that has just reached an outcome, and remembers
    * what each listed file is now.
    *
-   * A file resolving to `Validation failed` is deliberately NOT announced: what to
-   * tell the uploader about invalid rows is the `file-validation-and-retry` epic's
-   * requirement (R91), and saying something vague here would pre-empt it. The row
-   * shows the status either way.
+   * Two outcomes are announced, and the difference between them is deliberate:
+   *
+   * - `Imported` is good news and nothing is expected of the user, so it keeps the
+   *   toast's own lifetime and fades on its own (brief R10).
+   * - `Validation failed` is something the user must act on, so it does NOT fade
+   *   (`STAYS_UNTIL_ACTED_ON`) and carries a link straight to that file's rejected
+   *   rows (`file-validation-and-retry` FR9 / NFR-3, source R91 / UI-19).
+   *
+   * Both fire on the TRANSITION into the status, never on the status itself: a file
+   * already finished on the first read has not just happened, and a file that stays
+   * finished across every later re-read is not announced again.
    */
-  const announceFinishedImports = useCallback(
+  const announceFinishedFiles = useCallback(
     (files: FileLog[]): void => {
       const seen = statusesAlreadySeen.current;
 
@@ -175,21 +254,43 @@ export function SubmittedFilesList() {
         const previousStatus = seen.get(file.Id);
         seen.set(file.Id, file.CurrentStatus);
 
-        const justImported =
-          previousStatus !== undefined &&
-          previousStatus !== FILE_STATUS_IMPORTED &&
-          file.CurrentStatus === FILE_STATUS_IMPORTED;
+        /** Nothing was known about this file yet, so nothing about it is news. */
+        if (previousStatus === undefined) {
+          return;
+        }
 
-        if (justImported) {
+        const justReached = (status: string): boolean =>
+          previousStatus !== status && file.CurrentStatus === status;
+
+        if (justReached(FILE_STATUS_IMPORTED)) {
           showToast({
             variant: 'success',
             title: IMPORTED_TITLE,
             message: importedMessage(file),
           });
         }
+
+        if (
+          justReached(FILE_STATUS_VALIDATION_FAILED) &&
+          tellsTheUploaderAboutRejectedRows
+        ) {
+          showToast({
+            // The intent this project gives a failed validation — the same one the
+            // file's own status chip wears (`FileStatusBadge`), so the notification
+            // and the row do not describe the outcome differently.
+            variant: 'warning',
+            title: REJECTED_ROWS_TITLE,
+            message: rejectedRowsMessage(file),
+            duration: STAYS_UNTIL_ACTED_ON,
+            link: {
+              href: submittedFileAddress(file),
+              label: REJECTED_ROWS_LINK_LABEL,
+            },
+          });
+        }
       });
     },
-    [showToast],
+    [showToast, tellsTheUploaderAboutRejectedRows],
   );
 
   /**
@@ -212,7 +313,7 @@ export function SubmittedFilesList() {
             return;
           }
           const files = filesIn(body);
-          announceFinishedImports(files);
+          announceFinishedFiles(files);
           setState({ phase: 'loaded', files });
         })
         .catch((error: unknown) => {
@@ -237,7 +338,7 @@ export function SubmittedFilesList() {
                 },
           );
         }),
-    [announceFinishedImports],
+    [announceFinishedFiles],
   );
 
   useEffect(() => {

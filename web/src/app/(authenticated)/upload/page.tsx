@@ -24,7 +24,7 @@ import { SubmittedFilesList } from '@/components/files/SubmittedFilesList';
 import { SubmitExpenseFileForm } from '@/components/upload/SubmitExpenseFileForm';
 import { UPLOAD_PATH, canAccess } from '@/lib/auth/access-map';
 import { requireSession } from '@/lib/auth/requireSession';
-import { hasRole } from '@/lib/auth/roles';
+import { hasRole, rolesOf } from '@/lib/auth/roles';
 import { ROLE_IMPORTER } from '@/types/auth';
 
 import type { Metadata } from 'next';
@@ -46,7 +46,12 @@ export default async function UploadPage() {
     <div className="grid gap-8">
       <h1 className="text-2xl font-semibold tracking-tight">Expense files</h1>
       {hasRole(session, ROLE_IMPORTER) && <SubmitExpenseFileForm />}
-      <SubmittedFilesList />
+      {/* Who is watching is decided here, on the server, from the session — the list
+          never reads an identity in the browser. It is what narrows the
+          rejected-rows notification to the Finance Uploader
+          (`file-validation-and-retry` FR9): an Approver's rows still keep themselves
+          current, they are simply not told about another person's bad rows. */}
+      <SubmittedFilesList viewerRoles={rolesOf(session)} />
     </div>
   );
 }

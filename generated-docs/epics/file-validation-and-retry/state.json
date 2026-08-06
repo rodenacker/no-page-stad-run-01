@@ -17,7 +17,8 @@
       "Check the column headings on the rejected-rows table read the way your team names those fields: they are this app's own wording (Reference, Transaction date, Account number, Description, Amount, Transaction type, Currency, What is wrong). The service does publish a list of column names, but its only documented example comes from an unrelated system, so we did not use it.",
       "Check what you see if a failed file comes back with an EMPTY list of rejected rows. The app treats that as the service reporting nothing to show and says so plainly, rather than as something having gone wrong. Nothing in your requirements says whether that combination can actually happen.",
       "Glance at the NAME the downloaded error file is saved under. The app saves it under whatever the service holds against the file as its error-file reference, assuming that is a plain file name. Your requirements call it a \"reference\", so if the live service puts a path or an identifier there instead, that text becomes the saved file's name.",
-      "Check the NAME recorded against a cancelled file is the one you expect. When a file is cancelled the app tells the service who did it, and it sends the person's name as it appears in the app (for example \"Frances Nkosi\"), taken from the signed-in account and never from anything typed on screen. Your service might instead expect an email address or a login name in that field — worth confirming against a real cancel, since nothing in the contract says which it wants."
+      "Check the NAME recorded against a cancelled file is the one you expect. When a file is cancelled the app tells the service who did it, and it sends the person's name as it appears in the app (for example \"Frances Nkosi\"), taken from the signed-in account and never from anything typed on screen. Your service might instead expect an email address or a login name in that field — worth confirming against a real cancel, since nothing in the contract says which it wants.",
+      "Confirm you are happy that the rejected-rows notification is only kept from someone we KNOW is an Approver, rather than only shown to someone we know is the uploader. On the real screens this never differs — the Expense files list is always told who is signed in — so it changes nothing you can see. It is flagged because settling it the other way was the alternative, and it is your call which reads right."
     ],
     "manualTestResults": []
   },
@@ -52,11 +53,11 @@
       "completedAt": "2026-08-06T07:21:16.388Z"
     },
     "5": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-06T07:23:00.000Z",
+      "completedAt": "2026-08-06T07:39:30.171Z"
     }
   },
   "halt": null,
