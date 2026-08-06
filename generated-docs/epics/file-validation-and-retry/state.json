@@ -15,7 +15,7 @@
     ],
     "manualTestResults": []
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "BUILD",
   "stories": {
     "1": {
       "status": "pending",
