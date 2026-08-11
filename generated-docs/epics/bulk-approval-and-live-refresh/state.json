@@ -15,6 +15,7 @@
       "Resolved before building on 2026-08-11: the three reuse points from expense-decisions were confirmed against the merged main. The approve call and the confirmation are as planned; the staleness re-check was inlined in the list component rather than extracted, which story 2 already plans to correct.",
       "Unticking the 'Select all listed requests' control clears the WHOLE selection — including requests the current search or filters are hiding. Nothing in the requirements says what the clearing action should cover, and this is the only clear-selection control the screen offers; the alternative (clear only what is currently listed) would leave an invisible remainder ticked. Confirm that clearing everything is what you'd expect.",
       "The 'select everything currently listed' control ADDS to the selection rather than replacing it, so narrowing the list and taking what is left keeps anything ticked beforehand. Also not stated in the requirements — it is the reading consistent with a selection that survives narrowing.",
+      "The visible form of the 'last up to date' time is the project's own YYYY-MM-DD HH:MM on the reader's clock (the same notation every other app-written moment uses). The brief fixes only that the moment is shown, not how it reads — worth a glance that a bare timestamp is clear enough there, rather than something like 'about 2 minutes ago'.",
       "A refresh announces itself only to assistive technology (an invisible polite line naming how much has changed); there is no visible 'list updated' indicator, because a sighted reader sees the rows change. Confirm that is the wanted behaviour rather than a visible banner.",
       "The wording of the bulk-approval result is the app's own: it is headed 'Selection approved' (or 'Nothing was approved' / 'Some approvals could not be submitted') and reads 'Of the 3 requests selected: 2 approved, 1 left unchanged because it had already been decided.' The requirements fix the two figures and the reason but not the sentence — confirm it reads the way a finance approver would want."
     ],
@@ -51,11 +52,11 @@
       "completedAt": "2026-08-11T14:13:00.000Z"
     },
     "5": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-11T14:15:00.000Z",
+      "completedAt": "2026-08-11T17:20:00.000Z"
     }
   },
   "halt": null,

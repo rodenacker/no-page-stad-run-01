@@ -303,6 +303,26 @@
  *   present from the start so its contents CHANGING is what gets spoken; never an alert,
  *   never a dialog, and never the app's notification surface — a background data change
  *   must not interrupt whatever the reader is doing.
+ *
+ * And when refreshing itself stops working (R6, BR9):
+ *
+ * - **Two strikes, never one.** One failed read changes nothing whatsoever on screen —
+ *   transient failures are ordinary, and a notice on each would be noise. Only the SECOND
+ *   consecutive failure raises the notice, and the count is failures since the last
+ *   SUCCESS: a read that works in between puts it back to nothing.
+ * - **The moment named is the last read that SUCCEEDED**, held in a ref and written into
+ *   the notice as a machine-readable `<time>`. It is recorded when a read lands and never
+ *   when one fails — "last up to date: now", stamped on the failure, is the easy
+ *   implementation and it misleads the reader about the one thing they are being told.
+ * - **The rows are never blanked.** The failed-load state — the alert, the service's own
+ *   reason and Try again — belongs to a read that left the reader with NOTHING (the
+ *   convention `SubmittedFilesList` established). Here they have rows, so they keep them,
+ *   in their order, with their narrowing, ordering, page and keyboard untouched.
+ * - **Nothing is asked of the reader.** The notice carries no button and no link, and
+ *   recovery is the next successful poll clearing it — the timer never stopped, so there
+ *   is nothing to restart.
+ * - **It is polite, and one of it** (NFR2, inherited from the announcement above): a
+ *   single `role="status"` region, never an alert, however many further polls fail.
  */
 
 import {
@@ -424,7 +444,11 @@ import {
   sortStateOf,
 } from '@/lib/transactions/ordering';
 import {
+  CANNOT_REFRESH_MESSAGE,
+  FAILED_REFRESHES_BEFORE_STALE,
+  LAST_UP_TO_DATE_LEAD,
   LIST_REFRESH_INTERVAL_MS,
+  REFRESH_RESUMES_MESSAGE,
   listRefreshedMessage,
   refreshedList,
 } from '@/lib/transactions/refreshing';
@@ -447,6 +471,7 @@ import {
   subscribeToSort,
 } from '@/lib/transactions/sortPreference';
 import { PAGINATION } from '@/lib/utils/constants';
+import { onScreenDateTime } from '@/lib/utils/dateTime';
 import { ROLE_APPROVER } from '@/types/auth';
 import {
   TRANSACTION_STATUS_APPROVED,
@@ -1007,6 +1032,67 @@ export function ExpenseRequestList({
   const requestsOnScreen = useRef<TransactionRead[]>(NO_REQUESTS);
 
   /**
+   * When this list was last genuinely current: the instant of the last read that
+   * SUCCEEDED (R6/AC-5). A ref, because it is written on every read that lands and read
+   * only when the notice below is raised — holding it in state would re-render the whole
+   * list four times a minute to record something nobody is looking at.
+   *
+   * It starts as the moment the screen opened, which is the only honest answer before the
+   * first read lands; every read that succeeds — the first load included — moves it on,
+   * and no failure ever touches it.
+   */
+  const lastCurrentAt = useRef(Date.now());
+
+  /**
+   * How many reads in a row have failed SINCE THE LAST ONE THAT WORKED (BR9). A ref for
+   * the same reason: counting to one changes nothing on screen.
+   */
+  const failedRefreshes = useRef(0);
+
+  /**
+   * When the list was last current, while it can no longer refresh itself — and `null`
+   * whenever refreshing is working, which is what takes the notice away again.
+   *
+   * This is the ONE piece of all this that is rendered, so it is the one piece held in
+   * state. It is set on the failure that reaches BR9's threshold and cleared by the next
+   * read that succeeds, with no user action in between (R6).
+   */
+  const [cannotRefreshSince, setCannotRefreshSince] = useState<number | null>(
+    null,
+  );
+
+  /**
+   * A read landed: this is the moment the list was last current, and nothing is failing
+   * any more.
+   *
+   * The state is touched only when there was something to clear, so the ordinary case —
+   * a poll that simply worked — costs no render at all (NFR5).
+   */
+  const listIsCurrent = useCallback((): void => {
+    lastCurrentAt.current = Date.now();
+    if (failedRefreshes.current === 0) {
+      return;
+    }
+    failedRefreshes.current = 0;
+    setCannotRefreshSince(null);
+  }, []);
+
+  /**
+   * A read failed. One is a hiccup and says nothing (AC-2); the second in a row is what
+   * raises the notice, naming the moment recorded above rather than this one (AC-5).
+   *
+   * Further failures beyond the second re-state the same instant, so React holds the
+   * render and the notice never stacks (AC-3).
+   */
+  const refreshFailed = useCallback((): void => {
+    failedRefreshes.current += 1;
+    if (failedRefreshes.current < FAILED_REFRESHES_BEFORE_STALE) {
+      return;
+    }
+    setCannotRefreshSince(lastCurrentAt.current);
+  }, []);
+
+  /**
    * Puts a fresh read on screen without disturbing anything the reader arranged (BR8),
    * and answers with what it left there.
    *
@@ -1019,6 +1105,10 @@ export function ExpenseRequestList({
    */
   const showFreshRequests = useCallback(
     (incoming: TransactionRead[]): RefreshedList => {
+      // Whatever asked for it, this read landed — so this is the moment the list was
+      // last current, and refreshing is working again (R6).
+      listIsCurrent();
+
       const refreshed = refreshedList(requestsOnScreen.current, incoming);
       requestsOnScreen.current = refreshed.requests;
 
@@ -1033,7 +1123,7 @@ export function ExpenseRequestList({
 
       return refreshed;
     },
-    [],
+    [listIsCurrent],
   );
 
   /**
@@ -1051,6 +1141,8 @@ export function ExpenseRequestList({
           }
           const requests = requestsIn(body);
           requestsOnScreen.current = requests;
+          // The first load is the last moment the list was current, too (R6).
+          listIsCurrent();
           setState({ phase: 'loaded', requests });
         })
         .catch((error: unknown) => {
@@ -1065,7 +1157,7 @@ export function ExpenseRequestList({
             message: transactionListFailureMessage(error),
           });
         }),
-    [],
+    [listIsCurrent],
   );
 
   useEffect(() => {
@@ -1109,6 +1201,10 @@ export function ExpenseRequestList({
 
   const readAgain = (): void => {
     setState(LOADING);
+    // Asking for the list again starts the count over: what happens next is this read,
+    // not the polls that failed before it.
+    failedRefreshes.current = 0;
+    setCannotRefreshSince(null);
     setReadsRequested((reads) => reads + 1);
   };
 
@@ -1268,9 +1364,13 @@ export function ExpenseRequestList({
           setRefreshNote(listRefreshedMessage(changesFromElsewhere.current));
         })
         .catch(() => {
-          // The last known rows stay on screen (project convention).
+          // The last known rows stay on screen (project convention) — a failed poll
+          // never blanks the list, whichever way it failed. What it DOES do is count
+          // (BR9): the second failure in a row is where the screen stops looking
+          // current and says so.
+          refreshFailed();
         }),
-    [showFreshRequests],
+    [showFreshRequests, refreshFailed],
   );
 
   /** There are rows to keep current — nothing else is worth asking the service about. */
@@ -1773,6 +1873,33 @@ export function ExpenseRequestList({
       <p aria-live="polite" aria-atomic="true" className="sr-only">
         {refreshNote}
       </p>
+
+      {/* The list has stopped keeping itself current, and says so rather than going on
+          looking live (R6/BR9). Deliberately NOT the failed-load `Alert`: that state is
+          for a read that left the reader with nothing, this one leaves every row exactly
+          where it was — and an `alert` would interrupt whatever they are doing, which
+          NFR2 forbids for anything the background refresh does. So it is one polite
+          `status` region, carrying no control of any kind: the timer never stopped, and
+          the next read that works clears this by itself.
+
+          The moment named is the last read that SUCCEEDED, written as a `<time>` so it
+          means "a time" to assistive technology as well as to the eye. */}
+      {cannotRefreshSince !== null && (
+        <div
+          role="status"
+          className="border-border bg-muted/50 grid gap-1 rounded-md border p-3 text-sm"
+        >
+          <p className="font-medium">{CANNOT_REFRESH_MESSAGE}</p>
+          <p>
+            {LAST_UP_TO_DATE_LEAD}{' '}
+            <time dateTime={new Date(cannotRefreshSince).toISOString()}>
+              {onScreenDateTime(new Date(cannotRefreshSince))}
+            </time>
+            .
+          </p>
+          <p className="text-muted-foreground">{REFRESH_RESUMES_MESSAGE}</p>
+        </div>
+      )}
 
       {state.phase === 'loading' && state.wait !== 'brief' && (
         <div role="status" className="grid gap-2">

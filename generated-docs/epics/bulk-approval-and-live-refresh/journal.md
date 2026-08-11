@@ -26,3 +26,11 @@ The plan for this epic was parked while `expense-decisions` was still being buil
 - The expense request list now refreshes itself every 15 seconds while it is open, so a decision a colleague records turns up without anyone reloading. It stops asking while the tab is in the background and picks up the moment you come back to it, and it holds off entirely while you are part-way through approving a selection.
 - A refresh brings the rows up to date underneath you: nothing you have open closes, your search, filters, sort and page are left alone, and the keyboard stays where it was. If a request you had selected has just been decided by someone else, it quietly leaves your selection and the count goes down — no interruption, nothing to dismiss.
 - The one thing added for screen-reader users is an invisible line that says how much has changed; sighted readers simply see the rows move.
+
+## Story 5 — When the list cannot refresh
+
+- The expense request list now admits when it has stopped keeping itself up to date. If two refreshes in a row fail it shows a quiet notice saying so, along with the time it was last actually current — the time of the last refresh that worked, never the moment one failed. One failed refresh on its own changes nothing on screen, because brief network hiccups are normal and a warning on each would just be noise. The requests already listed stay exactly where they are the whole time, and nothing is asked of the reader: as soon as a refresh works again the notice disappears on its own, with no reload and no button to press.
+
+### A note on the build
+
+Story 5's first build run was cut short partway through by a spend limit on the account. Nothing was lost — the work in progress was picked up from where it stopped and finished normally.

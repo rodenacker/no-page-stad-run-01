@@ -22,6 +22,11 @@
  * - **How much moved is counted, not guessed** (NFR2). A request that arrived, changed
  *   or left is one change; that count is what the screen announces politely, and a
  *   count of nothing is what makes silence the right answer.
+ * - **A list that has stopped keeping itself current says so, after TWO failures**
+ *   (R6/BR9). One failed read is a hiccup and changes nothing on screen; two in a row is
+ *   a list quietly pretending to be live, which is the thing R6 exists to prevent. The
+ *   wording for that state lives here beside the cadence, because it is about the
+ *   refresh rather than about any one screen.
  *
  * Nothing here reads or writes anything: the read itself is `lib/api/transactions.ts`,
  * and the timer belongs to the screen that holds the rows.
@@ -119,3 +124,45 @@ export const listRefreshedMessage = (changes: number): string =>
   changes === 1
     ? 'The list has caught up with 1 change made elsewhere.'
     : `The list has caught up with ${String(changes)} changes made elsewhere.`;
+
+/**
+ * How many reads in a row have to fail before the screen admits it is no longer keeping
+ * itself current (BR9).
+ *
+ * Two, not one: a single failed read is an ordinary hiccup — a dropped connection, a
+ * service restarting — and a notice raised on every one of them would be noise the
+ * reader learns to ignore. Counted since the LAST SUCCESS, never since the screen
+ * opened: one success in between puts the count back to nothing, which is what "two
+ * consecutive" means.
+ */
+export const FAILED_REFRESHES_BEFORE_STALE = 2;
+
+/**
+ * What a list says once it has stopped keeping itself current (R6).
+ *
+ * The situation, in plain language, and not a technical cause: the reader cannot act on
+ * "500 from /v1/transactions", and what actually matters to them is that what they are
+ * looking at may no longer be true. It follows the project's failure-message convention
+ * (`transactionListFailureMessage`) in voice, but it is the SCREEN's own wording rather
+ * than the service's — the service, by definition, said nothing this time.
+ */
+export const CANNOT_REFRESH_MESSAGE =
+  'This list cannot refresh itself at the moment.';
+
+/**
+ * Leads into the moment the list was last genuinely current, which the screen writes as
+ * a `<time>` of its own after this phrase.
+ *
+ * That moment is the last read that SUCCEEDED, never the one that failed: "last up to
+ * date: now", written when a refresh fails, is the easy implementation and it tells the
+ * reader the exact opposite of the truth.
+ */
+export const LAST_UP_TO_DATE_LEAD = 'Last up to date at';
+
+/**
+ * That recovery needs nothing from the reader (R6) — no reload, no retry, no waiting for
+ * a control to press, because there is none. Said out loud rather than left implied: a
+ * screen that reports a problem and offers no way out reads as a dead end otherwise.
+ */
+export const REFRESH_RESUMES_MESSAGE =
+  'It will bring itself up to date on its own as soon as it can — there is nothing for you to do.';
