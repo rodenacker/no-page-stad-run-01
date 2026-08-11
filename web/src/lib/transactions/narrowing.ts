@@ -142,6 +142,24 @@ export const DATE_RANGE_WRONG_WAY_ROUND =
   'The transaction date range is the wrong way round — the latest date is before the earliest date, so it has not been applied.';
 
 /**
+ * THE ONE SENTENCE FOR "WHAT IS APPLIED HAS HIDDEN EVERY REQUEST".
+ *
+ * It lives here, with the narrowing itself, because two different surfaces have to say
+ * it and neither may invent its own wording: the list, where the rows would otherwise
+ * be, and the export, which explains why activating it produced no file. Two
+ * near-identical sentences on one screen ("…match what is currently applied." beside
+ * "…match the current search and filters.") read as two different answers to a user who
+ * has only asked one question.
+ *
+ * Deliberately NOT the never-imported wording: nothing here mentions importing, because
+ * requests do exist — the narrowing is what is hiding them, and the way out is to change
+ * it (see `ExpenseRequestList`'s own hint, which sits with the rows and not with the
+ * export).
+ */
+export const NARROWED_EMPTY_MESSAGE =
+  'No expense requests match what is currently applied.';
+
+/**
  * A new narrowing with one field changed. An exhaustive switch rather than a computed
  * key, so adding a narrowing to {@link NarrowingField} without handling it here is a
  * type error rather than a silent no-op.

@@ -45,6 +45,7 @@ existing `deliverFile`. Construction yields so the 10,000-row ceiling does not b
 - ☐ Move to page 2 of the list and export → the file still holds every matching request, not just the page you were looking at.
 - ☐ Filter to Imported only (requests nobody has decided yet) and export → those undecided requests are in the file.
 - ☐ Sign in as an Approver and export → the Approver gets a file too, for whatever their list is showing.
+- ☐ Export a very large list (thousands of requests) → the file is complete, and the screen does not visibly freeze while it is being built. *(Added at test generation: the automated test proves the file is complete at 10,000 rows, but "does not freeze" cannot be proven in jsdom without a banned test pattern — it needs human eyes.)*
 
 *Plus 2 technical checks verified automatically.*
 

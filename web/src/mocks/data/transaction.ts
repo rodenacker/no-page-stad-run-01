@@ -38,7 +38,9 @@
  *
  * ACCOUNT NUMBERS are FULL, unmasked values. Masking to the last four digits is
  * the application's job (POPIA — project.md §Compliance), so a test can only prove
- * masking happens if the mock hands the component something to mask.
+ * masking happens if the mock hands the component something to mask. The CSV export
+ * is the one deliberate exception that writes the value whole (csv-export brief
+ * §Compliance Exception), which the same full value here is what proves.
  *
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
@@ -224,6 +226,86 @@ export const transactionWithSourceFileDateFormat = (
     TransactionType: TRANSACTION_TYPE_DEBIT_CODE,
     ...overrides,
   });
+
+/**
+ * FREE TEXT THAT BREAKS A NAIVE CSV WRITER (csv-export epic, BR3 / RFC 4180).
+ *
+ * `Description` and `UserNote` are the two free-text fields a person types, so they
+ * are where a comma, a quotation mark or a line break actually arrives. A writer that
+ * joins values with commas and rows with newlines turns any of these into extra
+ * columns or extra rows in the hand-over file — which a receiving system, not a
+ * person, reads next.
+ *
+ * Each constant isolates ONE hostile character so a failure names which case broke,
+ * and the values are exported so a test asserts the round-trip against the same
+ * string the mock supplied rather than restating it. Both line-break spellings are
+ * present on purpose: a lone `\n`, and the `\r\n` that also happens to be RFC 4180's
+ * record separator (the harsher collision).
+ *
+ * Values are realistic expense wording (ZA locale, project.md §Compliance) — the
+ * sample upload file happens to contain no such characters, which is exactly why
+ * relying on it would leave this untested.
+ */
+export const DESCRIPTION_WITH_COMMA =
+  'Catering, venue hire and travel to Cape Town';
+export const DESCRIPTION_WITH_QUOTES =
+  'Reprint of the "Annual Report" for the board';
+export const DESCRIPTION_WITH_LINE_BREAK =
+  'Conference registration\nDelegate: T. Mokoena';
+export const DESCRIPTION_WITH_EVERY_HOSTILE_CHARACTER =
+  'Venue hire, "deposit" portion\r\nbalance due on 30 April';
+export const USER_NOTE_WITH_EVERY_HOSTILE_CHARACTER =
+  'Amount, "VAT" and date disagree\r\nwith the attached invoice';
+
+/**
+ * Four requests whose free text carries the characters RFC 4180 requires quoting:
+ * one per hostile character, plus one carrying all three in BOTH free-text fields
+ * (`Description` and `UserNote` — the rejected row, which is the only status that
+ * carries a note).
+ *
+ * Every row keeps its own id, reference and account number, and no two share the
+ * duplicate key, so a row is identified by its reference rather than by position.
+ * Use with {@link transactionListResponse} to answer `GET /v1/transactions`.
+ */
+export const transactionsWithCsvHostileText = (): TransactionRead[] => [
+  createTransaction({
+    Id: 7401,
+    Reference: 'TXN-20260415-0031',
+    TransactionDate: '2026-04-15 08:20:00',
+    AccountNumber: '8801-4472-1130',
+    Description: DESCRIPTION_WITH_COMMA,
+    Amount: 4820.5,
+    TransactionType: TRANSACTION_TYPE_DEBIT_CODE,
+  }),
+  createTransaction({
+    Id: 7402,
+    Reference: 'TXN-20260415-0032',
+    TransactionDate: '2026-04-15 09:41:00',
+    AccountNumber: '8801-4472-1131',
+    Description: DESCRIPTION_WITH_QUOTES,
+    Amount: 1375,
+    TransactionType: TRANSACTION_TYPE_DEBIT_CODE,
+  }),
+  createTransaction({
+    Id: 7403,
+    Reference: 'TXN-20260415-0033',
+    TransactionDate: '2026-04-15 11:12:00',
+    AccountNumber: '8801-4472-1132',
+    Description: DESCRIPTION_WITH_LINE_BREAK,
+    Amount: 2650,
+    TransactionType: TRANSACTION_TYPE_DEBIT_CODE,
+  }),
+  transactionWithStatus(TRANSACTION_STATUS_REJECTED, {
+    Id: 7404,
+    Reference: 'TXN-20260415-0034',
+    TransactionDate: '2026-04-15 13:05:00',
+    AccountNumber: '8801-4472-1133',
+    Description: DESCRIPTION_WITH_EVERY_HOSTILE_CHARACTER,
+    Amount: 9990,
+    TransactionType: TRANSACTION_TYPE_DEBIT_CODE,
+    UserNote: USER_NOTE_WITH_EVERY_HOSTILE_CHARACTER,
+  }),
+];
 
 /**
  * The duplicate key (BR3): two imported requests are possible duplicates when they
