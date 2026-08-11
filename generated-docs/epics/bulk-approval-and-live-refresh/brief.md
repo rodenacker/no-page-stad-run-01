@@ -151,3 +151,46 @@ Takes no query parameters; returns the full transaction list (up to 10,000 rows 
 - **CORS is an open backend item, not a frontend defect** (project.md NFR-base-6). Both the polling refresh calls and the N approve calls this epic issues are affected equally by the missing `Access-Control-Allow-Origin` on the transactions-api; treat any in-browser cross-origin failure during BUILD as this known dependency.
 - **Data volume context.** Requirements §10 states 1–10,000 records per batch and up to four concurrent users (one uploader, up to three approvers) all viewing the same list — the numbers behind BR6's cadence choice and NFR3's concurrency-bound suggestion.
 - No prototype source exists for this project (docs-only intake) — no prototype shortcuts to flag.
+
+---
+
+## Decisions settled at the stories approval (2026-08-11)
+
+Three points the source documents leave open were resolved when this epic's stories were approved. They are
+**settled**, not open assumptions — do not re-litigate them during BUILD.
+
+1. **A "select everything currently listed" control IS included.** Not mentioned in the requirements, but R4's
+   `99+` threshold is unreachable without it (nobody ticks 100 requests through a 20-row page). It selects every
+   *still-Imported* request the active search and filters left — not the whole fetched set, and not only the
+   visible page. Confirmed by the user.
+2. **A selection SURVIVES narrowing, ordering and paging.** The tick follows the *request*, not the row
+   position — which is why the selection is held as a set of transaction Ids. This is the only reading
+   consistent with a confirmation that names an exact count (BR4). The known consequence — the Approver may
+   approve requests not currently on screen — was shown to the user with a live demo and **accepted
+   deliberately**. The alternative (clear the selection on any view change) was declined.
+3. **The ambient selected-count indicator lives in the list's own toolbar**, beside the bulk action — not in the
+   app header. The header is fixed by project convention (nothing in it is hidden at any width), so a
+   conditional indicator there would fight that. Decided by the orchestrator and disclosed at approval.
+
+## Convention extension to record at epic end
+
+`generated-docs/architecture.md` § Conventions currently states that a self-updating view *"re-reads its OWN
+call on an interval, only while something it shows is still in progress, and stops once nothing is"* — the
+behaviour of `SubmittedFilesList` and `SubmittedFileDetail`.
+
+**R3/BR6 requires the opposite here:** the refresh runs the whole time the list is open, gated on tab
+visibility and paused around the user's own action. Nothing on this screen is ever "in progress" in the
+file-processing sense — what is being watched is *other people's decisions*, which never finish.
+
+This is an **extension** of the convention, not a violation of it. **Record it in `architecture.md` at epic
+end** so a later epic does not "fix" it back to the stop-when-idle form.
+
+## Planned against an unmerged dependency — read before BUILD
+
+This epic was planned while `expense-decisions` was still building, so its code was **not** in the tree the
+planner read. Three reuse points were therefore planned from that epic's story files rather than observed:
+the single-request approve call, the confirmation composition (UI-09), and the re-read-before-submit staleness
+check. Each is marked as a **dependency seam** in the story files that need it (stories 2 and 3).
+
+**At BUILD time, confirm each seam against the merged `main` first** and adapt to what actually landed —
+never add a parallel implementation alongside it.
