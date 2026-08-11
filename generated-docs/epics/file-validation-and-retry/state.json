@@ -22,44 +22,44 @@
     ],
     "manualTestResults": []
   },
-  "phase": "EPIC-END",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-06T06:15:00.873Z",
       "completedAt": "2026-08-06T06:35:23.727Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-06T06:37:00.000Z",
       "completedAt": "2026-08-06T06:51:41.437Z"
     },
     "3": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-06T06:53:00.000Z",
       "completedAt": "2026-08-06T07:04:21.160Z"
     },
     "4": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-06T07:06:00.000Z",
       "completedAt": "2026-08-06T07:21:16.388Z"
     },
     "5": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-06T07:23:00.000Z",
       "completedAt": "2026-08-06T07:39:30.171Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-05T07:35:00.000Z"
+  "lastUpdated": "2026-08-11T00:00:00.000Z"
 }
