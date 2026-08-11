@@ -531,7 +531,9 @@ describe('Epic csv-export, Story 1: Export the requests you are looking at', () 
       await screen.findByText(secondPageRequest.Reference),
     ).toBeInTheDocument();
     expect(exportControl()).toBeEnabled();
-  }, // for duplicates, ordered and written out. The raised ceiling is a runaway guard, // The ceiling itself is the cost: 10,000 requests are fetched, narrowed, compared
-  // not an expectation — see vitest.config.ts's own note on the 15s default.
-  40000);
+
+    // The ceiling itself is the cost: 10,000 requests are fetched, narrowed, compared
+    // for duplicates, ordered and written out. The raised timeout below is a runaway
+    // guard, not an expectation — see vitest.config.ts's own note on the 15s default.
+  }, 40000);
 });

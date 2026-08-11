@@ -136,6 +136,15 @@
  *   `lib/transactions/exportCsv.ts`'s business, which is where the reasoning lives.
  * - **The control carries no role check**, unlike submitting a file: both roles may
  *   export whatever each has listed.
+ * - **What the export TELLS the user is the export control's own business too** (R4/BR2):
+ *   a completed export raises the app's one notification naming how many requests went
+ *   into the file, who produced it and when, and a narrowing that has hidden everything
+ *   produces no file and says so. This component contributes two things to that and
+ *   nothing else — the ordered, narrowed set, and the signed-in person's name from the
+ *   `exportedBy` prop, which it passes straight through. The narrowed-empty sentence is
+ *   the SAME one the rows' place shows (`NARROWED_EMPTY_MESSAGE`, stated once in
+ *   `lib/transactions/narrowing.ts`): two near-identical sentences on one screen read as
+ *   two different answers.
  */
 
 import {
@@ -196,6 +205,7 @@ import {
 import { transactionTypeLabel } from '@/lib/transactions/display';
 import { possibleDuplicateIdsIn } from '@/lib/transactions/duplicates';
 import {
+  NARROWED_EMPTY_MESSAGE,
   NO_NARROWING,
   appliedNarrowings,
   narrowRequests,
@@ -262,9 +272,14 @@ const FAILED_TITLE = 'Could not load the expense requests';
  * Requests exist, but everything applied has hidden them all (R10/R18). This is not the
  * never-imported state and must not read like it — nothing here mentions importing, and
  * the upload action is not offered.
+ *
+ * The sentence itself lives with the narrowing (`lib/transactions/narrowing.ts`) because
+ * the export path has to say the SAME thing when activating it produced no file
+ * (csv-export BR2). It is re-exported here so every reader of this screen's wording — the
+ * rows, the export, and anything asserting there is only ONE such sentence — reaches it
+ * from one place.
  */
-const NARROWED_EMPTY_MESSAGE =
-  'No expense requests match what is currently applied.';
+export { NARROWED_EMPTY_MESSAGE };
 
 /** The way back, in the user's terms — Clear all sits with the summary above it. */
 const NARROWED_EMPTY_HINT =
@@ -486,10 +501,22 @@ interface ExpenseRequestListProps {
    * that omits it simply notifies nobody.
    */
   roles?: ProjectRole[];
+  /**
+   * The signed-in person's NAME, from the same server page (`displayNameOf(session)`).
+   *
+   * It exists for one purpose too: an export is attributed to whoever produced it
+   * (csv-export R4 — the second half of that epic's mandatory compliance exception), and
+   * this screen is where an export is asked for. Nothing here reads an identity from the
+   * browser; this is handed down to the export control unchanged, exactly as
+   * `SubmittedFileDetail` is handed its `actingUploader`. Optional for the same reason: a
+   * render with no session behind it has no name to give.
+   */
+  exportedBy?: string;
 }
 
 export function ExpenseRequestList({
   roles = NO_ROLES,
+  exportedBy,
 }: ExpenseRequestListProps) {
   const [state, setState] = useState<ListState>(LOADING);
   /** Bumped by Try again; asking for the list again is what re-runs the read. */
@@ -858,7 +885,10 @@ export function ExpenseRequestList({
               the whole fetched set (BR1). It sits above the controls that decide that
               set, so a keyboard user reaches it early. */}
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <ExportRequestsAction listedRequests={orderedRequests} />
+            <ExportRequestsAction
+              listedRequests={orderedRequests}
+              exportedBy={exportedBy}
+            />
           </div>
 
           {/* The choices come from the WHOLE fetched set, so a filter always offers

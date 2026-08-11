@@ -13,7 +13,9 @@
       "Verify the transaction type column is the form your payment system expects: the app exports the service's own value untranslated, on purpose. Your two source documents disagree — the upload file uses single letters (C, D) while the service's own example spells it out (Debit) — so if the file carries the wrong one, the payment system may reject the whole batch.",
       "Verify the transaction date column is in the format your payment system expects: the app writes the date exactly as the service sends it, with no reformatting. If the service's format differs from what the payment system reads, dates could be misread rather than refused, which is the more dangerous failure.",
       "Check the exported file is shaped the way your payment system expects, beyond the nine column names. There is no receiving system here to hand a file to, so this part is assumed: the file carries RPT-01's exact column names as a header row, CRLF line endings with a trailing newline, minimal quoting, and no byte-order mark. If your payment system wants a different header spelling, no header row at all, LF line endings, or a byte-order mark, each is a one-line change — but only handing over a real file will reveal it.",
-      "Confirm whether anyone opens these files in a spreadsheet as well as feeding them to the payment system. The file deliberately carries no byte-order mark, which is the right choice for a machine reading it (some parsers return that mark as part of the first column). The trade-off: if someone opens the file in Excel and a description contains an accented character, Excel may show it incorrectly until told the file is UTF-8."
+      "Confirm whether anyone opens these files in a spreadsheet as well as feeding them to the payment system. The file deliberately carries no byte-order mark, which is the right choice for a machine reading it (some parsers return that mark as part of the first column). The trade-off: if someone opens the file in Excel and a description contains an accented character, Excel may show it incorrectly until told the file is UTF-8.",
+      "Check the export confirmation reads the way you would want. It names the exported count, the signed-in person and the moment, and nothing else — no file name, no \"of N total\". For example: \"5 expense requests exported\" / \"Produced by Frances Nkosi at 2026-04-30 14:35.\" Your requirements ask for attribution but do not dictate the sentence, so this wording is ours.",
+      "Decide whether the export confirmation should stay on screen until dismissed. It currently fades after about 5 seconds, like other completion notices. Because this confirmation is the record of who produced a file carrying full account numbers, a compliance reviewer might expect it to persist rather than disappear on its own — that is a one-line change if so."
     ],
     "manualTestResults": []
   },
@@ -27,11 +29,11 @@
       "completedAt": "2026-08-11T13:32:00.000Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-11T13:35:00.000Z",
+      "completedAt": "2026-08-11T13:48:00.000Z"
     }
   },
   "halt": null,
