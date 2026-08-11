@@ -16,6 +16,9 @@
  * - **The reference is the primary identifier** (source UI-23), with three key values
  *   beside it — status, amount and transaction date. Everything else about the request,
  *   the account number included, is in the panel the action overflow opens.
+ * - **A card offers exactly what a row offers**, including the decisions: the same
+ *   `RequestActions` overflow, given `onDecide` on the same condition (an Approver, a
+ *   request still awaiting a decision). A phone-width reader is not a read-only reader.
  * - **The possible-duplicate mark is here too** (brief R8): the mark has to be readable
  *   in the list itself at every width, so it is the same `PossibleDuplicateMark` the
  *   table row renders, beside the status. Which requests carry it is decided once per
@@ -37,8 +40,10 @@ import {
   CardContent,
   CardHeader,
 } from '@/components/ui/card';
+import { awaitsDecision } from '@/lib/transactions/deciding';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type { DecisionOutcome } from '@/lib/api/decisions';
 import type { TransactionRead } from '@/types/transactions';
 
 /** Names the list itself, since there is no table caption at this width. */
@@ -57,8 +62,16 @@ interface RequestCardProps {
   presentationOf: (request: TransactionRead) => StatusPresentation | undefined;
   /** Whether this load marked the request a possible duplicate (brief BR2/BR3). */
   possibleDuplicate: boolean;
+  /**
+   * Whether this reader is offered a decision on THIS request — decided by the list
+   * from who is signed in and the request's own status. A plain boolean, so the memo
+   * below still holds.
+   */
+  canDecide: boolean;
   /** Opens this request's read-only detail panel. */
   onOpen: (request: TransactionRead) => void;
+  /** Starts recording a decision on this request; the list asks for confirmation. */
+  onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }
 
 /**
@@ -70,7 +83,9 @@ const RequestCard = memo(function RequestCard({
   request,
   presentationOf,
   possibleDuplicate,
+  canDecide,
   onOpen,
+  onDecide,
 }: RequestCardProps) {
   return (
     <Card className="gap-3 py-4">
@@ -89,6 +104,13 @@ const RequestCard = memo(function RequestCard({
             onOpen={() => {
               onOpen(request);
             }}
+            onDecide={
+              canDecide
+                ? (outcome) => {
+                    onDecide(request, outcome);
+                  }
+                : undefined
+            }
           />
         </CardAction>
       </CardHeader>
@@ -120,15 +142,24 @@ interface RequestCardsProps {
    * request whose match is on another page (brief BR3).
    */
   possibleDuplicateIds: ReadonlySet<number>;
+  /**
+   * Whether the reader may decide requests at all (an Approver). Which requests can
+   * still be decided is asked per request below, so this stays one stable boolean.
+   */
+  mayDecide: boolean;
   /** Opens one request's read-only detail panel. */
   onOpenRequest: (request: TransactionRead) => void;
+  /** Starts recording a decision on one request; the list asks for confirmation. */
+  onDecideRequest: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }
 
 export function RequestCards({
   requests,
   presentationOf,
   possibleDuplicateIds,
+  mayDecide,
   onOpenRequest,
+  onDecideRequest,
 }: RequestCardsProps) {
   return (
     <ul role="list" aria-label={LIST_LABEL} className="grid gap-3">
@@ -138,7 +169,9 @@ export function RequestCards({
             request={request}
             presentationOf={presentationOf}
             possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+            canDecide={mayDecide && awaitsDecision(request)}
             onOpen={onOpenRequest}
+            onDecide={onDecideRequest}
           />
         </li>
       ))}
