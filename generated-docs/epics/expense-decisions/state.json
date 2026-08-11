@@ -18,37 +18,37 @@
     ],
     "manualTestResults": []
   },
-  "phase": "EPIC-END",
+  "phase": "MANUAL-TEST",
   "stories": {
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "not-applicable",
       "startedAt": "2026-08-11T09:19:04.949Z",
       "completedAt": "2026-08-11T09:27:07.641Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-11T09:31:00.000Z",
       "completedAt": "2026-08-11T09:48:03.471Z"
     },
     "3": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed-after-fix",
       "startedAt": "2026-08-11T09:52:00.000Z",
       "completedAt": "2026-08-11T10:07:26.309Z"
     },
     "4": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-11T10:11:00.000Z",
       "completedAt": "2026-08-11T10:16:22.145Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-11T08:03:02.710Z"
+  "lastUpdated": "2026-08-11T10:59:10.124Z"
 }

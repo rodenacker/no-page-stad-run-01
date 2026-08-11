@@ -105,6 +105,16 @@
  *   note step's own container rather than through `getByRole('alert')`: Next renders a
  *   permanently empty body-level `role="alert"` route announcer, so an unscoped alert
  *   query always matches two elements.
+ * - **The list behind an OPEN modal cannot be addressed by role.** Radix marks
+ *   everything outside the open dialog `aria-hidden="true"` — including the app shell
+ *   wrapper that holds `<main>` — so while the note step is up, `getByRole('main')`
+ *   correctly matches nothing, however untouched the list is. That is a property of the
+ *   dialog, not of the app's data. So "nothing was recorded" is asserted here in two
+ *   ways that are both valid with a modal open: no decide call left the browser at all
+ *   ({@link DecisionCall.timesSent}) — the ONLY way a decision can be recorded — and the
+ *   row itself, read through the DOM ({@link rowBehindTheModal}) rather than through the
+ *   accessibility tree, still reads as awaiting a decision. Once no modal is open, the
+ *   list is addressed by role again ({@link requestRow}), as everywhere else.
  * - Cookie assumptions: the mock `session` cookie carries production-like attributes
  *   (HttpOnly, SameSite=Strict). `Secure` is omitted because the E2E server is plain
  *   http on localhost; the real cookie's full attribute set is asserted in the Vitest
@@ -272,6 +282,14 @@ const mockTransactionList = async (
 interface DecisionCall {
   /** The raw body of the decide call, or `null` if no decision has been sent yet. */
   bodySent: () => string | null;
+  /**
+   * How many decisions have left the browser so far.
+   *
+   * This call is the only way a decision can be RECORDED (brief BR1), so `0` is the
+   * strictest available form of "nothing was recorded" — and unlike reading the list,
+   * it can be asserted while a modal is open (see the header's Radix note).
+   */
+  timesSent: () => number;
 }
 
 /**
@@ -288,6 +306,7 @@ const mockDecisionEndpoint = async (
   { onDecided }: { onDecided?: () => void } = {},
 ): Promise<DecisionCall> => {
   let bodySent: string | null = null;
+  let timesSent = 0;
 
   await page.route(DECISIONS_ENDPOINT_GLOB, (route) => {
     const request = route.request();
@@ -297,13 +316,14 @@ const mockDecisionEndpoint = async (
       return route.abort();
     }
     bodySent = request.postData();
+    timesSent += 1;
     onDecided?.();
     return route.fulfill(
       jsonResponse(rejectSuccessResponse(REQUEST_TO_REJECT.Id)),
     );
   });
 
-  return { bodySent: () => bodySent };
+  return { bodySent: () => bodySent, timesSent: () => timesSent };
 };
 
 /**
@@ -343,6 +363,21 @@ const mockBrowserIdentityCall = async (
 /** One request's row, found by its own reference — never by position. */
 const requestRow = (page: Page, reference: string): Locator =>
   page.getByRole('main').getByRole('row').filter({ hasText: reference });
+
+/**
+ * The same row, while a modal is open over the list.
+ *
+ * {@link requestRow} reads the accessibility tree, and Radix takes the whole page
+ * behind an open dialog OUT of that tree (`aria-hidden="true"` on the app shell wrapper
+ * around `<main>`) — so it matches nothing while the note step is up, whatever the list
+ * says. This reads the DOM instead, where the row is still there to be read, so the
+ * claim "the request was left exactly as it was" can be made at the moment it matters:
+ * with the refusal on screen. Still found by the request's own reference, never by
+ * position; `tr` is the list's row element and the narrow-width cards are not a table,
+ * so this cannot match a request twice.
+ */
+const rowBehindTheModal = (page: Page, reference: string): Locator =>
+  page.locator('main tr').filter({ hasText: reference });
 
 /**
  * The note field, found by its own label rather than through whatever container it is
@@ -508,6 +543,11 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
 
     const step = noteStep(page);
     const sendRejection = step.getByRole('button', { name: REJECT_NAME });
+    /** The list underneath, addressed the one way that works with a modal open. */
+    const rowUnderTheStep = rowBehindTheModal(
+      page,
+      REQUEST_TO_REJECT.Reference,
+    );
 
     // ---- 3. Sent with nothing written: refused, in the brief's own words, and the
     // request is left exactly as it was.
@@ -517,10 +557,17 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
       'a rejection sent with an empty note was not refused with the wording R9/BR4 ' +
         'requires — check it is validated on SUBMIT, not on keystroke',
     ).toContainText(MISSING_NOTE_REFUSAL);
+    // Nothing was recorded — asserted at both ends: no decision left the browser, and
+    // the request behind the refusal still reads as awaiting one.
+    expect(
+      decision.timesSent(),
+      'the request was decided even though its note was empty — no decision may be ' +
+        'sent until a note is written (R7/BR4)',
+    ).toBe(0);
     await expect(
-      targetRow,
-      'the request was decided even though its note was empty — nothing may be ' +
-        'recorded until a note is written (R7/BR4)',
+      rowUnderTheStep,
+      'the request changed while its note was empty — nothing may be recorded until a ' +
+        'note is written (R7/BR4)',
     ).toContainText(TRANSACTION_STATUS_IMPORTED);
 
     // ---- 4. Corrected the way a keyboard user corrects it — and spaces are no more a
@@ -532,7 +579,11 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
       step,
       'a note made only of spaces was accepted as a reason (BR4)',
     ).toContainText(MISSING_NOTE_REFUSAL);
-    await expect(targetRow).toContainText(TRANSACTION_STATUS_IMPORTED);
+    expect(
+      decision.timesSent(),
+      'a note made only of spaces was sent on as a reason (BR4)',
+    ).toBe(0);
+    await expect(rowUnderTheStep).toContainText(TRANSACTION_STATUS_IMPORTED);
 
     // The refused state is one this story ADDS to the screen, so it is scanned here
     // rather than only in its happy state — violations are usually state-specific.
