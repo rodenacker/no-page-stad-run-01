@@ -26,12 +26,13 @@
  *   that is `SubmittedFileDetail`'s "not available" answer, not a variant of this
  *   section. Which is also why a confirmed cancel sends the user back to the Expense
  *   files list rather than leaving them on a page whose file no longer exists.
- * - **The cancel is gated by a confirmation (source UI-09).** It NAMES the file, says
- *   the file and its rows go and that it cannot be undone, opens with the way OUT
- *   holding focus (Radix focuses `AlertDialogCancel`, so a stray Enter keeps the file),
- *   and sends nothing until the confirming choice is taken. The way out reads "keep",
- *   never "cancel": the destructive action is itself called Cancel file, so "Cancel"
- *   would mean both things at once.
+ * - **The cancel is gated by the project's shared confirmation (source UI-09).**
+ *   `ConfirmAction` is the one implementation of that convention — it NAMES the file
+ *   here, says the file and its rows go and that it cannot be undone, opens with the way
+ *   OUT holding focus (a stray Enter keeps the file), and sends nothing until the
+ *   confirming choice is taken. The way out reads "keep", never "cancel": the
+ *   destructive action is itself called Cancel file, so "Cancel" would mean both things
+ *   at once.
  * - **A refusal is reported HERE, in the service's own words**, with the confirmation
  *   closed and both actions still on offer — a user is never trapped in a dialog to
  *   read why something did not happen, and the file is left exactly as it was.
@@ -41,18 +42,8 @@ import { Ban, RotateCcw, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ConfirmAction } from '@/components/common/ConfirmAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   cancelFailureMessage,
@@ -147,6 +138,8 @@ function OfferedActions({
   onRetried: () => void;
 }) {
   const [state, setState] = useState<ActionState>(IDLE);
+  /** Whether the user is being asked to confirm the cancel. Nothing is sent while it is. */
+  const [cancelAsked, setCancelAsked] = useState(false);
   const router = useRouter();
 
   /** Whether a call is already on its way — a second press must not send a second. */
@@ -226,36 +219,30 @@ function OfferedActions({
         )}
 
         {cancelApplies(file) && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline">
-                <Ban aria-hidden="true" />
-                {CANCEL_LABEL}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {confirmationTitleFor(file)}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {CONFIRMATION_MESSAGE}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                {/* The way out is the one that holds focus when this opens, which is
-                    what `AlertDialogCancel` gives for free — so arriving here and
-                    pressing Enter keeps the file. */}
-                <AlertDialogCancel>{KEEP_FILE_LABEL}</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={confirmCancel}
-                >
-                  {CONFIRM_CANCEL_LABEL}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCancelAsked(true);
+              }}
+            >
+              <Ban aria-hidden="true" />
+              {CANCEL_LABEL}
+            </Button>
+            {/* The project's one confirmation: it names the file, holds focus on the
+                way out, and sends nothing until the confirming choice is taken. */}
+            <ConfirmAction
+              open={cancelAsked}
+              onOpenChange={setCancelAsked}
+              title={confirmationTitleFor(file)}
+              description={CONFIRMATION_MESSAGE}
+              confirmLabel={CONFIRM_CANCEL_LABEL}
+              wayOutLabel={KEEP_FILE_LABEL}
+              destructive
+              onConfirm={confirmCancel}
+            />
+          </>
         )}
       </div>
 

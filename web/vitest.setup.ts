@@ -90,6 +90,33 @@ if (typeof Element !== 'undefined') {
   }
 }
 
+// Element size observation, for Radix popper-positioned primitives in jsdom.
+//
+// jsdom implements no `ResizeObserver`. Radix's `useSize` constructs one the
+// moment a popper-positioned surface mounts — a `dropdown-menu`'s content, a
+// `popover`, a `tooltip` — so WITHOUT this the content component throws
+// "ResizeObserver is not defined" while committing, the menu never appears, and
+// the primitive cannot be driven in a test at all (it also surfaces as an
+// unhandled error that fails the run outright).
+//
+// An observer that records what it was asked to watch and never reports a change
+// is the honest stand-in, exactly like the pointer-capture shims above: jsdom has
+// no layout engine, reports every element at 0×0 and never lays anything out
+// again, so "nothing ever resizes" is the true state rather than a convenient
+// pretence. It fakes no measurement a real browser would compute differently, so
+// a genuinely broken interaction still fails — the click still has to land, the
+// menu still has to open, the item still has to be selectable.
+//
+// Test-environment only; no production code is touched. Shared infrastructure —
+// any epic rendering a Shadcn `dropdown-menu` / `popover` / `tooltip` needs it.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  } as unknown as typeof globalThis.ResizeObserver;
+}
+
 // Polyfill for Web APIs needed by Next.js
 // These are required for testing files that import from 'next/server'
 if (typeof Request === 'undefined') {

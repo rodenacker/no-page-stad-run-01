@@ -16,6 +16,14 @@
  * - **The reference is the primary identifier** (source UI-23), with three key values
  *   beside it — status, amount and transaction date. Everything else about the request,
  *   the account number included, is in the panel the action overflow opens.
+ * - **A card offers exactly what a row offers**, including the decisions as DIRECT
+ *   controls: the same `RequestActions`, given `onDecide` on the same condition (an
+ *   Approver, a request still awaiting a decision). A phone-width reader is not a
+ *   read-only reader, and a decision costs them one tap here too. Those controls sit in
+ *   a footer ROW of their own rather than in the card's action corner: four controls
+ *   squeezed beside the reference at 360px would either crowd it or push the card
+ *   sideways, and the whole point of the card presentation is that the page never
+ *   scrolls sideways (NFR-base-3's floor).
  * - **The possible-duplicate mark is here too** (brief R8): the mark has to be readable
  *   in the list itself at every width, so it is the same `PossibleDuplicateMark` the
  *   table row renders, beside the status. Which requests carry it is decided once per
@@ -33,12 +41,14 @@ import { RequestActions } from '@/components/requests/RequestActions';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import {
   Card,
-  CardAction,
   CardContent,
+  CardFooter,
   CardHeader,
 } from '@/components/ui/card';
+import { awaitsDecision } from '@/lib/transactions/deciding';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type { DecisionOutcome } from '@/lib/api/decisions';
 import type { TransactionRead } from '@/types/transactions';
 
 /** Names the list itself, since there is no table caption at this width. */
@@ -57,8 +67,25 @@ interface RequestCardProps {
   presentationOf: (request: TransactionRead) => StatusPresentation | undefined;
   /** Whether this load marked the request a possible duplicate (brief BR2/BR3). */
   possibleDuplicate: boolean;
+  /**
+   * Whether this reader is offered a decision on THIS request — decided by the list
+   * from who is signed in and the request's own status. A plain boolean, so the memo
+   * below still holds.
+   */
+  canDecide: boolean;
+  /**
+   * Whether this card's decide controls are the ones being taken away by a decision
+   * that has just landed — in which case they hand the keyboard to Open rather than
+   * dropping it (NFR1). A phone-width reader with a keyboard is a keyboard user, so
+   * this travels to exactly the same `RequestActions` the table row uses.
+   */
+  handOffFocus: boolean;
+  /** Reports that hand-off done, so the list can put the request down. */
+  onFocusHandedOff: () => void;
   /** Opens this request's read-only detail panel. */
   onOpen: (request: TransactionRead) => void;
+  /** Starts recording a decision on this request; the list asks for confirmation. */
+  onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }
 
 /**
@@ -70,7 +97,11 @@ const RequestCard = memo(function RequestCard({
   request,
   presentationOf,
   possibleDuplicate,
+  canDecide,
+  handOffFocus,
+  onFocusHandedOff,
   onOpen,
+  onDecide,
 }: RequestCardProps) {
   return (
     <Card className="gap-3 py-4">
@@ -83,14 +114,6 @@ const RequestCard = memo(function RequestCard({
           />
           {possibleDuplicate && <PossibleDuplicateMark />}
         </div>
-        <CardAction>
-          <RequestActions
-            reference={request.Reference}
-            onOpen={() => {
-              onOpen(request);
-            }}
-          />
-        </CardAction>
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-2 gap-2 text-sm">
@@ -105,6 +128,25 @@ const RequestCard = memo(function RequestCard({
           </div>
         </dl>
       </CardContent>
+      {/* A row of its own, so the two decisions, Open and the overflow have the card's
+          whole width to sit across and wrap into at 360px. */}
+      <CardFooter className="justify-end">
+        <RequestActions
+          reference={request.Reference}
+          handOffFocus={handOffFocus}
+          onFocusHandedOff={onFocusHandedOff}
+          onOpen={() => {
+            onOpen(request);
+          }}
+          onDecide={
+            canDecide
+              ? (outcome) => {
+                  onDecide(request, outcome);
+                }
+              : undefined
+          }
+        />
+      </CardFooter>
     </Card>
   );
 });
@@ -120,15 +162,34 @@ interface RequestCardsProps {
    * request whose match is on another page (brief BR3).
    */
   possibleDuplicateIds: ReadonlySet<number>;
+  /**
+   * Whether the reader may decide requests at all (an Approver). Which requests can
+   * still be decided is asked per request below, so this stays one stable boolean.
+   */
+  mayDecide: boolean;
+  /**
+   * The request whose decide controls are going away with a decision that has just
+   * landed, by id — `null` when nothing has just been decided. The list owns it; see
+   * `ExpenseRequestList` and `RequestActions`.
+   */
+  handOffFocusTo: number | null;
+  /** Reports a hand-off done, so the list can put the request down. */
+  onFocusHandedOff: () => void;
   /** Opens one request's read-only detail panel. */
   onOpenRequest: (request: TransactionRead) => void;
+  /** Starts recording a decision on one request; the list asks for confirmation. */
+  onDecideRequest: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }
 
 export function RequestCards({
   requests,
   presentationOf,
   possibleDuplicateIds,
+  mayDecide,
+  handOffFocusTo,
+  onFocusHandedOff,
   onOpenRequest,
+  onDecideRequest,
 }: RequestCardsProps) {
   return (
     <ul role="list" aria-label={LIST_LABEL} className="grid gap-3">
@@ -138,7 +199,11 @@ export function RequestCards({
             request={request}
             presentationOf={presentationOf}
             possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+            canDecide={mayDecide && awaitsDecision(request)}
+            handOffFocus={handOffFocusTo === request.Id}
+            onFocusHandedOff={onFocusHandedOff}
             onOpen={onOpenRequest}
+            onDecide={onDecideRequest}
           />
         </li>
       ))}

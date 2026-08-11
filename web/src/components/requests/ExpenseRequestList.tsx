@@ -145,6 +145,63 @@
  *   the SAME one the rows' place shows (`NARROWED_EMPTY_MESSAGE`, stated once in
  *   `lib/transactions/narrowing.ts`): two near-identical sentences on one screen read as
  *   two different answers.
+ *
+ * Deciding one request (`expense-decisions` R1/R10/R11/R12/R14/R15, BR3/BR6/BR7):
+ *
+ * - **This component owns the decide flow; the row, the card and the panel only ask.**
+ *   `RequestActions` and `RequestDetailPanel` are handed `onDecide` — and handed it
+ *   ONLY for an Approver looking at a request that is still `Imported` — so a reader who
+ *   may not decide, or a request that has already been decided, has no decide control in
+ *   its markup at all. Absent, never disabled: the project's rule everywhere, and the
+ *   thing a greyed-out Approve would quietly break.
+ * - **The two decisions are DIRECT controls on the row and on the card** (user decision
+ *   at manual test), not items in the ⋯ overflow, which now holds only Open — so
+ *   deciding a request costs one activation rather than two. They are therefore on
+ *   screen once per listed request, which is why each one's accessible name carries the
+ *   request's reference; "Approve" alone would be a screenful of identical controls.
+ * - **Nothing is sent until the confirmation is accepted** (R10/BR6). Choosing Approve
+ *   or Reject only records WHICH decision is being asked about; the shared
+ *   `ConfirmAction` then names the request by its reference, holds focus on the way out
+ *   (NFR2) and prints no account number — naming a request must not defeat the masking
+ *   the list applies (project.md §Compliance).
+ * - **A rejection is asked WHY first** (R7/R9/BR4). Choosing Reject opens
+ *   `RejectionNoteStep` — a step of its own, BETWEEN the action and the confirmation,
+ *   never inside it: the confirmation's way out holds focus precisely so a stray Enter
+ *   decides nothing, and an editable field in it would defeat that. Approving asks for
+ *   no note at all. The note then travels with the decision as `UserNote`, and the
+ *   same request's confirmation is the same shared dialog either way.
+ * - **The confirmation closes as the decision is submitted, whichever way it turns
+ *   out.** A refusal is reported behind it, through the app's one notification surface:
+ *   a user is never held in a dialog to read why nothing happened, and a message trapped
+ *   behind an open dialog is unreachable to a screen reader anyway.
+ * - **The outcome arrives by RE-READING, never out of the answer.** Both decide
+ *   operations return the same generic envelope whatever happened (brief BR1), so a
+ *   recorded decision is followed by a fresh `GET /v1/transactions`, and it is that read
+ *   which moves the request's status, withdraws its decide actions and updates the
+ *   opened panel. A re-read that fails leaves the last known rows on screen.
+ * - **AND THE REQUEST IS RE-READ BEFORE ANYTHING IS SENT** (brief BR1, R4/R13). That
+ *   same envelope is also what a decide call answers when the request was ALREADY
+ *   decided, so nothing in the answer can tell an Approver they were beaten to it. An
+ *   accepted confirmation therefore reads `GET /v1/transactions` FIRST and sends the
+ *   decision only while that fresh read still shows the request awaiting one; otherwise
+ *   it refuses locally — no decide call at all — tells the Approver in R4/R13's words,
+ *   and leaves them looking at the decision that was actually recorded, because the
+ *   same read is what puts it on screen. There are now two re-reads in the decide path
+ *   and they answer different questions: this one asks "may I still?", the one after a
+ *   recorded decision asks "what happened?".
+ * - **The two notification lifetimes are the R11 rule, not a choice per message**: a
+ *   recorded decision confirms itself on the toast's default 5s (inside the 4-8s
+ *   window) and fades; a decision that was NOT recorded is something the Approver has to
+ *   act on, so it is raised with `duration: 0` and waits for them.
+ * - **A decision that STICKS hands the keyboard back** (NFR1). The decide controls the
+ *   Approver was standing on are withdrawn the moment the request stops awaiting a
+ *   decision, and a control that is removed while it holds focus drops it on the floor —
+ *   the whole page has to be walked again to reach anything. So this component names the
+ *   request whose controls are going (`handOffFocusTo`) and the request's own surface
+ *   moves focus to its Open control; see `RequestActions`. It is asked for wherever the
+ *   offer ENDS — the decision the Approver recorded, and the one a fresh read shows
+ *   somebody else had already recorded — and nowhere the request is left exactly as it
+ *   was: a refused decision keeps its controls, and focus comes back to them by itself.
  */
 
 import {
@@ -168,10 +225,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import { ConfirmAction } from '@/components/common/ConfirmAction';
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
+import { RejectionNoteStep } from '@/components/requests/RejectionNoteStep';
 import { RequestActions } from '@/components/requests/RequestActions';
 import { RequestCards } from '@/components/requests/RequestCards';
 import { RequestDetailPanel } from '@/components/requests/RequestDetailPanel';
@@ -193,6 +252,11 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/contexts/ToastContext';
 import {
+  DECISION_REJECT,
+  decisionFailureMessage,
+  recordDecision,
+} from '@/lib/api/decisions';
+import {
   fetchTransactions,
   transactionListFailureMessage,
 } from '@/lib/api/transactions';
@@ -202,6 +266,19 @@ import {
   isNarrowViewportOnServer,
   subscribeToViewportWidth,
 } from '@/lib/layout/viewport';
+import {
+  ALREADY_DECIDED_MESSAGE,
+  DECISION_REFUSED_TITLE,
+  REQUEST_NO_LONGER_LISTED_MESSAGE,
+  WAY_OUT_OF_CONFIRMATION,
+  awaitsDecision,
+  confirmDecisionLabel,
+  confirmationMessageFor,
+  confirmationTitleFor,
+  decisionInFlightMessage,
+  decisionRecordedMessage,
+  decisionRecordedTitle,
+} from '@/lib/transactions/deciding';
 import { transactionTypeLabel } from '@/lib/transactions/display';
 import { possibleDuplicateIdsIn } from '@/lib/transactions/duplicates';
 import {
@@ -236,6 +313,7 @@ import {
 } from '@/types/transactions';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type { DecisionOutcome } from '@/lib/api/decisions';
 import type {
   NarrowingField,
   RequestNarrowing,
@@ -330,6 +408,30 @@ const STILL_LOADING_AFTER_MS = 3000;
  */
 type WaitTier = 'brief' | 'placeholder' | 'prolonged';
 
+/**
+ * A decision the reader has been asked to confirm. Holding the request itself (not just
+ * its id) is what lets the confirmation name it even as the list re-reads underneath.
+ */
+interface PendingDecision {
+  request: TransactionRead;
+  outcome: DecisionOutcome;
+  /**
+   * The reason a rejection carries (R2/R7). Written at the step before this one and
+   * held here until the confirmation is accepted, so it travels with the decision
+   * rather than being asked for again. An approval never has one (R9).
+   */
+  note?: string;
+}
+
+/**
+ * A decision already on its way. Announced per REQUEST rather than as one shared "busy"
+ * flag, so two decisions in flight at once cannot clear each other's announcement.
+ */
+interface DecisionInFlight {
+  requestId: number;
+  message: string;
+}
+
 /** Where the list is: being read, read, or unreadable. */
 type ListState =
   | { phase: 'loading'; wait: WaitTier }
@@ -388,11 +490,25 @@ const presentationOf = (
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
+  canDecide,
+  handOffFocus,
+  onFocusHandedOff,
   onOpen,
+  onDecide,
 }: {
   request: TransactionRead;
   possibleDuplicate: boolean;
+  /**
+   * Whether this reader is offered a decision on THIS request. A plain boolean, worked
+   * out by the list from who is signed in and the request's own status, so the memo
+   * still holds and the row itself judges nothing.
+   */
+  canDecide: boolean;
+  /** Whether this row's decide controls are the ones going away (see `RequestActions`). */
+  handOffFocus: boolean;
+  onFocusHandedOff: () => void;
   onOpen: (request: TransactionRead) => void;
+  onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }) {
   return (
     <TableRow>
@@ -425,9 +541,18 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
       <TableCell>
         <RequestActions
           reference={request.Reference}
+          handOffFocus={handOffFocus}
+          onFocusHandedOff={onFocusHandedOff}
           onOpen={() => {
             onOpen(request);
           }}
+          onDecide={
+            canDecide
+              ? (outcome) => {
+                  onDecide(request, outcome);
+                }
+              : undefined
+          }
         />
       </TableCell>
     </TableRow>
@@ -553,7 +678,45 @@ export function ExpenseRequestList({
    */
   const [openRequestId, setOpenRequestId] = useState<number | null>(null);
 
-  /** The app's one notification surface, in the root layout (R21). */
+  /**
+   * The decision the reader is being asked to confirm, if any. Choosing Approve or
+   * Reject only sets this: nothing is sent until the confirmation is accepted (R10).
+   */
+  const [pendingDecision, setPendingDecision] =
+    useState<PendingDecision | null>(null);
+
+  /**
+   * The request whose rejection note is being written, if any (R7/R9/BR4). A step of
+   * its own, before the confirmation: while this is open nothing has been sent and
+   * nothing has been confirmed. `null` means no rejection is being written.
+   */
+  const [rejectionBeingWritten, setRejectionBeingWritten] =
+    useState<TransactionRead | null>(null);
+
+  /** The decisions currently on their way, one entry per request. */
+  const [decisionsInFlight, setDecisionsInFlight] = useState<
+    DecisionInFlight[]
+  >([]);
+
+  /**
+   * The request whose decide controls are being taken off the screen, by id — the one
+   * the Approver just decided, or the one a fresh read has just shown was decided by
+   * somebody else. Its surface hands the keyboard to its own Open control rather than
+   * letting a control disappear with focus on it (NFR1 — see this file's header).
+   *
+   * `null` the rest of the time. It STANDS until the request's own controls report the
+   * hand-off done, because the read that withdraws them is a round trip away — and it
+   * cannot fire twice or fire late, since the controls hand the keyboard over only on
+   * the commit that takes them off the screen, which happens once per decision.
+   */
+  const [handOffFocusTo, setHandOffFocusTo] = useState<number | null>(null);
+
+  /** The hand-off has happened; nothing is waiting for the keyboard any more. */
+  const focusHandedOff = useCallback((): void => {
+    setHandOffFocusTo(null);
+  }, []);
+
+  /** The app's one notification surface, in the root layout (R21, and R11/R15). */
   const { showToast } = useToast();
 
   /**
@@ -714,6 +877,182 @@ export function ExpenseRequestList({
   }, []);
 
   /**
+   * Choosing a decision asks for it — it does not record it (R10/BR6). A rejection is
+   * asked WHY first (R7/R9): the note step comes before the confirmation, and an
+   * approval goes straight to it with nothing to write. Stable, because every row and
+   * card holds it.
+   */
+  const askToDecide = useCallback(
+    (request: TransactionRead, outcome: DecisionOutcome): void => {
+      if (outcome === DECISION_REJECT) {
+        setRejectionBeingWritten(request);
+        return;
+      }
+      setPendingDecision({ request, outcome });
+    },
+    [],
+  );
+
+  /** Backing out of the note leaves the request exactly as it was — nothing sent. */
+  const abandonRejectionNote = useCallback((): void => {
+    setRejectionBeingWritten(null);
+  }, []);
+
+  /**
+   * Reads the list again WITHOUT taking the rows off the screen, and answers with what
+   * came back.
+   *
+   * Both halves of a decision go through this one read (brief BR1): the check BEFORE
+   * anything is sent — is this request still awaiting a decision? — and the outcome
+   * AFTER one is recorded, since the decide answer says nothing about the request's new
+   * status. Putting what came back on screen is part of the same act, so the rows the
+   * decision was judged against are the rows the reader is then looking at.
+   *
+   * It REJECTS when the read fails, so the caller can tell "the request has been
+   * decided already" from "nobody could find out" and refuse rather than send blind.
+   */
+  const rereadRequests = useCallback(
+    (): Promise<TransactionRead[]> =>
+      fetchTransactions().then((body) => {
+        const requests = requestsIn(body);
+        setState((current) =>
+          current.phase === 'loaded' ? { phase: 'loaded', requests } : current,
+        );
+        return requests;
+      }),
+    [],
+  );
+
+  /**
+   * The same re-read where the answer is only ever the screen catching up. A read that
+   * fails changes nothing: the last known rows stay, and the failed-load state is
+   * reserved for a read that left the user with nothing.
+   */
+  const refreshList = useCallback(
+    (): Promise<void> =>
+      rereadRequests()
+        .then(() => undefined)
+        .catch(() => {
+          // Nothing to say: the user is still looking at the requests they had.
+        }),
+    [rereadRequests],
+  );
+
+  /**
+   * The decision the reader has just accepted. The confirmation is already closing —
+   * whichever way this turns out, the answer belongs on the screen behind it and not in
+   * a dialog the Approver is left sitting in.
+   */
+  const recordPendingDecision = (): void => {
+    if (pendingDecision === null) {
+      return;
+    }
+    const { request, outcome, note } = pendingDecision;
+    setPendingDecision(null);
+
+    // One decision at a time PER REQUEST. Confirming closes the dialog, but the row
+    // keeps its `Imported` status — and so its decide actions — until the re-read
+    // lands, so the same request can be confirmed again while the first call is still
+    // out. Sending a second would be a second decision on the request, and the first
+    // call's `finally` below would take the "Recording your approval…" line off the
+    // screen while the other was still on its way. The announcement already on screen
+    // is the answer to a second press.
+    if (
+      decisionsInFlight.some((decision) => decision.requestId === request.Id)
+    ) {
+      return;
+    }
+
+    setDecisionsInFlight((current) =>
+      current.some((decision) => decision.requestId === request.Id)
+        ? current
+        : [
+            ...current,
+            {
+              requestId: request.Id,
+              message: decisionInFlightMessage(outcome, request.Reference),
+            },
+          ],
+    );
+
+    // BR1, the whole of it: the request's CURRENT status, read fresh, before anything
+    // is sent. Both decide operations answer the same envelope whether they recorded
+    // the decision or refused it as already made, so this read — never the answer — is
+    // the only thing that can tell an Approver somebody got there first.
+    void rereadRequests()
+      .then((requests) => {
+        const asRecorded = requests.find((listed) => listed.Id === request.Id);
+
+        if (asRecorded === undefined || !awaitsDecision(asRecorded)) {
+          // Refused here, with NOTHING sent (R4/R13): a decide call at this point
+          // would be a second decision on the request, and its answer would look
+          // exactly like a first one. The read above has already put what was
+          // actually recorded on screen, so the Approver is left looking at that
+          // rather than at the state they were acting on.
+          showToast({
+            variant: 'error',
+            title: DECISION_REFUSED_TITLE,
+            message:
+              asRecorded === undefined
+                ? REQUEST_NO_LONGER_LISTED_MESSAGE
+                : ALREADY_DECIDED_MESSAGE,
+            // Something the Approver has to act on (choose another request), so it
+            // waits for them rather than fading while they read elsewhere (R11).
+            duration: 0,
+          });
+          // Nothing was sent, but the request has still stopped awaiting a decision —
+          // the read above put somebody else's decision on screen — so its controls are
+          // going with the same commit and the keyboard needs somewhere to land.
+          setHandOffFocusTo(request.Id);
+          return;
+        }
+
+        return recordDecision({
+          TransactionId: request.Id,
+          Decision: outcome,
+          // A rejection carries the reason written at the step before this one; an
+          // approval carries none at all (R9), so the field is absent rather than
+          // empty.
+          ...(note === undefined ? {} : { UserNote: note }),
+        }).then(() => {
+          // Transient: the Approver asked for this and it happened, so it says so and
+          // then clears itself (R11's 4-8s window, which the toast's default sits in).
+          showToast({
+            variant: 'success',
+            title: decisionRecordedTitle(outcome),
+            message: decisionRecordedMessage(outcome, request.Reference),
+          });
+          // The keyboard is handed over BEFORE that read can withdraw the control the
+          // Approver is standing on (NFR1): asked for here, taken by the request's own
+          // controls, whether they see this commit or the one the re-read brings.
+          setHandOffFocusTo(request.Id);
+          // The answer carries no status, so the request's new state comes from a
+          // fresh read — which is also what withdraws its decide actions (R12).
+          return refreshList();
+        });
+      })
+      .catch((error: unknown) => {
+        // Either the service refused the decision, or the read that had to come first
+        // could not be made — and then nothing was sent, because a decision goes out
+        // only while the app can see the request is still awaiting one (BR1). Both
+        // are the same thing to the Approver: it was not recorded. So it waits for
+        // them (R11) and carries the service's own reason, never the client's
+        // placeholder.
+        showToast({
+          variant: 'error',
+          title: DECISION_REFUSED_TITLE,
+          message: decisionFailureMessage(error),
+          duration: 0,
+        });
+      })
+      .finally(() => {
+        setDecisionsInFlight((current) =>
+          current.filter((decision) => decision.requestId !== request.Id),
+        );
+      });
+  };
+
+  /**
    * What the listed requests and the summary are worked out from. It can trail the
    * controls by a render while React re-filters a large set, which is what keeps typing
    * responsive at the volume ceiling; it always catches up, and both surfaces read the
@@ -739,7 +1078,12 @@ export function ExpenseRequestList({
     [fetchedRequests],
   );
 
-  /** Whether the person reading this is the one R21 asks to be told. */
+  /**
+   * Whether the person reading this is an Approver — the one R21 asks to be told about
+   * possible duplicates, and the only one who may decide a request at all
+   * (`expense-decisions` R14/BR7). Both answers come from the one `roles` prop the
+   * server page fills; there is no second, client-side gate.
+   */
   const isApprover = roles.includes(ROLE_APPROVER);
 
   /**
@@ -924,6 +1268,18 @@ export function ExpenseRequestList({
             />
           )}
 
+          {/* One line per decision on its way. Announced, because nothing on screen
+              has changed yet: the request keeps its status until the re-read. */}
+          {decisionsInFlight.map((decision) => (
+            <p
+              key={decision.requestId}
+              role="status"
+              className="text-muted-foreground text-sm"
+            >
+              {decision.message}
+            </p>
+          ))}
+
           {visibleRequests.length === 0 ? (
             <div className="grid gap-2">
               <p className="max-w-prose">{NARROWED_EMPTY_MESSAGE}</p>
@@ -940,7 +1296,11 @@ export function ExpenseRequestList({
                   requests={requestsOnPage}
                   presentationOf={presentationOf}
                   possibleDuplicateIds={possibleDuplicateIds}
+                  mayDecide={isApprover}
+                  handOffFocusTo={handOffFocusTo}
+                  onFocusHandedOff={focusHandedOff}
                   onOpenRequest={openRequest}
+                  onDecideRequest={askToDecide}
                 />
               ) : (
                 <Table>
@@ -948,8 +1308,10 @@ export function ExpenseRequestList({
                     Imported expense payment requests: the file each came from,
                     its reference, transaction date, the last four digits of its
                     account number, its description, amount, transaction type
-                    and status, and a control that opens each request. Every
-                    value heading orders the list by its own column.
+                    and status, and the controls each request offers — opening
+                    it, and, where one is still awaiting a decision and you may
+                    make it, approving or rejecting it. Every value heading
+                    orders the list by its own column.
                   </TableCaption>
                   <TableHeader>
                     {/* Drawn from the column definitions, so every displayed
@@ -977,7 +1339,11 @@ export function ExpenseRequestList({
                         key={request.Id}
                         request={request}
                         possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+                        canDecide={isApprover && awaitsDecision(request)}
+                        handOffFocus={handOffFocusTo === request.Id}
+                        onFocusHandedOff={focusHandedOff}
                         onOpen={openRequest}
+                        onDecide={askToDecide}
                       />
                     ))}
                   </TableBody>
@@ -1006,10 +1372,58 @@ export function ExpenseRequestList({
               key={openedRequest.Id}
               request={openedRequest}
               statusPresentation={presentationOf(openedRequest)}
+              onDecide={
+                isApprover && awaitsDecision(openedRequest)
+                  ? (outcome) => {
+                      askToDecide(openedRequest, outcome);
+                    }
+                  : undefined
+              }
               onClose={closeOpenRequest}
             />
           )}
         </>
+      )}
+
+      {/* Why, before anything is confirmed (R7/R9/BR4) — and only for a rejection.
+          Mounted only while a note is being written, and it decides nothing itself:
+          the note it hands back is what opens the confirmation below. */}
+      {rejectionBeingWritten !== null && (
+        <RejectionNoteStep
+          key={rejectionBeingWritten.Id}
+          reference={rejectionBeingWritten.Reference}
+          onNoteWritten={(note) => {
+            setRejectionBeingWritten(null);
+            setPendingDecision({
+              request: rejectionBeingWritten,
+              outcome: DECISION_REJECT,
+              note,
+            });
+          }}
+          onCancel={abandonRejectionNote}
+        />
+      )}
+
+      {/* Asked from the row's overflow and from the opened request alike, so it lives
+          out here with the flow it belongs to rather than inside either of them. It is
+          mounted only while a decision is pending: closing it is what ends the ask. */}
+      {pendingDecision !== null && (
+        <ConfirmAction
+          open
+          onOpenChange={(stillAsking) => {
+            if (!stillAsking) {
+              setPendingDecision(null);
+            }
+          }}
+          title={confirmationTitleFor(
+            pendingDecision.outcome,
+            pendingDecision.request.Reference,
+          )}
+          description={confirmationMessageFor(pendingDecision.outcome)}
+          confirmLabel={confirmDecisionLabel(pendingDecision.outcome)}
+          wayOutLabel={WAY_OUT_OF_CONFIRMATION}
+          onConfirm={recordPendingDecision}
+        />
       )}
     </div>
   );

@@ -43,7 +43,7 @@ Implements **BR1's re-read-before-submit**: because both decide operations retur
 - `RequestDetailPanel.tsx` already renders `Status`, the rejection note, `LastChangedUser` and `LastChangedDate` — **R16 is mostly satisfied by existing code**; this story verifies and completes it rather than adding a second audit surface.
 - BR1's re-read has to use `GET /v1/transactions` (via `fetchTransactions` in `web/src/lib/api/transactions.ts`) filtered by `Id`: the contract defines no single-request read and the list call takes no parameters.
 - Status display goes through `web/src/components/status/StatusBadge.tsx` with the list's `STATUS_PRESENTATION` map — never a new badge, never a colour value in a component.
-- The already-decided refusal is a message the user **must acknowledge** — it must persist until dismissed, so it must **not** use the auto-dismissing toast from `ToastContext.tsx` (R11's second half).
+- The already-decided refusal is a message the user **must acknowledge** — it must persist until dismissed (R11's second half). Raise it through the existing `useToast()` with **`duration: 0`**, the never-auto-dismisses mode `file-validation-and-retry` added to `ToastOptions` (`web/src/types/toast.ts`). Do not build a separate persistent-message surface, and do not leave it on the default 5s.
 - Reuse story 2's decide plumbing and confirmation; the re-read slots in between "confirmation accepted" and "call the decision endpoint", not as a separate user step.
 
 ## Notes

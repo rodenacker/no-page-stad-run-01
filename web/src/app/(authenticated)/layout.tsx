@@ -35,9 +35,15 @@ export default async function AuthenticatedLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader session={session} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-        {children}
-      </main>
+      {/*
+        Full width and left-aligned: the screens in this app are dense tables of
+        expense requests and files, and a centred column would waste the space the
+        rows need (user decision at manual test). Only the horizontal padding is
+        kept, so text never touches the viewport edge — and it is the SAME padding
+        the header uses, which is what keeps the app's name lined up with the
+        content beneath it. Change one and you must change the other.
+      */}
+      <main className="w-full flex-1 px-4 py-8">{children}</main>
       {/*
         Mounted once for the whole signed-in area, not per screen: the idle period is a
         property of the session, so every protected screen shares one clock and one

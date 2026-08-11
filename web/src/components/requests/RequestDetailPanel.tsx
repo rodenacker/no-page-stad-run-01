@@ -16,9 +16,11 @@
  *   re-cases a status or invents a fallback: `TransactionDate` and `LastChangedDate` are
  *   an unverified assumption for this epic (brief §Notes & Caveats), and normalising on
  *   speculation would hide a real difference rather than surface it.
- * - **Read-only means read-only** (BR1/R5): no editable field, no form, nothing to
- *   submit, and no decide action. Approving or rejecting a request is the NEXT epic and
- *   must not be pre-empted here — not even as a disabled control.
+ * - **Every value is read-only** (BR1/R5): no editable field, no form, nothing to
+ *   submit. The only thing that can be done to the request from here is to DECIDE it —
+ *   `expense-decisions` R10/R14 — and even that only through `onDecide`, which the list
+ *   hands over solely for an Approver looking at a request still awaiting a decision.
+ *   Absent, that reader is offered nothing: no disabled control, no greyed-out one.
  * - **THE REVEAL IS THIS PANEL'S OWN STATE, and it dies with the panel.** The account
  *   number shows its last four digits until the named reveal control is used, and only
  *   then is the full value rendered at all. Because the list unmounts this component
@@ -29,9 +31,15 @@
  *   outlives the open panel.
  * - **There is no reveal-all, anywhere.** One request at a time is the compliance
  *   requirement; a control that unmasked the list would defeat the whole arrangement.
+ * - **A request that has already been decided SAYS SO where the decisions would be**
+ *   (`expense-decisions` R12): the sentence names the state the request itself carries
+ *   — approved or rejected — so the reader is told why nothing is on offer rather than
+ *   left looking at a panel that has quietly lost its actions. It is shown to both
+ *   roles, because it describes the request rather than what this reader may do, and it
+ *   is plain text: a status is never carried by colour or by an absence.
  */
 
-import { Eye, EyeOff } from 'lucide-react';
+import { Check, Eye, EyeOff, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
@@ -46,9 +54,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DECISION_APPROVE } from '@/lib/api/decisions';
+import {
+  DECIDE_OUTCOMES,
+  awaitsDecision,
+  decideActionLabel,
+  decideActionName,
+  decidedStateMessage,
+} from '@/lib/transactions/deciding';
 import { transactionTypeLabel } from '@/lib/transactions/display';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type { DecisionOutcome } from '@/lib/api/decisions';
 import type { TransactionRead } from '@/types/transactions';
 import type { ReactNode } from 'react';
 
@@ -104,6 +121,12 @@ interface RequestDetailPanelProps {
   request: TransactionRead;
   /** How each recognised status reads — the list owns that vocabulary, not this panel. */
   statusPresentation?: StatusPresentation;
+  /**
+   * Starts recording a decision on this request, which the list asks the reader to
+   * confirm before anything is sent. ABSENT means this reader is offered no decision on
+   * this request — see this file's header.
+   */
+  onDecide?: (outcome: DecisionOutcome) => void;
   /** Closing puts the reader back on the list, unchanged. */
   onClose: () => void;
 }
@@ -111,6 +134,7 @@ interface RequestDetailPanelProps {
 export function RequestDetailPanel({
   request,
   statusPresentation,
+  onDecide,
   onClose,
 }: RequestDetailPanelProps) {
   /**
@@ -206,11 +230,42 @@ export function RequestDetailPanel({
           </DetailField>
         </dl>
 
-        {/* The only other control in the panel, and it goes nowhere near the values.
-            Written out rather than taken from the primitive's own `showCloseButton`
-            slot so it carries `type="button"`: a button with no type IS a submit
-            button, and a read-only panel has nothing to submit (R5/BR1). */}
+        {/* Where the decisions would be, for a request that has already had one
+            (R12). It states the request's own state rather than saying the actions
+            are unavailable, and it is here for both roles: an Importer reading a
+            decided request is told the same thing, since this describes the request
+            and not what the reader may do to it. */}
+        {!awaitsDecision(request) && (
+          <p className="text-muted-foreground max-w-prose text-sm">
+            {decidedStateMessage(request)}
+          </p>
+        )}
+
+        {/* Close is written out rather than taken from the primitive's own
+            `showCloseButton` slot so it carries `type="button"`: a button with no type
+            IS a submit button, and there is no form here to submit. The decisions sit
+            beside it only when this reader is offered them; each names the request it
+            decides, since the confirmation that follows names it too. */}
         <DialogFooter>
+          {onDecide !== undefined &&
+            DECIDE_OUTCOMES.map((outcome) => (
+              <Button
+                key={outcome}
+                type="button"
+                variant={outcome === DECISION_APPROVE ? 'default' : 'secondary'}
+                aria-label={decideActionName(outcome, request.Reference)}
+                onClick={() => {
+                  onDecide(outcome);
+                }}
+              >
+                {outcome === DECISION_APPROVE ? (
+                  <Check aria-hidden="true" />
+                ) : (
+                  <X aria-hidden="true" />
+                )}
+                {decideActionLabel(outcome)}
+              </Button>
+            ))}
           <DialogClose asChild>
             <Button type="button" variant="outline">
               {CLOSE_LABEL}

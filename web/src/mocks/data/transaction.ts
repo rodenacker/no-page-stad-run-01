@@ -42,6 +42,19 @@
  * is the one deliberate exception that writes the value whole (csv-export brief
  * §Compliance Exception), which the same full value here is what proves.
  *
+ * DECIDING A REQUEST (epic `expense-decisions`): the approve/reject calls and the
+ * decided-request shapes live in the final section of this file. Two things there
+ * matter more than the rest:
+ *   - `DECIDING_APPROVER` is derived from `userInfoFor(ROLE_APPROVER)` rather than
+ *     spelled out, because the same name has to appear in two places at once — the
+ *     `LastChangedUser` REQUEST HEADER both decide calls require, and the
+ *     `LastChangedUser` FIELD the audit view then shows (brief R16). Deriving it
+ *     from the identity source is what stops those two drifting apart.
+ *   - `alreadyDecidedResponse` is deliberately IDENTICAL to the success body
+ *     (brief BR1): the service answers the same `DefaultResponse` envelope whatever
+ *     happened, so the response cannot be parsed to detect an already-decided
+ *     request. Detection is a fresh re-read before submitting, not a body check.
+ *
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
@@ -50,6 +63,9 @@ import {
   createFileLog,
   fileLogWithStatus,
 } from './file-log';
+import { userInfoFor } from './identity';
+import { ROLE_APPROVER } from './role';
+import { fullNameOf } from './user';
 import {
   TRANSACTION_STATUS_APPROVED,
   TRANSACTION_STATUS_IMPORTED,
@@ -120,10 +136,53 @@ export const createTransaction = (
 });
 
 /**
+ * The signed-in Approver's own display name, taken from the identity source rather
+ * than spelled out here.
+ *
+ * It is the value the app must put in the `LastChangedUser` header of both decide
+ * calls (from the authenticated session, never client-supplied — brief §Notes &
+ * Caveats) AND the value that then comes back on the decided request and is shown
+ * on the audit view (R16). Deriving both from `userInfoFor(ROLE_APPROVER)` means a
+ * test asserting "the header said who decided it" and a test asserting "the screen
+ * shows who decided it" can never be checking two different people.
+ */
+export const DECIDING_APPROVER = fullNameOf(userInfoFor(ROLE_APPROVER));
+
+/**
+ * A DIFFERENT Approver — the person who got there first in the already-decided race
+ * (brief Workflow 3, R4/R13). Deliberately not {@link DECIDING_APPROVER}, so a test
+ * can tell "someone else decided this" apart from "I decided this".
+ *
+ * This project has exactly two role NAMES but any number of people holding them, so
+ * a second approver is a real identity, not a second role.
+ */
+export const OTHER_APPROVER = 'Naledi Khumalo';
+
+/**
+ * The canonical rejection note (brief R2/R9): the reason an Approver types when
+ * rejecting, and the value that must then be recorded and shown alongside the
+ * rejected status.
+ */
+export const REJECTION_NOTE = 'Amount does not match the supporting document';
+
+/**
+ * A note made only of whitespace — the value BR4 requires a rejection to be REFUSED
+ * for, exactly as an empty one is. A test that only ever tries `''` proves nothing
+ * about the rule as written ("empty or whitespace-only"), which is why the value
+ * lives here rather than being invented per test.
+ */
+export const WHITESPACE_ONLY_NOTE = '   ';
+
+/** When a decided request was decided (approval / rejection). */
+const APPROVED_AT = '2026-04-16 10:22:00';
+const REJECTED_AT = '2026-04-16 11:05:00';
+
+/**
  * The fields that travel WITH a status on a real response: only a rejected request
  * carries a `UserNote`, and a decided request was last changed by a named person
  * rather than by the importer. Keeping them together here is what stops a test
- * mocking an incoherent row (e.g. an `Imported` request with a rejection note).
+ * mocking an incoherent row (e.g. an `Imported` request with a rejection note, or a
+ * decided one still showing `System` as the last person to touch it).
  */
 const STATUS_DEFAULTS: Record<TransactionStatus, Partial<TransactionRead>> = {
   [TRANSACTION_STATUS_IMPORTED]: {
@@ -131,13 +190,13 @@ const STATUS_DEFAULTS: Record<TransactionStatus, Partial<TransactionRead>> = {
     LastChangedDate: '2026-04-15 09:00:00',
   },
   [TRANSACTION_STATUS_APPROVED]: {
-    LastChangedUser: 'Thabo Mokoena',
-    LastChangedDate: '2026-04-16 10:22:00',
+    LastChangedUser: DECIDING_APPROVER,
+    LastChangedDate: APPROVED_AT,
   },
   [TRANSACTION_STATUS_REJECTED]: {
-    UserNote: 'Amount does not match the supporting document',
-    LastChangedUser: 'Thabo Mokoena',
-    LastChangedDate: '2026-04-16 11:05:00',
+    UserNote: REJECTION_NOTE,
+    LastChangedUser: DECIDING_APPROVER,
+    LastChangedDate: REJECTED_AT,
   },
 };
 
@@ -395,9 +454,9 @@ export const rejectedMatchOf = (
     Reference: `${transaction.Reference}-RJ`,
     Description: 'EFT to J. Smith (rejected earlier)',
     Status: TRANSACTION_STATUS_REJECTED,
-    UserNote: STATUS_DEFAULTS[TRANSACTION_STATUS_REJECTED].UserNote,
-    LastChangedUser: 'Thabo Mokoena',
-    LastChangedDate: '2026-04-16 11:05:00',
+    UserNote: REJECTION_NOTE,
+    LastChangedUser: DECIDING_APPROVER,
+    LastChangedDate: REJECTED_AT,
     ...overrides,
   });
 
@@ -603,3 +662,143 @@ export const transactionListFailureResponse = (
   MessageType: 'ERROR',
   Messages: [message],
 });
+
+/* -------------------------------------------------------------------------- */
+/* Deciding a request — POST /v1/transactions/approve and /reject              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The body of `POST /v1/transactions/reject`
+ * (`documentation/transactions-api.yaml` → `TransactionRejectWrite`): the note, and
+ * nothing else. `TransactionId` travels as a QUERY parameter and `LastChangedUser`
+ * as a HEADER — neither belongs in this body, which is the mistake this helper
+ * exists to make impossible.
+ *
+ * Approve has NO body at all: it is `TransactionId` + `LastChangedUser` only.
+ *
+ * @example expect(bodySent).toEqual(rejectionWriteBody('Duplicate claim'))
+ */
+export const rejectionWriteBody = (
+  note: string = REJECTION_NOTE,
+): { UserNote: string } => ({ UserNote: note });
+
+/**
+ * The request AFTER a decision has been recorded on it — the row a fresh read
+ * returns once someone has approved or rejected it.
+ *
+ * Everything that identifies the request (id, reference, account, amount, file) is
+ * carried over untouched, because a decision changes only `Status`, `UserNote`,
+ * `LastChangedUser` and `LastChangedDate` (brief §Out of Scope: imported values are
+ * read-only). The four decision fields are then made coherent for the status asked
+ * for, so no test can mock an approved request that still carries a rejection note.
+ *
+ * @example transactionDecided(request, { status: TRANSACTION_STATUS_REJECTED, note: 'Duplicate claim' })
+ */
+export const transactionDecided = (
+  transaction: TransactionRead,
+  {
+    status = TRANSACTION_STATUS_APPROVED,
+    by = DECIDING_APPROVER,
+    note,
+    at,
+  }: {
+    status?: string;
+    by?: string;
+    note?: string;
+    at?: string;
+  } = {},
+): TransactionRead => {
+  // Any note the request already carried goes FIRST, before the status defaults put
+  // back whichever one this status legitimately has. Spreading the defaults over the
+  // request cannot remove a field the request already had, so without this an
+  // already-rejected request re-decided as approved would keep its rejection note —
+  // exactly the incoherent row this helper exists to make impossible.
+  const withoutDecision: TransactionRead = { ...transaction };
+  delete withoutDecision.UserNote;
+
+  return {
+    ...withoutDecision,
+    Status: status,
+    ...(isKnownTransactionStatus(status) ? STATUS_DEFAULTS[status] : {}),
+    LastChangedUser: by,
+    ...(note === undefined ? {} : { UserNote: note }),
+    ...(at === undefined ? {} : { LastChangedDate: at }),
+  };
+};
+
+/**
+ * The same request as re-read a moment later, already decided by SOMEONE ELSE
+ * ({@link OTHER_APPROVER}) — the state BR1's re-read-before-submit is there to
+ * find, and R4/R13's "this request has already been decided" is the answer to.
+ *
+ * Feed it back through {@link transactionListResponse} for the re-read, since the
+ * transactions service has no single-request GET: the fresh read is another
+ * `GET /v1/transactions`.
+ *
+ * @example transactionListResponse([transactionDecidedElsewhere(request)])
+ */
+export const transactionDecidedElsewhere = (
+  transaction: TransactionRead,
+  status: string = TRANSACTION_STATUS_APPROVED,
+): TransactionRead =>
+  transactionDecided(transaction, { status, by: OTHER_APPROVER });
+
+/**
+ * `POST /v1/transactions/approve` success body — the generic `DefaultResponse`
+ * envelope, which says nothing about the request's new status. A caller learns the
+ * outcome only by re-reading the list (see {@link transactionListResponse}).
+ */
+export const approveSuccessResponse = (
+  transactionId: number = createTransaction().Id,
+): DefaultResponse => ({
+  Id: transactionId,
+  MessageType: 'SUCCESS',
+  Messages: ['Transaction approved'],
+});
+
+/** `POST /v1/transactions/reject` success body — same envelope as approve. */
+export const rejectSuccessResponse = (
+  transactionId: number = createTransaction().Id,
+): DefaultResponse => ({
+  Id: transactionId,
+  MessageType: 'SUCCESS',
+  Messages: ['Transaction rejected'],
+});
+
+/**
+ * The body a decide call answers with when the request was ALREADY DECIDED.
+ *
+ * It returns {@link approveSuccessResponse} — the exact same body, field for field.
+ * That is not an oversight, it is brief BR1 stated as data: the service answers one
+ * envelope whatever happened, so no amount of parsing the response can tell
+ * "decided" from "already decided". Any implementation that passes a test using
+ * this fixture WITHOUT re-reading the request's status first is reading the outcome
+ * out of a body that does not carry it.
+ */
+export const alreadyDecidedResponse = (
+  transactionId: number = createTransaction().Id,
+): DefaultResponse => approveSuccessResponse(transactionId);
+
+/**
+ * The wording the SERVICE itself gives for a refused decision — deliberately
+ * phrased as only a backend would phrase it, so a test can tell it apart from
+ * wording the screen wrote for itself (`serviceMessageOf ?? serviceDetailOf ?? own
+ * wording`, `lib/api/errors.ts`).
+ */
+export const DECISION_REFUSED_MESSAGE =
+  'The transaction could not be updated (the record is locked by another process).';
+
+/**
+ * `POST /v1/transactions/approve` / `/reject` failure body. Both operations declare
+ * only 200 / 401 / 500, and the 500 carries this same `DefaultResponse` envelope —
+ * so a refusal's reason travels in `Messages[]`, which `apiClient` keeps on the
+ * failure's `details`.
+ *
+ * For the other half of the error case — a failure the service gave no readable
+ * reason for — answer with no body at all rather than an empty envelope, so the
+ * client is left holding only its own placeholder (which must never reach the user,
+ * project.md NFR-base-5).
+ */
+export const decisionFailureResponse = (
+  message: string = DECISION_REFUSED_MESSAGE,
+): DefaultResponse => ({ Id: 0, MessageType: 'ERROR', Messages: [message] });

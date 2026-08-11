@@ -136,8 +136,15 @@ const answeredWith = (upstream: Response): Response => {
   );
 };
 
-/** A 502 the caller can act on, carrying a code and no wording of ours. */
-const unreachable = (): Response =>
+/**
+ * A 502 the caller can act on, carrying a code and no wording of ours.
+ *
+ * Exported because the app's own non-proxy routes have to answer a service nobody
+ * answered for in exactly this shape — `app/api/decisions/route.ts` does — and a screen
+ * can only tell "nobody answered" from "the service refused" while the two are the same
+ * envelope. Two hand-written copies would be free to drift apart.
+ */
+export const backendUnreachableResponse = (): Response =>
   new Response(
     JSON.stringify({
       Error: BACKEND_UNREACHABLE_ERROR,
@@ -171,7 +178,7 @@ export const forwardToService = async (
         `${request.method} ${new URL(request.url).pathname}.`,
       error,
     );
-    return unreachable();
+    return backendUnreachableResponse();
   }
 };
 
