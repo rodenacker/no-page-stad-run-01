@@ -41,6 +41,7 @@ On confirmation the decision endpoint is called with `{ UserNote }`, the request
 ## Infrastructure reuse notes
 
 - Reuse story 2's confirmation component and decide plumbing — this is the *same* dialog with a note step, not a second confirmation implementation.
+- Transient confirmations use `useToast()` at its default duration; a message the user must act on uses `duration: 0` (see story 2's notes).
 - The note field composes the Shadcn `textarea` / `label` primitives (install with `(cd web && npx shadcn add textarea --yes)` only if genuinely missing) — never a hand-rolled input.
 - The rejection note is rendered by `RequestDetailPanel.tsx`, which already displays `UserNote` — do not add a second place a note is shown.
 - Decide calls go through story 1's `web/src/lib/api/decisions.ts` with `{ UserNote }` as the reject body.

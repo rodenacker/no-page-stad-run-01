@@ -11,18 +11,19 @@
     "unverifiedAssumptions": [
       "Verify a second decision is genuinely refused: because the service answers the same way whether a decision was recorded or refused, the app decides 'already decided' by re-reading the request just before it submits. If the service actually accepts a second decision, one approver could overwrite another's decision without either of them seeing anything wrong.",
       "Verify the right person is named as the decider: the app sends the signed-in person's first and last name as who made the decision. If the service expects a username or an email address instead, 'Last changed by' could name nobody recognisable, or be blank, on every decision recorded from now on.",
-      "Verify a decision shows immediately: after you approve or reject, the app re-reads the request list to show the new status. If the service records the decision but takes a moment to report it, the request may still read Imported straight after you decided it, and look as though nothing happened."
+      "Verify a decision shows immediately: after you approve or reject, the app re-reads the request list to show the new status. If the service records the decision but takes a moment to report it, the request may still read Imported straight after you decided it, and look as though nothing happened.",
+      "Verify the payments service accepts a decision on the strength of your sign-in alone: the app passes your existing session along when it records a decision. If that service expects something else for a server-to-server call, every decision will come back refused even though you are properly signed in — worth watching on the very first live approval."
     ],
     "manualTestResults": []
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "BUILD",
   "stories": {
     "1": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-11T09:19:04.949Z",
+      "completedAt": "2026-08-11T09:27:07.641Z"
     },
     "2": {
       "status": "pending",
