@@ -69,17 +69,34 @@ export type DecisionStaleness = 'already-decided' | 'no-longer-listed';
  * screen last showed it: the whole point is that the two can disagree because a
  * colleague decided the request in between.
  */
-export const stalenessIn = (
-  requests: readonly TransactionRead[],
-  id: number,
+const stalenessOf = (
+  listed: TransactionRead | undefined,
 ): DecisionStaleness | undefined => {
-  const listed = requests.find((request) => request.Id === id);
-
   if (listed === undefined) {
     return 'no-longer-listed';
   }
   return awaitsDecision(listed) ? undefined : 'already-decided';
 };
+
+export const stalenessIn = (
+  requests: readonly TransactionRead[],
+  id: number,
+): DecisionStaleness | undefined =>
+  stalenessOf(requests.find((request) => request.Id === id));
+
+/**
+ * The read indexed by id, built ONCE per batch.
+ *
+ * The two functions below judge a whole selection against a whole read, and both
+ * ceilings in this feature are large — 10,000 listed requests, a selection that can run
+ * to thousands. Asking {@link stalenessIn} per id would scan the list again for each
+ * one, which is that product of the two (tens of millions of comparisons) on the thread
+ * that has to keep the screen responsive while the batch runs.
+ */
+const listedById = (
+  requests: readonly TransactionRead[],
+): Map<number, TransactionRead> =>
+  new Map(requests.map((request) => [request.Id, request]));
 
 /**
  * What to tell the user about ONE request that can no longer be decided. Both sentences
@@ -112,11 +129,12 @@ export const eligibilityIn = (
   requests: readonly TransactionRead[],
   ids: readonly number[],
 ): BulkEligibility => {
+  const listed = listedById(requests);
   const eligible: number[] = [];
   const leftUnchanged: number[] = [];
 
   for (const id of ids) {
-    if (stalenessIn(requests, id) === undefined) {
+    if (stalenessOf(listed.get(id)) === undefined) {
       eligible.push(id);
     } else {
       leftUnchanged.push(id);
@@ -138,8 +156,13 @@ export const eligibilityIn = (
 export const approvedIn = (
   requests: readonly TransactionRead[],
   submitted: readonly number[],
-): number[] =>
-  submitted.filter((id) => stalenessIn(requests, id) === 'already-decided');
+): number[] => {
+  const listed = listedById(requests);
+
+  return submitted.filter(
+    (id) => stalenessOf(listed.get(id)) === 'already-decided',
+  );
+};
 
 /** What became of one request's own approve call. */
 export interface ApprovalAttempt {

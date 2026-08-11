@@ -1364,6 +1364,15 @@ export function ExpenseRequestList({
           setRefreshNote(listRefreshedMessage(changesFromElsewhere.current));
         })
         .catch(() => {
+          // Guarded exactly as the landing path above is, and for the same reason: a
+          // poll whose answer no longer matters must not report on this screen either
+          // way. Counting a failure that arrived after the reader started their own
+          // bulk action, backgrounded the tab or left the screen would raise "this list
+          // cannot refresh itself" about a read nothing was waiting for — and, on the
+          // way out, would set state on a component that has gone.
+          if (!stillWatching()) {
+            return;
+          }
           // The last known rows stay on screen (project convention) — a failed poll
           // never blanks the list, whichever way it failed. What it DOES do is count
           // (BR9): the second failure in a row is where the screen stops looking
@@ -2248,8 +2257,18 @@ export function ExpenseRequestList({
           SAME dialog the single decision uses, never a second convention. Its title
           carries the selection's literal count however large it is — the `99+` form
           belongs to the ambient indicator alone — and it names no account number, the
-          confirmation being a listing surface like the list behind it. */}
-      {bulkApprovalAsked && selectedCount > 0 && (
+          confirmation being a listing surface like the list behind it.
+
+          It is gated on `bulkApprovalAsked` ALONE — never also on there still being a
+          selection. The control that opens it exists only while something is selected,
+          so it can never open empty; but a selection CAN empty underneath it (a single
+          decision started a moment earlier lands and prunes the one request that was
+          ticked), and a dialog that unmounts on its own never reports itself closed.
+          `bulkApprovalAsked` would then stay true for good — which is also what pauses
+          the self-refresh, so the list would silently stop keeping itself current for
+          the rest of the session. Confirming an empty selection does nothing
+          (`runBulkApproval` refuses it), and either answer clears the flag. */}
+      {bulkApprovalAsked && (
         <ConfirmAction
           open
           onOpenChange={(stillAsking) => {
