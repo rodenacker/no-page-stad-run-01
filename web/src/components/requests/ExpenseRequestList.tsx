@@ -120,6 +120,22 @@
  *   request id, exactly as `SubmittedFilesList` remembers which files it has announced.
  *   That is what makes a dismissed notification stay dismissed across every later
  *   re-render, while a duplicate that appears in a LATER read is still news.
+ *
+ * Exporting the listed requests for the payment system (csv-export R1/R2/R3):
+ *
+ * - **The export is handed the ORDERED, NARROWED set, not the page on screen.** The
+ *   pipeline above already holds it as `orderedRequests`, so the export is one more
+ *   reader of that array — every request the search and filters left, in the order the
+ *   list is sorted. Handing it `requestsOnPage` would ship a one-page file that looks
+ *   perfectly correct on screen, and handing it the fetched set would ignore the
+ *   narrowing (csv-export BR1). Both are silent corruptions of a hand-over file a machine
+ *   reads next.
+ * - **The file itself is built only when the control is activated**, and the account
+ *   number goes into it WHOLE — the one documented exception to the masking rule the rest
+ *   of this component obeys. Both are `ExportRequestsAction`'s and
+ *   `lib/transactions/exportCsv.ts`'s business, which is where the reasoning lives.
+ * - **The control carries no role check**, unlike submitting a file: both roles may
+ *   export whatever each has listed.
  */
 
 import {
@@ -144,6 +160,7 @@ import {
 } from 'react';
 
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
+import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RequestActions } from '@/components/requests/RequestActions';
@@ -834,6 +851,16 @@ export function ExpenseRequestList({
 
       {state.phase === 'loaded' && state.requests.length > 0 && (
         <>
+          {/* The hand-over file for the payment system (csv-export R1/R3), offered to
+              both roles with no role check of any kind — see `ExportRequestsAction`.
+              What it exports is `orderedRequests`: every request the search and filters
+              LEFT, in the order the list is sorted, never the page on screen and never
+              the whole fetched set (BR1). It sits above the controls that decide that
+              set, so a keyboard user reaches it early. */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ExportRequestsAction listedRequests={orderedRequests} />
+          </div>
+
           {/* The choices come from the WHOLE fetched set, so a filter always offers
               its own way back out of what it narrowed to. */}
           <RequestNarrowingControls
