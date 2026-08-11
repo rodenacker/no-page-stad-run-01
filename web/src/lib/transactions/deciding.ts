@@ -88,6 +88,48 @@ export const confirmDecisionLabel = (outcome: DecisionOutcome): string =>
 /** The way out of the confirmation, which holds focus when it opens (NFR2). */
 export const WAY_OUT_OF_CONFIRMATION = 'Cancel';
 
+/* -------------------------------------------------------------------------- */
+/* The note step — asked for BEFORE the confirmation, only on a rejection      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The note step names the request it is about, as everything else on this screen
+ * does, and asks the question the note answers rather than restating the action.
+ * Deliberately NOT worded like {@link confirmationTitleFor}: the two steps follow one
+ * another, and a reader must be able to tell which one they are looking at.
+ */
+export const noteStepTitleFor = (reference: string): string =>
+  `Why is request ${reference} being rejected?`;
+
+/** What the note is for, and what becomes of it (R2/R16). */
+export const NOTE_STEP_DESCRIPTION =
+  'The reason is recorded with the request and shown with it afterwards. Nothing ' +
+  'is recorded until you confirm on the next step.';
+
+/** The field's own label — the note is a required one, so it carries the marker. */
+export const REJECTION_NOTE_LABEL = 'Rejection note';
+
+/** Said under the field, in the Approver's terms rather than the wire's. */
+export const REJECTION_NOTE_HINT =
+  'Say what is wrong with this request, in your own words.';
+
+/**
+ * The control that sends the note on. Its visible wording is "Continue" — this step
+ * does not reject anything, the confirmation after it does — while its accessible
+ * name says which request is being continued with, as every per-request control on
+ * this screen does.
+ *
+ * The three phrases of a rejection are therefore all different: "Reject" asks,
+ * "Continue" moves on, "Reject request" does it, and "Cancel" backs out.
+ */
+export const CONTINUE_FROM_NOTE_LABEL = 'Continue';
+
+export const continueFromNoteName = (reference: string): string =>
+  `${CONTINUE_FROM_NOTE_LABEL} to reject request ${reference}`;
+
+/** The way out of the note step. Escape does the same thing. */
+export const WAY_OUT_OF_NOTE_STEP = 'Cancel';
+
 /** Announced while the decision is on its way, since nothing has changed yet. */
 export const decisionInFlightMessage = (
   outcome: DecisionOutcome,

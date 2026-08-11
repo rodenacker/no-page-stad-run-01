@@ -159,6 +159,12 @@
  *   `ConfirmAction` then names the request by its reference, holds focus on the way out
  *   (NFR2) and prints no account number — naming a request must not defeat the masking
  *   the list applies (project.md §Compliance).
+ * - **A rejection is asked WHY first** (R7/R9/BR4). Choosing Reject opens
+ *   `RejectionNoteStep` — a step of its own, BETWEEN the action and the confirmation,
+ *   never inside it: the confirmation's way out holds focus precisely so a stray Enter
+ *   decides nothing, and an editable field in it would defeat that. Approving asks for
+ *   no note at all. The note then travels with the decision as `UserNote`, and the
+ *   same request's confirmation is the same shared dialog either way.
  * - **The confirmation closes as the decision is submitted, whichever way it turns
  *   out.** A refusal is reported behind it, through the app's one notification surface:
  *   a user is never held in a dialog to read why nothing happened, and a message trapped
@@ -200,6 +206,7 @@ import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingS
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
+import { RejectionNoteStep } from '@/components/requests/RejectionNoteStep';
 import { RequestActions } from '@/components/requests/RequestActions';
 import { RequestCards } from '@/components/requests/RequestCards';
 import { RequestDetailPanel } from '@/components/requests/RequestDetailPanel';
@@ -220,7 +227,11 @@ import {
 } from '@/components/ui/table';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/contexts/ToastContext';
-import { decisionFailureMessage, recordDecision } from '@/lib/api/decisions';
+import {
+  DECISION_REJECT,
+  decisionFailureMessage,
+  recordDecision,
+} from '@/lib/api/decisions';
 import {
   fetchTransactions,
   transactionListFailureMessage,
@@ -378,6 +389,12 @@ type WaitTier = 'brief' | 'placeholder' | 'prolonged';
 interface PendingDecision {
   request: TransactionRead;
   outcome: DecisionOutcome;
+  /**
+   * The reason a rejection carries (R2/R7). Written at the step before this one and
+   * held here until the confirmation is accepted, so it travels with the decision
+   * rather than being asked for again. An approval never has one (R9).
+   */
+  note?: string;
 }
 
 /**
@@ -635,6 +652,14 @@ export function ExpenseRequestList({
   const [pendingDecision, setPendingDecision] =
     useState<PendingDecision | null>(null);
 
+  /**
+   * The request whose rejection note is being written, if any (R7/R9/BR4). A step of
+   * its own, before the confirmation: while this is open nothing has been sent and
+   * nothing has been confirmed. `null` means no rejection is being written.
+   */
+  const [rejectionBeingWritten, setRejectionBeingWritten] =
+    useState<TransactionRead | null>(null);
+
   /** The decisions currently on their way, one entry per request. */
   const [decisionsInFlight, setDecisionsInFlight] = useState<
     DecisionInFlight[]
@@ -801,15 +826,26 @@ export function ExpenseRequestList({
   }, []);
 
   /**
-   * Choosing a decision asks for it — it does not record it (R10/BR6). Stable, because
-   * every row and card holds it.
+   * Choosing a decision asks for it — it does not record it (R10/BR6). A rejection is
+   * asked WHY first (R7/R9): the note step comes before the confirmation, and an
+   * approval goes straight to it with nothing to write. Stable, because every row and
+   * card holds it.
    */
   const askToDecide = useCallback(
     (request: TransactionRead, outcome: DecisionOutcome): void => {
+      if (outcome === DECISION_REJECT) {
+        setRejectionBeingWritten(request);
+        return;
+      }
       setPendingDecision({ request, outcome });
     },
     [],
   );
+
+  /** Backing out of the note leaves the request exactly as it was — nothing sent. */
+  const abandonRejectionNote = useCallback((): void => {
+    setRejectionBeingWritten(null);
+  }, []);
 
   /**
    * Reads the list again WITHOUT taking the rows off the screen — how the outcome of a
@@ -842,7 +878,7 @@ export function ExpenseRequestList({
     if (pendingDecision === null) {
       return;
     }
-    const { request, outcome } = pendingDecision;
+    const { request, outcome, note } = pendingDecision;
     setPendingDecision(null);
     setDecisionsInFlight((current) =>
       current.some((decision) => decision.requestId === request.Id)
@@ -856,7 +892,13 @@ export function ExpenseRequestList({
           ],
     );
 
-    void recordDecision({ TransactionId: request.Id, Decision: outcome })
+    void recordDecision({
+      TransactionId: request.Id,
+      Decision: outcome,
+      // A rejection carries the reason written at the step before this one; an
+      // approval carries none at all (R9), so the field is absent rather than empty.
+      ...(note === undefined ? {} : { UserNote: note }),
+    })
       .then(() => {
         // Transient: the Approver asked for this and it happened, so it says so and
         // then clears itself (R11's 4-8s window, which the toast's default sits in).
@@ -1211,6 +1253,25 @@ export function ExpenseRequestList({
             />
           )}
         </>
+      )}
+
+      {/* Why, before anything is confirmed (R7/R9/BR4) — and only for a rejection.
+          Mounted only while a note is being written, and it decides nothing itself:
+          the note it hands back is what opens the confirmation below. */}
+      {rejectionBeingWritten !== null && (
+        <RejectionNoteStep
+          key={rejectionBeingWritten.Id}
+          reference={rejectionBeingWritten.Reference}
+          onNoteWritten={(note) => {
+            setRejectionBeingWritten(null);
+            setPendingDecision({
+              request: rejectionBeingWritten,
+              outcome: DECISION_REJECT,
+              note,
+            });
+          }}
+          onCancel={abandonRejectionNote}
+        />
       )}
 
       {/* Asked from the row's overflow and from the opened request alike, so it lives

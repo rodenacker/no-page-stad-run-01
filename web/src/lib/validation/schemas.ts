@@ -123,6 +123,31 @@ export type ExpenseFileSubmissionValues = z.infer<
 >;
 
 /**
+ * The one thing an Approver is told when a rejection carries no reason.
+ *
+ * The wording is the requirement's own, verbatim (epic `expense-decisions` R9/BR4,
+ * source `VR Transaction.UserNote`) — it is content, not a developer's phrasing, so
+ * it is quoted here and nowhere else.
+ */
+export const REJECTION_NOTE_REQUIRED_MESSAGE =
+  'Add a note explaining why this request is rejected.';
+
+/**
+ * The note a rejection has to carry (epic `expense-decisions` R7/R9/BR4).
+ *
+ * `.trim()` before the presence check is the whole of the rule as written — "empty
+ * or whitespace-only" — and it is also what makes the value that reaches the service
+ * the note the Approver actually wrote, without the spaces around it. The check is
+ * run when the note step is SUBMITTED, never on a keystroke (requirements §6.3, the
+ * project's validation-timing rule); that is the form's `mode`, not this schema's.
+ */
+export const rejectionNoteSchema = z.object({
+  note: z.string().trim().min(1, REJECTION_NOTE_REQUIRED_MESSAGE),
+});
+
+export type RejectionNoteValues = z.infer<typeof rejectionNoteSchema>;
+
+/**
  * User ID validation schema
  * Validates MongoDB ObjectId or UUID format
  */
