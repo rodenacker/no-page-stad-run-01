@@ -40,7 +40,59 @@ interface TransactionsProxyContext {
 }
 
 /** The service paths this app answers itself, and therefore never forwards. */
-const NOT_FORWARDED = new Set<string>(Object.values(DECIDE_SERVICE_PATHS));
+const NOT_FORWARDED = new Set<string>(
+  Object.values(DECIDE_SERVICE_PATHS).map((path) => path.toLowerCase()),
+);
+
+/**
+ * The service path a forwarded call would ACTUALLY arrive at, so the refusal below is
+ * measured against that rather than against the spelling the caller happened to use.
+ *
+ * This is the whole of the check, and comparing the raw `segments.join('/')` is a hole
+ * straight through it. The segments come from a catch-all route, which hands them over
+ * URL-DECODED, and the address is then assembled and normalised by `fetch` before the
+ * service does its own decoding — so every one of these reaches the decide operation
+ * while reading as something else on the way in:
+ *
+ * - `v1/transactions/x/../approve` — resolved away by the URL parser.
+ * - `v1/transactions/%61pprove` — a second layer of encoding, undone by the service.
+ * - `v1/transactions/Approve` — the service matches its routes case-insensitively.
+ * - `v1//transactions/approve/` — empty segments, which the URL parser keeps and a
+ *   server routing the call may not.
+ *
+ * So the path is resolved by the same parser `forwardPathToService` uses, against the
+ * same configured base URL, then decoded once more, stripped of empty segments and
+ * compared without case. Every one of those steps only ever widens what is REFUSED —
+ * what is forwarded is still the caller's own path, untouched. A path that escapes the
+ * mount point is `null`: nothing here refuses it, because `forwardPathToService`
+ * refuses it already, and it is not one of these two.
+ */
+const decidePathAskedFor = (segments: readonly string[]): string | null => {
+  try {
+    const base = transactionsApiBaseUrl();
+    // The trailing slash makes the mount a directory the target has to sit inside.
+    const mount = new URL(`${base}/`);
+    const target = new URL(`${base}/${segments.join('/')}`);
+
+    if (
+      target.origin !== mount.origin ||
+      !target.pathname.startsWith(mount.pathname)
+    ) {
+      return null;
+    }
+
+    const servicePath = `/${target.pathname.slice(mount.pathname.length)}`;
+    return `/${decodeURIComponent(servicePath)
+      .split('/')
+      .filter((segment) => segment !== '')
+      .join('/')}`.toLowerCase();
+  } catch {
+    // A base URL that is not a URL, or a path that will not decode. Neither is one of
+    // the two operations, and both are answered further down the same way they were
+    // before this check existed.
+    return null;
+  }
+};
 
 /**
  * As on the auth route, the path the caller asked for is carried by
@@ -53,7 +105,8 @@ const forward = async (
 ): Promise<Response> => {
   const { path } = await context.params;
 
-  if (NOT_FORWARDED.has(`/${path.join('/')}`)) {
+  const asked = decidePathAskedFor(path);
+  if (asked !== null && NOT_FORWARDED.has(asked)) {
     return new Response(null, { status: 404 });
   }
 

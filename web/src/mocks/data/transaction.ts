@@ -707,14 +707,24 @@ export const transactionDecided = (
     note?: string;
     at?: string;
   } = {},
-): TransactionRead => ({
-  ...transaction,
-  Status: status,
-  ...(isKnownTransactionStatus(status) ? STATUS_DEFAULTS[status] : {}),
-  LastChangedUser: by,
-  ...(note === undefined ? {} : { UserNote: note }),
-  ...(at === undefined ? {} : { LastChangedDate: at }),
-});
+): TransactionRead => {
+  // Any note the request already carried goes FIRST, before the status defaults put
+  // back whichever one this status legitimately has. Spreading the defaults over the
+  // request cannot remove a field the request already had, so without this an
+  // already-rejected request re-decided as approved would keep its rejection note —
+  // exactly the incoherent row this helper exists to make impossible.
+  const withoutDecision: TransactionRead = { ...transaction };
+  delete withoutDecision.UserNote;
+
+  return {
+    ...withoutDecision,
+    Status: status,
+    ...(isKnownTransactionStatus(status) ? STATUS_DEFAULTS[status] : {}),
+    LastChangedUser: by,
+    ...(note === undefined ? {} : { UserNote: note }),
+    ...(at === undefined ? {} : { LastChangedDate: at }),
+  };
+};
 
 /**
  * The same request as re-read a moment later, already decided by SOMEONE ELSE

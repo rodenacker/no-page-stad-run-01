@@ -910,6 +910,20 @@ export function ExpenseRequestList({
     }
     const { request, outcome, note } = pendingDecision;
     setPendingDecision(null);
+
+    // One decision at a time PER REQUEST. Confirming closes the dialog, but the row
+    // keeps its `Imported` status — and so its decide actions — until the re-read
+    // lands, so the same request can be confirmed again while the first call is still
+    // out. Sending a second would be a second decision on the request, and the first
+    // call's `finally` below would take the "Recording your approval…" line off the
+    // screen while the other was still on its way. The announcement already on screen
+    // is the answer to a second press.
+    if (
+      decisionsInFlight.some((decision) => decision.requestId === request.Id)
+    ) {
+      return;
+    }
+
     setDecisionsInFlight((current) =>
       current.some((decision) => decision.requestId === request.Id)
         ? current

@@ -90,6 +90,7 @@ import { BACKEND_UNREACHABLE_ERROR } from '@/lib/api/serviceProxy';
 import { sessionCookieHeader } from '@/lib/auth/sessionCookie';
 import {
   userInfoFor,
+  userInfoWithNonLatinScriptName,
   userInfoWithUnrecognisedRole,
 } from '@/mocks/data/identity';
 import { ROLE_APPROVER, ROLE_IMPORTER } from '@/mocks/data/role';
@@ -655,5 +656,37 @@ describe('Epic 5, Story 1: record a decision as the person who made it', () => {
     expect(Object.values(CLIENT_FALLBACK_MESSAGES)).not.toContain(
       DECISION_FAILED_MESSAGE,
     );
+  });
+
+  // AC-6
+  it('reports a failure, and sends nothing to the transactions service, when the signed-in name cannot travel in the required header', async () => {
+    const request = createTransaction();
+    const { POST } = await loadDecisionsRoute();
+    const { DECISION_APPROVE } = await loadDecisionsApi();
+
+    // An Approver whose name is written in a non-Latin script — an ordinary person
+    // the auth service can return, whose name an HTTP header value (a byte string)
+    // cannot carry. The service requires that name in a header, so the decision
+    // genuinely cannot be sent as this app is allowed to send it.
+    userInfoResponse = () =>
+      jsonResponse(200, userInfoWithNonLatinScriptName());
+
+    // Awaiting this is part of the assertion: an unhandled failure here escapes the
+    // handler as a crash instead of an answer the screen can act on.
+    const answered = await POST(
+      await decideRequest({
+        TransactionId: request.Id,
+        Decision: DECISION_APPROVE,
+      }),
+    );
+
+    // Reported, not dismissed and not crashed — and bodyless, so nothing about why
+    // travels back: not the name, not the service, not a stack trace.
+    expect(answered.status).toBe(500);
+    expect(await answered.text()).toBe('');
+
+    // Nothing was recorded: the decision never left this app, so no decision was
+    // stamped with a name other than the signed-in one, nor with a mangled one.
+    expect(decideCallUrls()).toEqual([]);
   });
 });

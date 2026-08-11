@@ -59,6 +59,25 @@ export const userInfoWithUnrecognisedRole = (): UserInfoRead =>
   });
 
 /**
+ * The userinfo body for a signed-in Approver whose name is written in a non-Latin
+ * script (Cyrillic here) — a perfectly ordinary person the auth service can return.
+ *
+ * It exists because such a name cannot travel in an HTTP header: a header value is a
+ * byte string, so any code point above U+00FF is not representable in one (accented
+ * Latin — "André Müller" — is, and is unremarkable). The transactions service requires
+ * the decider's name in a header, so this identity is the one that proves the app
+ * reports a failed decision instead of crashing, and never quietly alters the name it
+ * would record.
+ */
+export const userInfoWithNonLatinScriptName = (): UserInfoRead =>
+  createUserWithRoles([ROLE_APPROVER], {
+    Id: 404,
+    Email: 'kirill.ivanov@example.co.za',
+    FirstName: 'Кирилл',
+    LastName: 'Иванов',
+  });
+
+/**
  * The userinfo body for a signed-in user holding the named role.
  *
  * Each role gets its own stable identity (distinct `Id`, name and email), so a

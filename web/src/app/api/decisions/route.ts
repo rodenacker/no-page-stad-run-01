@@ -24,7 +24,8 @@
  * 4. Forwards exactly one request's decision to the service, with the resolved name in
  *    the required header and the caller's session cookie carried explicitly (a
  *    server-side fetch has no browser cookie jar, and the service accepts nothing
- *    else).
+ *    else). A name an HTTP header cannot carry is reported as a failed decision
+ *    instead — never altered to fit, and never left to escape as a crash.
  * 5. Answers the service's own status and `DefaultResponse` through, so its wording
  *    reaches the screen. Nothing internal travels either way: no service address, no
  *    connection error, no stack trace (bff-auth-pattern.md Rule 4) — a service nobody
@@ -41,7 +42,7 @@ import {
 } from '@/lib/api/decisions';
 import { transactionsApiBaseUrl } from '@/lib/api/serviceBaseUrl';
 import {
-  BACKEND_UNREACHABLE_ERROR,
+  backendUnreachableResponse,
   forwardToService,
 } from '@/lib/api/serviceProxy';
 import { fetchUserInfo } from '@/lib/auth/authApi';
@@ -54,7 +55,6 @@ import {
 import { ROLE_APPROVER } from '@/types/auth';
 
 import type { DecisionRequest } from '@/lib/api/decisions';
-import type { ErrorResponse } from '@/types/api';
 import type { UserInfoRead } from '@/types/auth';
 import type { NextRequest } from 'next/server';
 
@@ -68,17 +68,14 @@ export const dynamic = 'force-dynamic';
 const refused = (status: number): Response => new Response(null, { status });
 
 /**
- * Nobody answered. The same shape the service proxy answers with, so a screen tells
- * "nobody answered" from "the service refused" the same way whichever path it came
- * down — a code, and no wording of ours.
+ * The app could not assemble the call at all, so nothing was sent to the transactions
+ * service. Same bodyless envelope as a refusal, different meaning: this is not the
+ * caller being told "no", it is this app being unable to carry the decision — and it
+ * is reported as a status rather than allowed to escape as an unhandled error
+ * (CLAUDE.md §3). The reason is logged server-side, where it is useful and private;
+ * nothing internal travels back.
  */
-const unreachable = (): Response =>
-  new Response(
-    JSON.stringify({
-      Error: BACKEND_UNREACHABLE_ERROR,
-    } satisfies Pick<ErrorResponse, 'Error'>),
-    { status: 502, headers: { 'content-type': 'application/json' } },
-  );
+const couldNotCarryOut = (): Response => refused(500);
 
 /**
  * The decision the caller asked for, or `null` when the call does not describe one.
@@ -126,6 +123,15 @@ const bodyOf = async (request: NextRequest): Promise<unknown> => {
  * parameter — the operation takes exactly one per call), the note in the BODY and
  * only in the body (a reason someone typed has no business in an address that gets
  * logged along every hop), and the signed-in name in the required header.
+ *
+ * THROWS when the resolved name cannot be carried in a header at all. An HTTP header
+ * value is a byte string, so a name written in a script above U+00FF (Cyrillic, CJK —
+ * accented Latin is fine) is not representable in one, and constructing the request
+ * rejects it. The name itself is NOT adjusted to fit: what gets recorded as who
+ * decided is the transactions service's contract, not this route's to reinterpret, and
+ * a decision recorded under a mangled name is worse than one not recorded. So the
+ * failure is raised and the caller is told the decision did not go through — see the
+ * catch in `POST`.
  */
 const decideCall = (
   decision: DecisionRequest,
@@ -183,7 +189,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       'Could not resolve the signed-in identity for a decision.',
       error,
     );
-    return unreachable();
+    // The proxy's own "nobody answered" envelope, not a second one written here: a
+    // screen tells "nobody answered" from "the service refused" the same way whichever
+    // path the failure came down.
+    return backendUnreachableResponse();
   }
 
   if (session === null) {
@@ -198,6 +207,21 @@ export async function POST(request: NextRequest): Promise<Response> {
     return refused(400);
   }
 
-  const call = decideCall(decision, session, sessionValue);
+  let call: Request;
+  try {
+    call = decideCall(decision, session, sessionValue);
+  } catch (error) {
+    // The call could not be assembled — the signed-in name is not representable in
+    // the required header (see `decideCall`). Nothing was sent to the transactions
+    // service, and nothing was recorded, so the caller is told the decision failed
+    // rather than left with an unhandled error. The detail stays server-side.
+    console.error(
+      'Could not assemble the decide call for a decision: the signed-in name may ' +
+        'not be representable in the required LastChangedUser header.',
+      error,
+    );
+    return couldNotCarryOut();
+  }
+
   return forwardToService(call, call.url);
 }
