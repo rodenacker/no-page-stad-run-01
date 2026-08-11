@@ -31,7 +31,7 @@
  *    do not rebuild it. The component under test is the existing client
  *    component `web/src/components/requests/ExpenseRequestList.tsx`, still fed
  *    `roles` by the server page (`rolesOf(session)`), with its per-request
- *    overflow (`RequestActions.tsx`) and its opened request
+ *    controls (`RequestActions.tsx`) and its opened request
  *    (`RequestDetailPanel.tsx`). No second list, no second route, no second
  *    server-side gate — `/requests` is already registered for both roles in
  *    `lib/auth/access-map.ts` and must stay that way.
@@ -51,10 +51,11 @@
  *        in the code path. Do not add an owner field to have something to test.
  * 4. WHERE the controls live: DIRECTLY on each request — in its own row (and, at
  *    phone width, its own card), reachable in ONE activation — and as controls
- *    inside the opened request's panel. They are NOT items in the ⋯ actions
- *    overflow: that menu holds Open and nothing else, and this file asserts the
- *    absence there as well as the presence on the row, so a second copy hidden
- *    in the overflow fails as loudly as a missing control would. Each accessible
+ *    inside the opened request's panel. A request carries NO ⋯ overflow menu at
+ *    all (removed at a later manual test, once the only thing left in it was a
+ *    second way to reach Open): every per-request action is a direct control, so
+ *    the row is asserted to carry exactly one Approve and one Reject and no
+ *    decision is ever offered twice on one request. Each accessible
  *    name begins with "Approve" / "Reject" and goes on to name the request
  *    ("Approve request TXN-20260415-0001") — with one Approve per listed
  *    request on screen, a bare "Approve" would be ambiguous to a screen-reader
@@ -110,8 +111,8 @@
  * print one if the mock hands the screen something to print.
  *
  * These tests WILL FAIL until the story is implemented (TDD red): nothing in the
- * list, its overflow or its detail panel offers a decision yet — the previous
- * epic asserts the opposite on purpose.
+ * list's rows or its detail panel offers a decision yet — the previous epic
+ * asserts the opposite on purpose.
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -245,26 +246,6 @@ const rowFor = (reference: string): HTMLElement => {
   return rows[0];
 };
 
-/** Opens one request's actions overflow and hands back the open menu. */
-const openActionsMenuFor = async (
-  user: User,
-  reference: string,
-): Promise<HTMLElement> => {
-  const trigger = await waitFor(() =>
-    within(rowFor(reference)).getByRole('button', { name: /^actions\b/i }),
-  );
-  await user.click(trigger);
-  return await screen.findByRole('menu');
-};
-
-/** Closes the open overflow the way a keyboard user does. */
-const closeActionsMenu = async (user: User): Promise<void> => {
-  await user.keyboard('{Escape}');
-  await waitFor(() => {
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-};
-
 /** Opens one request's detail panel and hands back the panel itself. */
 const openRequest = async (
   user: User,
@@ -347,8 +328,8 @@ const withStatusIn = (
 
 /**
  * One of a request's two decide controls, on the row itself — the placement this
- * story owns. A plain `button` in the row, not an item behind the ⋯ overflow: a
- * decision is one activation away, not two.
+ * story owns. A plain `button` in the row: a decision is one activation away,
+ * not two.
  */
 const decideControlOn = async (
   reference: string,
@@ -440,15 +421,18 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
       ).toBeInTheDocument();
     }
 
-    // ...and they are offered there INSTEAD of in the ⋯ overflow, not as well as:
-    // the same decision in two places on one request is two things to keep in step
-    // and two answers to "where is Approve?".
-    const overflow = await openActionsMenuFor(user, smallest.Reference);
+    // ...and they are offered ONCE each: a request's actions are all direct
+    // controls on its row (there is no ⋯ overflow behind it), so the same decision
+    // is never in two places — two things to keep in step and two answers to
+    // "where is Approve?". Open sits beside them, the only other thing on offer.
     expect(
-      within(overflow).getByRole('menuitem', { name: /^open\b/i }),
+      controlsNamed(rowFor(smallest.Reference), DECIDE_ACTION).map(described),
+    ).toHaveLength(2);
+    expect(
+      within(rowFor(smallest.Reference)).getByRole('button', {
+        name: /^open\b/i,
+      }),
     ).toBeInTheDocument();
-    expect(controlsNamed(overflow, DECIDE_ACTION).map(described)).toEqual([]);
-    await closeActionsMenu(user);
 
     // ...and the opened request offers the same two decisions, so an Approver
     // who read the detail before deciding does not have to go back to the row.
@@ -479,16 +463,10 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
     ).toBeInTheDocument();
 
     // A request somebody has already decided offers neither action — absent,
-    // not disabled (R6/BR3, R12) — on its row, and in the overflow behind it.
+    // not disabled (R6/BR3, R12) — on its row.
     expect(
       controlsNamed(rowFor(approved.Reference), DECIDE_ACTION).map(described),
     ).toEqual([]);
-
-    const approvedMenu = await openActionsMenuFor(user, approved.Reference);
-    expect(controlsNamed(approvedMenu, DECIDE_ACTION).map(described)).toEqual(
-      [],
-    );
-    await closeActionsMenu(user);
 
     // ...and neither does it when it is opened, which is the other place a
     // per-request decision would look natural.
@@ -513,16 +491,7 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
       ),
     ).toEqual([]);
 
-    // ...nor tucked back into the overflow they were moved out of.
-    const uploaderMenu = await openActionsMenuFor(
-      user,
-      awaitingDecision.Reference,
-    );
-    expect(controlsNamed(uploaderMenu, DECIDE_ACTION).map(described)).toEqual(
-      [],
-    );
-    await closeActionsMenu(user);
-
+    // ...nor inside the request when it is opened.
     const uploaderDetail = await openRequest(user, awaitingDecision.Reference);
     expect(controlsNamed(uploaderDetail, DECIDE_ACTION).map(described)).toEqual(
       [],
@@ -627,8 +596,7 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
     expect(notifications).toHaveTextContent(/approved/i);
 
     // ...and the decide actions are gone from that request — absent, not
-    // disabled (R12), on its row, in the overflow behind it and in the opened
-    // request alike.
+    // disabled (R12), on its row and in the opened request alike.
     expect(
       controlsNamed(rowFor(awaitingDecision.Reference), DECIDE_ACTION).map(
         described,
@@ -648,15 +616,6 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
         }),
       ).toHaveFocus();
     });
-
-    const decidedMenu = await openActionsMenuFor(
-      user,
-      awaitingDecision.Reference,
-    );
-    expect(controlsNamed(decidedMenu, DECIDE_ACTION).map(described)).toEqual(
-      [],
-    );
-    await closeActionsMenu(user);
 
     const decidedDetail = await openRequest(user, awaitingDecision.Reference);
     expect(controlsNamed(decidedDetail, DECIDE_ACTION).map(described)).toEqual(

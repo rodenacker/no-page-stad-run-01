@@ -34,3 +34,8 @@ The plan for this epic was parked while `expense-decisions` was still being buil
 ### A note on the build
 
 Story 5's first build run was cut short partway through by a spend limit on the account. Nothing was lost — the work in progress was picked up from where it stopped and finished normally.
+
+## Manual test — change requested
+
+- The ⋯ menu on each row of the Expense requests table is gone. It only offered "Open", which is already a button on the row, so it was a second way to reach something you could already click. Approve, Reject and Open now sit directly on every row and on every card at phone width — nothing you could do before has been lost.
+- The earlier list epic asked for an action overflow on each request at phone width. Removing the menu goes against the letter of that, though not its point: the actions are still reachable at every width, now directly. Recorded as a deliberate supersede so nobody restores the menu later thinking it went missing by accident.

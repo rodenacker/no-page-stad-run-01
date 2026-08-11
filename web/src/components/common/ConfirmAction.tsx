@@ -22,8 +22,8 @@
  *   follow: the control that ASKS, the one that DOES it and the one that BACKS OUT are
  *   three different phrases, so neither a user nor a query can confuse them.
  * - **It is CONTROLLED — the caller owns whether it is open.** A confirmation is
- *   reached from a plain button on one screen and from an item in a per-request
- *   overflow menu on another, and only the caller knows which object the answer is
+ *   reached from a plain button on one screen and from a per-request control in a list
+ *   row on another, and only the caller knows which object the answer is
  *   about. So there is no trigger slot here; the caller renders whatever asks, and
  *   holds what is being confirmed while this is open.
  * - **Nothing here calls anything.** `onConfirm` is the caller's, and this component

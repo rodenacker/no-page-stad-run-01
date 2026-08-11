@@ -28,9 +28,9 @@
  *    introduces — it does NOT build a second one. The unit under test is the client
  *    list `@/components/requests/ExpenseRequestList` (from `expense-request-list`),
  *    and Reject is reached the way story 2 places it: as a control on the request's
- *    OWN ROW, one activation away, NOT as an item inside the ⋯ overflow (which now
- *    holds only Open — its trigger is still named "Actions for request
- *    <Reference>"). The same reject flow is offered from the opened request
+ *    OWN ROW, one activation away. A request has no ⋯ overflow menu at all — every
+ *    action it offers is a direct control, Open included (the menu was removed at a
+ *    later manual test). The same reject flow is offered from the opened request
  *    (`RequestDetailPanel`); nothing here asserts that second entry point, only that
  *    the flow itself behaves — one flow, two ways in.
  * 2. LABELS these tests query by (distinct words, so no query — and no user — can
@@ -77,9 +77,8 @@
  *    renders `UserNote` ("Rejection note") — do not add a second place a note is
  *    shown, and do not put it in the list row.
  * 8. THE DECIDE ACTIONS ARE WITHDRAWN once the request is no longer `Imported`
- *    (R12/BR3) — absent from the row AND from the overflow, not disabled, which is
- *    this project's rule everywhere. The Open action stays: the request is still
- *    readable.
+ *    (R12/BR3) — absent from the row, not disabled, which is this project's rule
+ *    everywhere. The Open action stays: the request is still readable.
  * 9. THE CONFIRMATION MESSAGE is a transient in-app notification through the
  *    existing `useToast()` (`@/contexts/ToastContext`) at its DEFAULT duration
  *    (R11/R15 — the 5s default already sits inside the 4–8s window); it names the
@@ -180,7 +179,6 @@ const NOTE_REQUIRED_MESSAGE =
  * TXN-20260415-0001") satisfies them, while a STATUS a request merely carries
  * ("Rejected") never does.
  */
-const ACTIONS_TRIGGER = /^actions\b/i;
 const REJECT_ACTION = /^reject\b/i;
 const APPROVE_ACTION = /^approve\b/i;
 const OPEN_ACTION = /^open\b/i;
@@ -309,20 +307,9 @@ const rowFor = (reference: string): HTMLElement => {
   return row;
 };
 
-/** Opens a request's action overflow and hands back the menu itself. */
-const openActionsFor = async (
-  user: User,
-  reference: string,
-): Promise<HTMLElement> => {
-  await user.click(
-    within(rowFor(reference)).getByRole('button', { name: ACTIONS_TRIGGER }),
-  );
-  return await screen.findByRole('menu');
-};
-
 /**
  * One of a request's two decide controls, on the row itself (story 2's placement):
- * a plain `button` in the row, not an item behind the ⋯ overflow.
+ * a plain `button` in the row, one activation away.
  */
 const decideControlOn = (reference: string, action: RegExp): HTMLElement =>
   within(rowFor(reference)).getByRole('button', { name: action });
@@ -591,28 +578,22 @@ describe('Epic expense-decisions, Story 3: reject a request with a note', () => 
     expect(
       within(decidedRow).queryByRole('button', { name: APPROVE_ACTION }),
     ).not.toBeInTheDocument();
-    // ...and they have not reappeared in the overflow they were moved out of. The
-    // other request, still awaiting a decision, keeps both — so these are absences
-    // about THIS request rather than a screen that has stopped offering decisions.
+    // The other request, still awaiting a decision, keeps both — so these are
+    // absences about THIS request rather than a screen that has stopped offering
+    // decisions at all.
     expect(
       decideControlOn(otherRequest.Reference, REJECT_ACTION),
     ).toBeVisible();
 
-    const menu = await openActionsFor(user, request.Reference);
-    // The overflow really did open — so the two absences below are absences, not
-    // an unopened menu.
-    expect(
-      within(menu).getByRole('menuitem', { name: OPEN_ACTION }),
-    ).toBeVisible();
-    expect(
-      within(menu).queryByRole('menuitem', { name: REJECT_ACTION }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(menu).queryByRole('menuitem', { name: APPROVE_ACTION }),
-    ).not.toBeInTheDocument();
+    // ...while the decided request keeps the one control it still owes a reader:
+    // Open, which is how the note below is reached.
+    const openControl = within(decidedRow).getByRole('button', {
+      name: OPEN_ACTION,
+    });
+    expect(openControl).toBeVisible();
 
     // --- and the note is shown with the request it was written for ----------
-    await user.click(within(menu).getByRole('menuitem', { name: OPEN_ACTION }));
+    await user.click(openControl);
 
     const panel = await screen.findByRole('dialog');
     expect(panel).toHaveTextContent(TRANSACTION_STATUS_REJECTED);

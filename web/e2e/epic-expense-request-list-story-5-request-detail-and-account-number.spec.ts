@@ -12,7 +12,7 @@
  *   and a reveal never escapes the one request it was made on), AC-5 (every icon-only
  *   control names itself on hover AND on keyboard focus, with a matching accessible
  *   label) and AC-6 (at phone width each request is a card with its reference plus key
- *   values and an action overflow, and the page never scrolls sideways) → this file.
+ *   values and its own controls, and the page never scrolls sideways) → this file.
  * - AC-1 (an opened request shows every value the service holds, read-only), AC-2 (no
  *   control anywhere changes an imported value — BR1) and AC-3 (masked until the named
  *   reveal control is used) → the Vitest layer at
@@ -65,12 +65,14 @@
  *   reuse notes). `page.route()` cannot intercept a fetch made by the Next.js server or
  *   by a Server Action — if this read moves server-side, this spec's mock is bypassed
  *   and the request leaves for the real transactions service.
- * - A request is opened the SAME way at every width: each request offers an action
- *   overflow (the Shadcn `dropdown-menu`, `role="button"` trigger named for what it
- *   opens — matching `REQUEST_ACTIONS_NAME`) holding an item that opens the request
- *   (matching `OPEN_REQUEST_NAME`). AC-6 requires that overflow at phone width, and one
- *   mechanism at both widths is the simplest implementation (it is also Shadcn's own
- *   data-table pattern). The detail then opens as a `role="dialog"` panel over the list,
+ * - A request is opened the SAME way at every width: each request carries a DIRECT
+ *   control that opens it (a plain `button` matching `OPEN_REQUEST_NAME`), on its table
+ *   row at desktop width and on its card at phone width — one component renders both.
+ *   AC-6 asked for that control as an ⋯ action overflow; the menu was removed outright
+ *   at a later manual test once Open was the only thing left in it, so the mechanism is
+ *   superseded (see `generated-docs/architecture.md`) while what AC-6 is about — every
+ *   per-request action reachable at every width — still holds, in one activation rather
+ *   than two. The detail then opens as a `role="dialog"` panel over the list,
  *   one at a time, closable with Escape (the design decision resolved at the stories
  *   approval), with the reveal control INSIDE it, named with a reveal verb and "account"
  *   (matching `REVEAL_ACCOUNT_NUMBER_NAME`).
@@ -143,9 +145,8 @@ const PREVIOUS_PAGE_NAME = /prev/i;
 /**
  * This story's own controls. Wording is the developer's; only the sense of it is fixed
  * here — the reveal control must name what it reveals (AC-3 "clearly-named"), and the
- * action overflow must name what it opens.
+ * control on a request must name what it opens.
  */
-const REQUEST_ACTIONS_NAME = /(action|more|option|menu)/i;
 const OPEN_REQUEST_NAME = /(open|view|detail)/i;
 const REVEAL_ACCOUNT_NUMBER_NAME = /(reveal|show|unmask).*account/i;
 
@@ -356,15 +357,11 @@ const chooseStatusFilter = async (
 };
 
 /**
- * Opens one request from its row (desktop) or its card (phone width) through the action
- * overflow, and hands back the detail panel over the list.
+ * Opens one request from its row (desktop) or its card (phone width) through the direct
+ * control it carries, and hands back the detail panel over the list.
  */
 const openRequest = async (page: Page, request: Locator): Promise<Locator> => {
-  await request.getByRole('button', { name: REQUEST_ACTIONS_NAME }).click();
-  await page
-    .getByRole('menu')
-    .getByRole('menuitem', { name: OPEN_REQUEST_NAME })
-    .click();
+  await request.getByRole('button', { name: OPEN_REQUEST_NAME }).click();
 
   const detail = page.getByRole('dialog');
   await expect(detail).toBeVisible();
@@ -461,6 +458,13 @@ const expectAccountNumbersMasked = async (
  * discovered set); that is safe here because the sweep restores the page between
  * candidates, so the set never shifts underneath it.
  */
+/**
+ * How many candidate controls `root` holds at all — icon-only or not. The sweep's
+ * population, used to prove it really looked at this screen rather than at nothing.
+ */
+const controlCountIn = async (root: Locator): Promise<number> =>
+  await root.locator(CONTROL_SELECTOR).count();
+
 const iconOnlyControlsIn = async (root: Locator): Promise<Locator[]> => {
   const controls = root.locator(CONTROL_SELECTOR);
 
@@ -729,6 +733,9 @@ test.describe('Epic expense-request-list, Story 5: open one request, with its ac
     await expect(requestRow(page, REVEALED_REQUEST.Reference)).toBeVisible();
 
     const listControls = await iconOnlyControlsIn(page.getByRole('main'));
+    // Counted while the list is the accessible page — an open modal dialog takes the
+    // rest of it out of the accessibility tree, so `main` is unreachable after this.
+    const listControlCount = await controlCountIn(page.getByRole('main'));
     for (const control of listControls) {
       await expectNamesItselfOnHoverAndFocus(page, control);
     }
@@ -738,18 +745,21 @@ test.describe('Epic expense-request-list, Story 5: open one request, with its ac
       requestRow(page, REVEALED_REQUEST.Reference),
     );
     const detailControls = await iconOnlyControlsIn(detail);
+    const detailControlCount = await controlCountIn(detail);
     for (const control of detailControls) {
       await expectNamesItselfOnHoverAndFocus(page, control);
     }
 
-    // A sweep that examined nothing proves nothing. This screen is expected to have at
-    // least one icon-only control — R15 names reveal-account-number as its own example,
-    // and AC-6 requires an action overflow per request. If every control here genuinely
-    // grew visible wording instead, that is a change to take back to the planner, not a
-    // green test.
+    // A sweep that examined nothing proves nothing — so what is guarded is that this
+    // screen really has controls for the sweep to have judged. It is deliberately NOT
+    // guarded that one of them is icon-only: the ⋯ action overflow that used to be this
+    // screen's example was removed at a manual test, and every control here now carries
+    // visible wording of its own, which satisfies R15 the other way round (a control
+    // that says what it does owes no tooltip). The loops above are what covers the next
+    // icon-only control added to either surface.
     expect(
-      listControls.length + detailControls.length,
-      'no icon-only control was found in the list or in an opened request, so this criterion checked nothing',
+      listControlCount + detailControlCount,
+      'no control at all was found in the list or in an opened request, so this criterion checked nothing',
     ).toBeGreaterThan(0);
   });
 
@@ -757,7 +767,7 @@ test.describe('Epic expense-request-list, Story 5: open one request, with its ac
   // Rendered AT phone width from the first paint, the way a phone user receives it —
   // not resized after a desktop render, which can leave a layout that a real phone would
   // never have produced.
-  test('at phone width each request is a card with its reference and key values plus an action overflow that opens it, and the page never scrolls sideways', async ({
+  test('at phone width each request is a card with its reference and key values plus its own control that opens it, and the page never scrolls sideways', async ({
     page,
     context,
   }) => {
@@ -784,7 +794,7 @@ test.describe('Epic expense-request-list, Story 5: open one request, with its ac
 
     await expectNoSidewaysScrolling(page, 'the request list at phone width');
 
-    // The action overflow is how a request is opened at this width.
+    // The card's own Open control is how a request is opened at this width.
     const detail = await openRequest(page, card);
     await expect(detail).toContainText(REVEALED_REQUEST.Reference);
     await expectNoSidewaysScrolling(page, 'an opened request at phone width');

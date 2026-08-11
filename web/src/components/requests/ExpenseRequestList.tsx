@@ -88,9 +88,9 @@
  *   at the stories approval, over an expandable row. This component holds only WHICH
  *   request is open (by id); the panel holds the reveal, so closing it returns the
  *   reader to their place, ordering and page untouched. See `RequestDetailPanel`.
- * - **Still nothing changes a request** (BR1/R5). The only per-request controls are
- *   "open it" — offered directly and through an action overflow, the mechanism R16 asks
- *   for at phone width and the place a later epic's actions will go.
+ * - **Still nothing changes a request** (BR1/R5). The only per-request control is
+ *   "open it", a direct control on the row and on the card alike — see `RequestActions`
+ *   for why there is no ⋯ overflow behind it.
  * - **At phone width the requests are CARDS, not a table.** Which presentation is
  *   rendered is decided by the browser's own media query, watched as external state, so
  *   only one of the two is ever in the markup: a table hidden by CSS would still be read
@@ -155,8 +155,8 @@
  *   its markup at all. Absent, never disabled: the project's rule everywhere, and the
  *   thing a greyed-out Approve would quietly break.
  * - **The two decisions are DIRECT controls on the row and on the card** (user decision
- *   at manual test), not items in the ⋯ overflow, which now holds only Open — so
- *   deciding a request costs one activation rather than two. They are therefore on
+ *   at manual test), and there is no ⋯ overflow anywhere on a request — so deciding one
+ *   costs one activation rather than two. They are therefore on
  *   screen once per listed request, which is why each one's accessible name carries the
  *   request's reference; "Approve" alone would be a screenful of identical controls.
  * - **Nothing is sent until the confirmation is accepted** (R10/BR6). Choosing Approve
@@ -373,7 +373,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/contexts/ToastContext';
 import {
   DECISION_APPROVE,
@@ -654,7 +653,7 @@ const presentationOf = (
  * row. A row's contents depend on nothing else, so a keystroke in the search box or a
  * range bound that leaves the page unchanged re-renders no rows at all. That is what
  * keeps a page render inside the feature NFR's 400ms p95 at the 10,000-row ceiling,
- * where every row carries an action overflow of its own.
+ * where every row carries controls of its own.
  *
  * `selected` being a BOOLEAN rather than the selection itself is the load-bearing half
  * of that: the list holds a set of ids, and handing that set to every row would defeat
@@ -2096,9 +2095,8 @@ export function ExpenseRequestList({
               </p>
             </div>
           ) : (
-            /* One presentation or the other, never both: see this file's header. The
-               tooltip provider is context only and renders nothing of its own. */
-            <TooltipProvider>
+            /* One presentation or the other, never both: see this file's header. */
+            <>
               {narrowViewport ? (
                 <RequestCards
                   requests={requestsOnPage}
@@ -2176,7 +2174,7 @@ export function ExpenseRequestList({
                   </TableBody>
                 </Table>
               )}
-            </TooltipProvider>
+            </>
           )}
 
           {/* Always on the screen, whether or not there is anywhere to page to
@@ -2231,7 +2229,7 @@ export function ExpenseRequestList({
         />
       )}
 
-      {/* Asked from the row's overflow and from the opened request alike, so it lives
+      {/* Asked from the row's own controls and from the opened request alike, so it lives
           out here with the flow it belongs to rather than inside either of them. It is
           mounted only while a decision is pending: closing it is what ends the ask. */}
       {pendingDecision !== null && (

@@ -15,7 +15,7 @@
  *   and a bulletless list loses its role in some browsers.
  * - **The reference is the primary identifier** (source UI-23), with three key values
  *   beside it — status, amount and transaction date. Everything else about the request,
- *   the account number included, is in the panel the action overflow opens.
+ *   the account number included, is in the panel the Open control opens.
  * - **The selection tick is here too**, sitting with the reference it selects and
  *   offered on the same condition the table row applies (an Approver, a request still
  *   awaiting a decision). Each card is handed a plain `selected` boolean rather than
@@ -170,8 +170,8 @@ const RequestCard = memo(function RequestCard({
           </div>
         </dl>
       </CardContent>
-      {/* A row of its own, so the two decisions, Open and the overflow have the card's
-          whole width to sit across and wrap into at 360px. */}
+      {/* A row of its own, so the two decisions and Open have the card's whole width to
+          sit across and wrap into at 360px. */}
       <CardFooter className="justify-end">
         <RequestActions
           reference={request.Reference}
