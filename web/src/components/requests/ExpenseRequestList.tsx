@@ -248,6 +248,26 @@
  * - **What the batch decided stops being selected** (BR8): approved requests, and
  *   requests a colleague decided first, drop out of the selection and the count corrects
  *   itself. Anything still awaiting a decision keeps its tick.
+ *
+ * When part of a batch fails (R5/R10, BR11):
+ *
+ * - **Three buckets, never two.** A call that FAILED is not the same thing as a request
+ *   nobody sent a call for. "Left unchanged" means a colleague decided it first and
+ *   nothing went wrong; "could not be submitted" means the call itself was refused. The
+ *   report names all three, empty ones included, and gives the SERVICE's own reason for
+ *   the failures — never the client's placeholder (project.md NFR-base-5).
+ * - **The report waits, and carries the way out.** Something the Approver has to act on
+ *   does not fade (`duration: 0`), and the way to act on it is a real button inside the
+ *   notification (`action` on the toast surface) — not a click handler on its body,
+ *   which no keyboard can reach.
+ * - **Trying again is scoped, re-checks, and asks nothing.** It covers exactly the
+ *   requests whose calls failed, and it runs the SAME batch (`runBulkApproval`), so the
+ *   eligibility re-check happens again over that subset: a request decided in the
+ *   interim comes back as left unchanged rather than approved a second time (BR11). It
+ *   does not ask for confirmation again — this bulk approval was confirmed when it
+ *   started, and choosing a named, smaller subset is itself the deliberate act — and
+ *   taking it dismisses the report, so two answers about one batch are never on screen
+ *   together.
  */
 
 import {
@@ -329,6 +349,7 @@ import {
   bulkApprovalOutcomeTitle,
   bulkApproveConfirmationTitle,
   eligibilityIn,
+  retryRefusedApprovalsLabel,
   staleDecisionMessage,
   stalenessIn,
   submitApprovals,
@@ -850,6 +871,14 @@ export function ExpenseRequestList({
   const bulkApprovalRunning = bulkApprovalSubmitting !== null;
 
   /**
+   * The same fact as a ref, for the ONE caller that cannot read it from state: the
+   * "try again" control the failed-batch report carries (R10) is created while a batch
+   * is still running, so the state it closed over says "running" forever. The ref is
+   * read at the moment the control is taken, which is what the guard actually means.
+   */
+  const bulkApprovalInFlight = useRef(false);
+
+  /**
    * The decision the reader is being asked to confirm, if any. Choosing Approve or
    * Reject only sets this: nothing is sent until the confirmation is accepted (R10).
    */
@@ -1224,14 +1253,14 @@ export function ExpenseRequestList({
   };
 
   /**
-   * The bulk approval the Approver has just accepted (bulk-approval R1/R5/R9, BR1-BR5,
-   * NFR3). Four steps, in this order, and none of them is optional:
+   * One batch of approvals over the requests named (bulk-approval R1/R5/R9/R10,
+   * BR1-BR5/BR11, NFR3). Four steps, in this order, and none of them is optional:
    *
-   * 1. **A fresh read** — the whole selection is judged against the list as it stands
-   *    NOW, not as it stood when the ticks were put in (BR2). A read that fails sends
+   * 1. **A fresh read** — the requests are judged against the list as it stands NOW,
+   *    not as it stood when the ticks were put in (BR2). A read that fails sends
    *    nothing at all: approvals go out only while the app can see which requests are
    *    still awaiting one.
-   * 2. **The split** — every selected request the read no longer shows awaiting a
+   * 2. **The split** — every named request the read no longer shows awaiting a
    *    decision is dropped from the batch and no approve call is ever made for it
    *    (BR1). It is reported as left unchanged instead (R5).
    * 3. **One call per remaining request** (BR3), at a bounded concurrency (NFR3) so a
@@ -1243,14 +1272,26 @@ export function ExpenseRequestList({
    *    envelope whether it approved a request or found it already decided, so an
    *    implementation that trusted the answers would report a colleague's decision as
    *    one of this Approver's own.
+   *
+   * It takes the requests to act on as an ARGUMENT rather than reading the selection,
+   * because it is run twice for the same batch: once for the whole selection, and
+   * again — from the report's own "try again" control — for just the requests whose
+   * calls FAILED (R10). That second run is the whole of BR11: the same four steps, so
+   * the eligibility re-check happens again over the smaller subset and a request a
+   * colleague decided in between comes back as left unchanged rather than being
+   * approved twice. There is deliberately no second batch path.
+   *
+   * The three buckets it reports are kept strictly apart (R5/R10): approved is what
+   * step 4's comparison shows changed, left unchanged is what step 2 never sent
+   * (nothing went wrong — a colleague got there first), and could-not-be-submitted is
+   * a call that failed. Only the last of those is a failure, and only it is retried.
    */
-  const approveSelection = async (): Promise<void> => {
-    const selection = [...selectedIds];
-
-    if (selection.length === 0 || bulkApprovalRunning) {
+  const runBulkApproval = async (ids: readonly number[]): Promise<void> => {
+    if (ids.length === 0 || bulkApprovalInFlight.current) {
       return;
     }
-    setBulkApprovalSubmitting(selection.length);
+    bulkApprovalInFlight.current = true;
+    setBulkApprovalSubmitting(ids.length);
 
     try {
       let before: TransactionRead[];
@@ -1269,7 +1310,7 @@ export function ExpenseRequestList({
         return;
       }
 
-      const { eligible, leftUnchanged } = eligibilityIn(before, selection);
+      const { eligible, leftUnchanged } = eligibilityIn(before, ids);
 
       const attempts =
         eligible.length === 0
@@ -1301,11 +1342,14 @@ export function ExpenseRequestList({
       }
 
       const tally = {
-        selected: selection.length,
+        selected: ids.length,
         approved: approvedIn(after, submitted).length,
         leftUnchanged: leftUnchanged.length,
         refused: refused.length,
       };
+
+      /** Exactly the requests whose own call failed — the only bucket a retry covers. */
+      const refusedIds = refused.map((attempt) => attempt.id);
 
       showToast({
         variant: refused.length === 0 ? 'success' : 'error',
@@ -1317,8 +1361,23 @@ export function ExpenseRequestList({
             : decisionFailureMessage(refused[0].failure),
         ),
         // A completed batch confirms itself and fades (R11's window); one carrying
-        // requests that could not be submitted is something the Approver has to act on.
-        ...(refused.length === 0 ? {} : { duration: 0 }),
+        // requests that could not be submitted is something the Approver has to act on,
+        // so it waits for them and carries the way to act on it (R10, NFR-base-5).
+        ...(refused.length === 0
+          ? {}
+          : {
+              duration: 0,
+              action: {
+                label: retryRefusedApprovalsLabel(refusedIds.length),
+                onAction: () => {
+                  // No second confirmation: this bulk approval was confirmed when it
+                  // started, and choosing a named, smaller subset is itself the
+                  // deliberate act. Taking it dismisses this report, so the Approver
+                  // is never left with two answers about the same batch.
+                  void runBulkApproval(refusedIds);
+                },
+              },
+            }),
       });
 
       // Whatever the batch decided — and whatever a colleague decided first — has
@@ -1327,9 +1386,14 @@ export function ExpenseRequestList({
       // what leaves a refused request ready to be tried again.
       setSelectedIds((current) => withDecidedRequestsDropped(current, after));
     } finally {
+      bulkApprovalInFlight.current = false;
       setBulkApprovalSubmitting(null);
     }
   };
+
+  /** The bulk approval the Approver has just accepted: the whole selection (R1/R8). */
+  const approveSelection = (): Promise<void> =>
+    runBulkApproval([...selectedIds]);
 
   /**
    * What the listed requests and the summary are worked out from. It can trail the

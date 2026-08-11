@@ -16,6 +16,11 @@
  * user is expected to act on. Following it dismisses the notification, because acting
  * on it is one of the two ways it goes away (the other being the dismiss control).
  *
+ * It can equally offer something to DO where there is no address to send the user to
+ * (`toast.action`) — a real `<button>`, for the same reason and with the same
+ * lifetime: taking the action dismisses the notification, so a report can never go on
+ * offering to act on something that has already been acted on.
+ *
  * A `duration` of 0 (or none at all on the toast object) is a notification that never
  * fades: what the user must act on stays until they do (source UI-19).
  */
@@ -27,6 +32,9 @@ import { Button } from '@/components/ui/button';
 import { ToastProps } from '@/types/toast';
 
 export function Toast({ toast, onDismiss }: ToastProps) {
+  // Pulled out of the toast object so the narrowing below survives into the handler.
+  const { action } = toast;
+
   // Auto-dismiss after duration
   useEffect(() => {
     if (toast.duration && toast.duration > 0) {
@@ -170,6 +178,24 @@ export function Toast({ toast, onDismiss }: ToastProps) {
             >
               {toast.link.label}
             </Link>
+          </Button>
+        )}
+        {action && (
+          /* A real control, so it is in the tab order and operable by keyboard —
+             which a click handler on the notification's body is not. Taking it is
+             acting on the notification, so the notification goes with it. */
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={(event) => {
+              event.stopPropagation();
+              action.onAction();
+              onDismiss(toast.id);
+            }}
+          >
+            {action.label}
           </Button>
         )}
       </div>

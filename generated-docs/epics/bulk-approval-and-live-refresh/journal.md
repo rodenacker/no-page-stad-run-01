@@ -14,3 +14,9 @@ The plan for this epic was parked while `expense-decisions` was still being buil
 
 - When a bulk approval finishes, any request it approved — and any a colleague had decided first — drops out of the selection, so the count corrects itself instead of still claiming three requests are selected when none of them can be acted on any more. Requests still awaiting a decision keep their tick.
 - The result already names a third group — requests whose approval could not be sent at all because the service refused the call — rather than quietly leaving them out of a message that says everything went through. The way to retry just those is the next story's; this story only makes sure the report is never a false success.
+
+## Story 3 — When part of a bulk approval fails
+
+- The app's notification surface could show you something to *go to* (a link) but had nothing you could actually *press*. The "try again" this story needs is a thing to do, not a place to go, so notifications can now carry a real button. It is a proper button rather than a clickable message, because a clickable message cannot be reached by keyboard at all — which this project's accessibility bar does not allow.
+- The try-again control says what it covers — "Try again for the 2 that could not be submitted" — rather than a bare "Try again". Two reasons: it is honest that only the failures are retried and the ones already approved are left alone, and the request list already has a plain "Try again" for when the whole list fails to load, which two identically-worded recovery buttons on one screen would be confused with.
+- Trying again does not ask you to confirm a second time. You confirmed this bulk approval when you started it, and choosing a named, smaller group is itself the deliberate act. It does re-check every request first, so if a colleague decided one in the meantime it is reported as left unchanged instead of being approved twice.

@@ -22,6 +22,13 @@
  *   (BR5). {@link approvedIn} is that comparison, and it is load-bearing: an
  *   implementation that trusts the answers would report an already-decided request as
  *   one of its own approvals, because the answer is identical.
+ * - **A call that FAILED is a third thing, and not the second** (R10). "Left
+ *   unchanged" is nothing going wrong — a colleague got there first, and no call was
+ *   ever made. "Could not be submitted" is the call itself failing, and it is the only
+ *   bucket the retry covers ({@link retryRefusedApprovalsLabel}). Retrying re-runs
+ *   {@link eligibilityIn} over that subset rather than resubmitting the ids blindly
+ *   (BR11): time has passed, so one of them may since have been decided, and it must
+ *   then be reported as left unchanged rather than approved a second time.
  *
  * Nothing here sends anything or renders anything: the call is `lib/api/decisions.ts`'s
  * (`recordDecision`, through the app's own decide route, which stamps who acted from the
@@ -306,6 +313,23 @@ export const bulkApprovalOutcomeMessage = (
 
   return refusalReason === undefined ? outcome : `${outcome} ${refusalReason}`;
 };
+
+/**
+ * The way out the outcome offers when some approvals could not be submitted (R10,
+ * project.md NFR-base-5). It NAMES the subset it covers, for two reasons:
+ *
+ * - it is scoped, and saying so is the difference between "run the whole thing again"
+ *   (which would resubmit requests this batch already approved) and what actually
+ *   happens — only the calls that failed are made again;
+ * - this screen already carries a bare "Try again" on its failed-load state, and the
+ *   project's rule is that two recovery controls on one screen must not read alike.
+ *
+ * Trying again does NOT ask for confirmation a second time: the Approver confirmed
+ * this bulk approval when they started it (UI-09), and choosing a named, smaller
+ * subset is itself the deliberate act.
+ */
+export const retryRefusedApprovalsLabel = (refused: number): string =>
+  `Try again for the ${String(refused)} that could not be submitted`;
 
 /** Heads a bulk approval that could not be attempted or could not be confirmed. */
 export const BULK_APPROVE_REFUSED_TITLE = 'Could not approve the selection';
