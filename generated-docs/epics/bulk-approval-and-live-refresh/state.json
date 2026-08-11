@@ -14,7 +14,8 @@
       "Verify a 15-second refresh is comfortable against your real data volumes: the list re-reads every request each time (the service offers no way to ask for just what changed), and this was only ever exercised against small test data. On a batch near the 10,000-request ceiling you may notice the screen stutter every 15 seconds or the refresh not finishing before the next one is due.",
       "Resolved before building on 2026-08-11: the three reuse points from expense-decisions were confirmed against the merged main. The approve call and the confirmation are as planned; the staleness re-check was inlined in the list component rather than extracted, which story 2 already plans to correct.",
       "Unticking the 'Select all listed requests' control clears the WHOLE selection — including requests the current search or filters are hiding. Nothing in the requirements says what the clearing action should cover, and this is the only clear-selection control the screen offers; the alternative (clear only what is currently listed) would leave an invisible remainder ticked. Confirm that clearing everything is what you'd expect.",
-      "The 'select everything currently listed' control ADDS to the selection rather than replacing it, so narrowing the list and taking what is left keeps anything ticked beforehand. Also not stated in the requirements — it is the reading consistent with a selection that survives narrowing."
+      "The 'select everything currently listed' control ADDS to the selection rather than replacing it, so narrowing the list and taking what is left keeps anything ticked beforehand. Also not stated in the requirements — it is the reading consistent with a selection that survives narrowing.",
+      "The wording of the bulk-approval result is the app's own: it is headed 'Selection approved' (or 'Nothing was approved' / 'Some approvals could not be submitted') and reads 'Of the 3 requests selected: 2 approved, 1 left unchanged because it had already been decided.' The requirements fix the two figures and the reason but not the sentence — confirm it reads the way a finance approver would want."
     ],
     "manualTestResults": []
   },
@@ -28,11 +29,11 @@
       "completedAt": "2026-08-11T13:19:00.000Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-11T13:20:00.000Z",
+      "completedAt": "2026-08-11T13:38:00.000Z"
     },
     "3": {
       "status": "pending",

@@ -112,3 +112,25 @@ export const withIdsSelected = (
   selected: ReadonlySet<number>,
   ids: readonly number[],
 ): ReadonlySet<number> => new Set([...selected, ...ids]);
+
+/**
+ * The selection with every request that is no longer awaiting a decision taken out of
+ * it — because this user's own bulk approval has just decided it, or because a fresh
+ * read shows a colleague did (brief BR8).
+ *
+ * A request nobody can act on any more must not keep a tick and must not keep counting:
+ * the visible count simply corrects itself, with no separate interruption. A request
+ * that has left the list altogether goes too, for the same reason.
+ *
+ * The SAME set comes back when nothing changed, so a read that decided nothing costs no
+ * re-render of the rows below it.
+ */
+export const withDecidedRequestsDropped = (
+  selected: ReadonlySet<number>,
+  requests: readonly TransactionRead[],
+): ReadonlySet<number> => {
+  const stillSelectable = new Set(selectableIdsIn(requests));
+  const kept = [...selected].filter((id) => stillSelectable.has(id));
+
+  return kept.length === selected.size ? selected : new Set(kept);
+};

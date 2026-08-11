@@ -81,6 +81,12 @@ interface RequestCardProps {
   selectable: boolean;
   /** Whether this request is in the selection. A plain boolean, so the memo holds. */
   selected: boolean;
+  /**
+   * Whether the selection is being acted on right now, in which case the tick cannot be
+   * moved. Transient state, so it is disabled rather than absent — unlike the permission
+   * above it, which never reaches the markup at all (bulk-approval BR10).
+   */
+  selectionLocked: boolean;
   /** Ticks or unticks this request; the list owns what is selected. */
   onToggleSelection: (request: TransactionRead) => void;
   /**
@@ -115,6 +121,7 @@ const RequestCard = memo(function RequestCard({
   possibleDuplicate,
   selectable,
   selected,
+  selectionLocked,
   onToggleSelection,
   canDecide,
   handOffFocus,
@@ -133,6 +140,7 @@ const RequestCard = memo(function RequestCard({
             <Checkbox
               className="mt-0.5"
               checked={selected}
+              disabled={selectionLocked}
               onCheckedChange={() => {
                 onToggleSelection(request);
               }}
@@ -208,6 +216,11 @@ interface RequestCardsProps {
    * tick and on every refresh (see `ExpenseRequestList`).
    */
   selectedIds: ReadonlySet<number>;
+  /**
+   * Whether a bulk action is running over the selection right now, in which case no
+   * tick can be moved underneath it (bulk-approval AC-4).
+   */
+  selectionLocked: boolean;
   /** Ticks or unticks one request; the list owns what is selected. */
   onToggleSelection: (request: TransactionRead) => void;
   /**
@@ -235,6 +248,7 @@ export function RequestCards({
   possibleDuplicateIds,
   maySelect,
   selectedIds,
+  selectionLocked,
   onToggleSelection,
   mayDecide,
   handOffFocusTo,
@@ -252,6 +266,7 @@ export function RequestCards({
             possibleDuplicate={possibleDuplicateIds.has(request.Id)}
             selectable={maySelect && awaitsDecision(request)}
             selected={selectedIds.has(request.Id)}
+            selectionLocked={selectionLocked}
             onToggleSelection={onToggleSelection}
             canDecide={mayDecide && awaitsDecision(request)}
             handOffFocus={handOffFocusTo === request.Id}

@@ -223,6 +223,31 @@
  *   decision (BR1). Unticking it is this screen's clear-the-selection action.
  * - **`99+` is the ambient indicator's alone** (R4): anything that gates an action
  *   states the literal count. Both forms live in `lib/transactions/selecting.ts`.
+ *
+ * Approving the whole selection at once (R1/R5/R8/R9, BR1-BR5, NFR3):
+ *
+ * - **The batch is N single-request approve calls** — there is no bulk endpoint (BR3).
+ *   They run a few at a time, at the bound stated in `lib/transactions/bulkApproval.ts`,
+ *   so a selection that can run to thousands neither floods the service nor leaves the
+ *   screen unusable while it works through them (NFR3).
+ * - **Nothing is sent until a FRESH read says it may be** (BR1/BR2), and the read is the
+ *   same one a single decision takes — the check itself now lives in
+ *   `lib/transactions/bulkApproval.ts` and both paths ask it, so "already decided"
+ *   cannot come to mean two things on one screen. A selected request the read shows
+ *   decided is dropped from the batch with no call made for it at all, and reported as
+ *   left unchanged.
+ * - **The outcome is a comparison of two reads, never the call answers** (BR5). The
+ *   service answers the same envelope whether it approved a request or found it already
+ *   decided, so the approved count comes from the read taken AFTER the batch against the
+ *   one taken before it. That second read is load-bearing, not a refresh.
+ * - **The selection controls are DISABLED while the batch runs** — the one place this
+ *   screen shows a disabled control rather than an absent one. It is transient state,
+ *   not a permission: BR10's hidden-never-disabled rule governs who may act, and that
+ *   still never reaches the markup. The list itself stays readable throughout, and the
+ *   batch announces itself politely, since no row changes until the read.
+ * - **What the batch decided stops being selected** (BR8): approved requests, and
+ *   requests a colleague decided first, drop out of the selection and the count corrects
+ *   itself. Anything still awaiting a decision keeps its tick.
  */
 
 import {
@@ -276,6 +301,7 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/contexts/ToastContext';
 import {
+  DECISION_APPROVE,
   DECISION_REJECT,
   decisionFailureMessage,
   recordDecision,
@@ -291,9 +317,24 @@ import {
   subscribeToViewportWidth,
 } from '@/lib/layout/viewport';
 import {
-  ALREADY_DECIDED_MESSAGE,
+  BULK_APPROVE_ACTION_LABEL,
+  BULK_APPROVE_CONFIRMATION_MESSAGE,
+  BULK_APPROVE_CONFIRM_LABEL,
+  BULK_APPROVE_REFUSED_TITLE,
+  NOTHING_SENT_MESSAGE,
+  OUTCOME_UNKNOWN_MESSAGE,
+  approvedIn,
+  bulkApprovalInFlightMessage,
+  bulkApprovalOutcomeMessage,
+  bulkApprovalOutcomeTitle,
+  bulkApproveConfirmationTitle,
+  eligibilityIn,
+  staleDecisionMessage,
+  stalenessIn,
+  submitApprovals,
+} from '@/lib/transactions/bulkApproval';
+import {
   DECISION_REFUSED_TITLE,
-  REQUEST_NO_LONGER_LISTED_MESSAGE,
   WAY_OUT_OF_CONFIRMATION,
   awaitsDecision,
   confirmDecisionLabel,
@@ -329,6 +370,7 @@ import {
   selectRequestLabel,
   selectableIdsIn,
   selectionCountMessage,
+  withDecidedRequestsDropped,
   withIdsSelected,
   withSelectionToggled,
 } from '@/lib/transactions/selecting';
@@ -532,6 +574,7 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   selectionOffered,
   selectable,
   selected,
+  selectionLocked,
   onToggleSelection,
   canDecide,
   handOffFocus,
@@ -555,6 +598,13 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   selectable: boolean;
   /** Whether this request is in the selection. A plain boolean, so the memo holds. */
   selected: boolean;
+  /**
+   * Whether the selection is being acted on right now, in which case the tick cannot be
+   * moved (bulk-approval AC-4). This is the ONE place this screen shows a disabled
+   * control rather than an absent one: it is transient state — the batch is in flight —
+   * and not a permission, which BR10 keeps out of the markup entirely.
+   */
+  selectionLocked: boolean;
   /** Ticks or unticks this request; the list owns what is selected. */
   onToggleSelection: (request: TransactionRead) => void;
   /**
@@ -576,6 +626,7 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
           {selectable && (
             <Checkbox
               checked={selected}
+              disabled={selectionLocked}
               onCheckedChange={() => {
                 onToggleSelection(request);
               }}
@@ -776,6 +827,27 @@ export function ExpenseRequestList({
 
   /** The id the select-everything control and its wording are wired together by. */
   const selectEverythingId = useId();
+
+  /**
+   * Whether the Approver has been asked to confirm approving the whole selection
+   * (R8/BR4). Nothing is read and nothing is sent while this is merely open: choosing
+   * the bulk action only asks the question.
+   */
+  const [bulkApprovalAsked, setBulkApprovalAsked] = useState(false);
+
+  /**
+   * How many requests the batch now running was asked to approve, or `null` when no
+   * batch is running. It is the selection's own size, announced the moment the Approver
+   * accepts: the read that decides which of them are still eligible is a round trip
+   * away, and a screen that says nothing at all after an accepted, irreversible action
+   * is the worse answer. What the batch actually did is the outcome's business (R5).
+   */
+  const [bulkApprovalSubmitting, setBulkApprovalSubmitting] = useState<
+    number | null
+  >(null);
+
+  /** Whether a batch is in flight — which locks the selection controls (AC-4). */
+  const bulkApprovalRunning = bulkApprovalSubmitting !== null;
 
   /**
    * The decision the reader is being asked to confirm, if any. Choosing Approve or
@@ -1080,9 +1152,12 @@ export function ExpenseRequestList({
     // the only thing that can tell an Approver somebody got there first.
     void rereadRequests()
       .then((requests) => {
-        const asRecorded = requests.find((listed) => listed.Id === request.Id);
+        // The check itself lives in `lib/transactions/bulkApproval.ts` — one request
+        // here, a whole selection there, and one rule for both: a decision goes out
+        // only while a fresh read still shows the request awaiting one.
+        const staleness = stalenessIn(requests, request.Id);
 
-        if (asRecorded === undefined || !awaitsDecision(asRecorded)) {
+        if (staleness !== undefined) {
           // Refused here, with NOTHING sent (R4/R13): a decide call at this point
           // would be a second decision on the request, and its answer would look
           // exactly like a first one. The read above has already put what was
@@ -1091,10 +1166,7 @@ export function ExpenseRequestList({
           showToast({
             variant: 'error',
             title: DECISION_REFUSED_TITLE,
-            message:
-              asRecorded === undefined
-                ? REQUEST_NO_LONGER_LISTED_MESSAGE
-                : ALREADY_DECIDED_MESSAGE,
+            message: staleDecisionMessage(staleness),
             // Something the Approver has to act on (choose another request), so it
             // waits for them rather than fading while they read elsewhere (R11).
             duration: 0,
@@ -1149,6 +1221,114 @@ export function ExpenseRequestList({
           current.filter((decision) => decision.requestId !== request.Id),
         );
       });
+  };
+
+  /**
+   * The bulk approval the Approver has just accepted (bulk-approval R1/R5/R9, BR1-BR5,
+   * NFR3). Four steps, in this order, and none of them is optional:
+   *
+   * 1. **A fresh read** — the whole selection is judged against the list as it stands
+   *    NOW, not as it stood when the ticks were put in (BR2). A read that fails sends
+   *    nothing at all: approvals go out only while the app can see which requests are
+   *    still awaiting one.
+   * 2. **The split** — every selected request the read no longer shows awaiting a
+   *    decision is dropped from the batch and no approve call is ever made for it
+   *    (BR1). It is reported as left unchanged instead (R5).
+   * 3. **One call per remaining request** (BR3), at a bounded concurrency (NFR3) so a
+   *    selection that can run to thousands neither floods the service nor leaves the
+   *    screen unusable. The selection and the bulk action are locked for the duration
+   *    and the list itself stays readable.
+   * 4. **A read back** — and the approved count comes from comparing that read with the
+   *    one in step 1 (BR5), NEVER from the call answers. The service returns the same
+   *    envelope whether it approved a request or found it already decided, so an
+   *    implementation that trusted the answers would report a colleague's decision as
+   *    one of this Approver's own.
+   */
+  const approveSelection = async (): Promise<void> => {
+    const selection = [...selectedIds];
+
+    if (selection.length === 0 || bulkApprovalRunning) {
+      return;
+    }
+    setBulkApprovalSubmitting(selection.length);
+
+    try {
+      let before: TransactionRead[];
+      try {
+        before = await rereadRequests();
+      } catch (error: unknown) {
+        // Nothing was sent (BR2), so the selection is exactly as it was and the
+        // Approver can simply ask again. The service's own reason, never the client's
+        // placeholder (project.md NFR-base-5).
+        showToast({
+          variant: 'error',
+          title: BULK_APPROVE_REFUSED_TITLE,
+          message: `${transactionListFailureMessage(error)} ${NOTHING_SENT_MESSAGE}`,
+          duration: 0,
+        });
+        return;
+      }
+
+      const { eligible, leftUnchanged } = eligibilityIn(before, selection);
+
+      const attempts =
+        eligible.length === 0
+          ? []
+          : await submitApprovals(eligible, (id) =>
+              recordDecision({ TransactionId: id, Decision: DECISION_APPROVE }),
+            );
+
+      const refused = attempts.filter((attempt) => attempt.refused);
+      const submitted = attempts
+        .filter((attempt) => !attempt.refused)
+        .map((attempt) => attempt.id);
+
+      // Only worth a second read if something was actually sent; where nothing was,
+      // the read taken before the batch is already the current state (NFR4).
+      let after = before;
+      if (submitted.length > 0) {
+        try {
+          after = await rereadRequests();
+        } catch {
+          showToast({
+            variant: 'error',
+            title: BULK_APPROVE_REFUSED_TITLE,
+            message: OUTCOME_UNKNOWN_MESSAGE,
+            duration: 0,
+          });
+          return;
+        }
+      }
+
+      const tally = {
+        selected: selection.length,
+        approved: approvedIn(after, submitted).length,
+        leftUnchanged: leftUnchanged.length,
+        refused: refused.length,
+      };
+
+      showToast({
+        variant: refused.length === 0 ? 'success' : 'error',
+        title: bulkApprovalOutcomeTitle(tally),
+        message: bulkApprovalOutcomeMessage(
+          tally,
+          refused.length === 0
+            ? undefined
+            : decisionFailureMessage(refused[0].failure),
+        ),
+        // A completed batch confirms itself and fades (R11's window); one carrying
+        // requests that could not be submitted is something the Approver has to act on.
+        ...(refused.length === 0 ? {} : { duration: 0 }),
+      });
+
+      // Whatever the batch decided — and whatever a colleague decided first — has
+      // stopped awaiting a decision, so it stops being selectable and the count
+      // corrects itself (BR8). Anything still awaiting one keeps its tick, which is
+      // what leaves a refused request ready to be tried again.
+      setSelectedIds((current) => withDecidedRequestsDropped(current, after));
+    } finally {
+      setBulkApprovalSubmitting(null);
+    }
   };
 
   /**
@@ -1378,6 +1558,7 @@ export function ExpenseRequestList({
                   <Checkbox
                     id={selectEverythingId}
                     checked={everythingListedSelected}
+                    disabled={bulkApprovalRunning}
                     onCheckedChange={(takeEverything) => {
                       changeEverythingListed(takeEverything === true);
                     }}
@@ -1403,6 +1584,26 @@ export function ExpenseRequestList({
                   >
                     {selectionCountMessage(selectedCount)}
                   </p>
+                )}
+
+                {/* The action the selection leads to (R1), beside the count it acts
+                    on and offered only while there IS a selection — an Approve with
+                    nothing selected has nothing to act on, and the count and the
+                    action belong on screen together. Named for the SELECTION, so it
+                    can never be confused with the "Approve request TXN-…" control
+                    every listed request carries. Disabled only while a batch of its
+                    own is running (AC-4): transient state, not a permission. */}
+                {selectedCount > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={bulkApprovalRunning}
+                    onClick={() => {
+                      setBulkApprovalAsked(true);
+                    }}
+                  >
+                    {BULK_APPROVE_ACTION_LABEL}
+                  </Button>
                 )}
               </div>
             )}
@@ -1458,6 +1659,15 @@ export function ExpenseRequestList({
             </p>
           ))}
 
+          {/* The batch on its way, announced the same polite way and in ONE element:
+              the rows keep their place and their statuses until the read that follows
+              the calls, so without this the screen would look inert for the duration. */}
+          {bulkApprovalSubmitting !== null && (
+            <p role="status" className="text-muted-foreground text-sm">
+              {bulkApprovalInFlightMessage(bulkApprovalSubmitting)}
+            </p>
+          )}
+
           {visibleRequests.length === 0 ? (
             <div className="grid gap-2">
               <p className="max-w-prose">{NARROWED_EMPTY_MESSAGE}</p>
@@ -1476,6 +1686,7 @@ export function ExpenseRequestList({
                   possibleDuplicateIds={possibleDuplicateIds}
                   maySelect={isApprover}
                   selectedIds={selectedIds}
+                  selectionLocked={bulkApprovalRunning}
                   onToggleSelection={toggleSelectionOf}
                   mayDecide={isApprover}
                   handOffFocusTo={handOffFocusTo}
@@ -1533,6 +1744,7 @@ export function ExpenseRequestList({
                         selectionOffered={isApprover}
                         selectable={isApprover && awaitsDecision(request)}
                         selected={selectedIds.has(request.Id)}
+                        selectionLocked={bulkApprovalRunning}
                         onToggleSelection={toggleSelectionOf}
                         canDecide={isApprover && awaitsDecision(request)}
                         handOffFocus={handOffFocusTo === request.Id}
@@ -1618,6 +1830,29 @@ export function ExpenseRequestList({
           confirmLabel={confirmDecisionLabel(pendingDecision.outcome)}
           wayOutLabel={WAY_OUT_OF_CONFIRMATION}
           onConfirm={recordPendingDecision}
+        />
+      )}
+
+      {/* The same shared confirmation, asked of the whole selection (R8/BR4): the
+          SAME dialog the single decision uses, never a second convention. Its title
+          carries the selection's literal count however large it is — the `99+` form
+          belongs to the ambient indicator alone — and it names no account number, the
+          confirmation being a listing surface like the list behind it. */}
+      {bulkApprovalAsked && selectedCount > 0 && (
+        <ConfirmAction
+          open
+          onOpenChange={(stillAsking) => {
+            if (!stillAsking) {
+              setBulkApprovalAsked(false);
+            }
+          }}
+          title={bulkApproveConfirmationTitle(selectedCount)}
+          description={BULK_APPROVE_CONFIRMATION_MESSAGE}
+          confirmLabel={BULK_APPROVE_CONFIRM_LABEL}
+          wayOutLabel={WAY_OUT_OF_CONFIRMATION}
+          onConfirm={() => {
+            void approveSelection();
+          }}
         />
       )}
     </div>
