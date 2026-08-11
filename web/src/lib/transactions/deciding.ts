@@ -12,10 +12,15 @@
  * `lib/api/decisions.ts`; nothing here sends anything.
  */
 import { DECISION_APPROVE, DECISION_REJECT } from '@/lib/api/decisions';
-import { TRANSACTION_STATUS_IMPORTED } from '@/types/transactions';
+import {
+  TRANSACTION_STATUS_APPROVED,
+  TRANSACTION_STATUS_IMPORTED,
+  TRANSACTION_STATUS_REJECTED,
+  isKnownTransactionStatus,
+} from '@/types/transactions';
 
 import type { DecisionOutcome } from '@/lib/api/decisions';
-import type { TransactionRead } from '@/types/transactions';
+import type { TransactionRead, TransactionStatus } from '@/types/transactions';
 
 /**
  * The two decisions, in the order they are offered. Approve first: it is the common
@@ -153,3 +158,56 @@ export const decisionRecordedMessage = (
  * dismisses it — it is something they have to act on (R11).
  */
 export const DECISION_REFUSED_TITLE = 'Could not record this decision';
+
+/* -------------------------------------------------------------------------- */
+/* One decision per request — a request already decided (R3/R4/R12/R13, BR1)   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What an Approver is told when the request turns out to have been decided by
+ * somebody else while they had it on screen (R4/R13), word for word as the
+ * requirement states it.
+ *
+ * It is raised on the strength of a FRESH READ taken before anything is sent (BR1) —
+ * never from a decide answer, which carries the same envelope whatever happened and
+ * so cannot tell a first decision from a second one. It is something the Approver has
+ * to act on, so whoever raises it gives it no duration (R11).
+ */
+export const ALREADY_DECIDED_MESSAGE = 'This request has already been decided.';
+
+/**
+ * The other thing that fresh read can find: the request is not in the list at all
+ * any more. Nothing is sent then either — the app cannot see that the request is
+ * still awaiting a decision, and BR1's guarantee is that a decision goes out only
+ * when it can.
+ */
+export const REQUEST_NO_LONGER_LISTED_MESSAGE =
+  'This request is no longer in the expense requests, so no decision was recorded.';
+
+/** How a recorded decision reads back off the request's OWN status (not an outcome). */
+const DECIDED_AS: Partial<Record<TransactionStatus, string>> = {
+  [TRANSACTION_STATUS_APPROVED]: 'approved',
+  [TRANSACTION_STATUS_REJECTED]: 'rejected',
+};
+
+/**
+ * What an opened request says where its decide actions would be, once it has been
+ * decided (R12): the state it is actually in, named — never a vague "this request
+ * cannot be changed", and never colour or a badge on its own.
+ *
+ * The wording is derived from the request's own `Status`, so an approved request and
+ * a rejected one say different things. A status this app has never heard of is
+ * carried through in the service's own words rather than lower-cased into a sentence
+ * that would misreport it (the service owns that vocabulary — brief §Data Model).
+ */
+export const decidedStateMessage = (request: TransactionRead): string => {
+  const decision = isKnownTransactionStatus(request.Status)
+    ? DECIDED_AS[request.Status]
+    : undefined;
+
+  return decision === undefined
+    ? `This request is ${request.Status}, so it is no longer awaiting a decision ` +
+        'and none can be recorded on it.'
+    : `This request has already been ${decision}. A request carries only one ` +
+        'decision, so it can no longer be approved or rejected.';
+};

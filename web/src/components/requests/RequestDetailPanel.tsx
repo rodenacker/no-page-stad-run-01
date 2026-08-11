@@ -31,6 +31,12 @@
  *   outlives the open panel.
  * - **There is no reveal-all, anywhere.** One request at a time is the compliance
  *   requirement; a control that unmasked the list would defeat the whole arrangement.
+ * - **A request that has already been decided SAYS SO where the decisions would be**
+ *   (`expense-decisions` R12): the sentence names the state the request itself carries
+ *   — approved or rejected — so the reader is told why nothing is on offer rather than
+ *   left looking at a panel that has quietly lost its actions. It is shown to both
+ *   roles, because it describes the request rather than what this reader may do, and it
+ *   is plain text: a status is never carried by colour or by an absence.
  */
 
 import { Check, Eye, EyeOff, X } from 'lucide-react';
@@ -51,8 +57,10 @@ import {
 import { DECISION_APPROVE } from '@/lib/api/decisions';
 import {
   DECIDE_OUTCOMES,
+  awaitsDecision,
   decideActionLabel,
   decideActionName,
+  decidedStateMessage,
 } from '@/lib/transactions/deciding';
 import { transactionTypeLabel } from '@/lib/transactions/display';
 
@@ -221,6 +229,17 @@ export function RequestDetailPanel({
             {request.LastChangedDate}
           </DetailField>
         </dl>
+
+        {/* Where the decisions would be, for a request that has already had one
+            (R12). It states the request's own state rather than saying the actions
+            are unavailable, and it is here for both roles: an Importer reading a
+            decided request is told the same thing, since this describes the request
+            and not what the reader may do to it. */}
+        {!awaitsDecision(request) && (
+          <p className="text-muted-foreground max-w-prose text-sm">
+            {decidedStateMessage(request)}
+          </p>
+        )}
 
         {/* Close is written out rather than taken from the primitive's own
             `showCloseButton` slot so it carries `type="button"`: a button with no type

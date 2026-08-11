@@ -174,6 +174,16 @@
  *   recorded decision is followed by a fresh `GET /v1/transactions`, and it is that read
  *   which moves the request's status, withdraws its decide actions and updates the
  *   opened panel. A re-read that fails leaves the last known rows on screen.
+ * - **AND THE REQUEST IS RE-READ BEFORE ANYTHING IS SENT** (brief BR1, R4/R13). That
+ *   same envelope is also what a decide call answers when the request was ALREADY
+ *   decided, so nothing in the answer can tell an Approver they were beaten to it. An
+ *   accepted confirmation therefore reads `GET /v1/transactions` FIRST and sends the
+ *   decision only while that fresh read still shows the request awaiting one; otherwise
+ *   it refuses locally — no decide call at all — tells the Approver in R4/R13's words,
+ *   and leaves them looking at the decision that was actually recorded, because the
+ *   same read is what puts it on screen. There are now two re-reads in the decide path
+ *   and they answer different questions: this one asks "may I still?", the one after a
+ *   recorded decision asks "what happened?".
  * - **The two notification lifetimes are the R11 rule, not a choice per message**: a
  *   recorded decision confirms itself on the toast's default 5s (inside the 4-8s
  *   window) and fades; a decision that was NOT recorded is something the Approver has to
@@ -243,7 +253,9 @@ import {
   subscribeToViewportWidth,
 } from '@/lib/layout/viewport';
 import {
+  ALREADY_DECIDED_MESSAGE,
   DECISION_REFUSED_TITLE,
+  REQUEST_NO_LONGER_LISTED_MESSAGE,
   WAY_OUT_OF_CONFIRMATION,
   awaitsDecision,
   confirmDecisionLabel,
@@ -848,25 +860,43 @@ export function ExpenseRequestList({
   }, []);
 
   /**
-   * Reads the list again WITHOUT taking the rows off the screen — how the outcome of a
-   * decision arrives, since the decide answer says nothing about the request's new
-   * status (brief BR1). A re-read that fails changes nothing: the last known rows stay,
-   * and the failed-load state is reserved for a read that left the user with nothing.
+   * Reads the list again WITHOUT taking the rows off the screen, and answers with what
+   * came back.
+   *
+   * Both halves of a decision go through this one read (brief BR1): the check BEFORE
+   * anything is sent — is this request still awaiting a decision? — and the outcome
+   * AFTER one is recorded, since the decide answer says nothing about the request's new
+   * status. Putting what came back on screen is part of the same act, so the rows the
+   * decision was judged against are the rows the reader is then looking at.
+   *
+   * It REJECTS when the read fails, so the caller can tell "the request has been
+   * decided already" from "nobody could find out" and refuse rather than send blind.
+   */
+  const rereadRequests = useCallback(
+    (): Promise<TransactionRead[]> =>
+      fetchTransactions().then((body) => {
+        const requests = requestsIn(body);
+        setState((current) =>
+          current.phase === 'loaded' ? { phase: 'loaded', requests } : current,
+        );
+        return requests;
+      }),
+    [],
+  );
+
+  /**
+   * The same re-read where the answer is only ever the screen catching up. A read that
+   * fails changes nothing: the last known rows stay, and the failed-load state is
+   * reserved for a read that left the user with nothing.
    */
   const refreshList = useCallback(
     (): Promise<void> =>
-      fetchTransactions()
-        .then((body) => {
-          setState((current) =>
-            current.phase === 'loaded'
-              ? { phase: 'loaded', requests: requestsIn(body) }
-              : current,
-          );
-        })
+      rereadRequests()
+        .then(() => undefined)
         .catch(() => {
           // Nothing to say: the user is still looking at the requests they had.
         }),
-    [],
+    [rereadRequests],
   );
 
   /**
@@ -892,28 +922,61 @@ export function ExpenseRequestList({
           ],
     );
 
-    void recordDecision({
-      TransactionId: request.Id,
-      Decision: outcome,
-      // A rejection carries the reason written at the step before this one; an
-      // approval carries none at all (R9), so the field is absent rather than empty.
-      ...(note === undefined ? {} : { UserNote: note }),
-    })
-      .then(() => {
-        // Transient: the Approver asked for this and it happened, so it says so and
-        // then clears itself (R11's 4-8s window, which the toast's default sits in).
-        showToast({
-          variant: 'success',
-          title: decisionRecordedTitle(outcome),
-          message: decisionRecordedMessage(outcome, request.Reference),
+    // BR1, the whole of it: the request's CURRENT status, read fresh, before anything
+    // is sent. Both decide operations answer the same envelope whether they recorded
+    // the decision or refused it as already made, so this read — never the answer — is
+    // the only thing that can tell an Approver somebody got there first.
+    void rereadRequests()
+      .then((requests) => {
+        const asRecorded = requests.find((listed) => listed.Id === request.Id);
+
+        if (asRecorded === undefined || !awaitsDecision(asRecorded)) {
+          // Refused here, with NOTHING sent (R4/R13): a decide call at this point
+          // would be a second decision on the request, and its answer would look
+          // exactly like a first one. The read above has already put what was
+          // actually recorded on screen, so the Approver is left looking at that
+          // rather than at the state they were acting on.
+          showToast({
+            variant: 'error',
+            title: DECISION_REFUSED_TITLE,
+            message:
+              asRecorded === undefined
+                ? REQUEST_NO_LONGER_LISTED_MESSAGE
+                : ALREADY_DECIDED_MESSAGE,
+            // Something the Approver has to act on (choose another request), so it
+            // waits for them rather than fading while they read elsewhere (R11).
+            duration: 0,
+          });
+          return;
+        }
+
+        return recordDecision({
+          TransactionId: request.Id,
+          Decision: outcome,
+          // A rejection carries the reason written at the step before this one; an
+          // approval carries none at all (R9), so the field is absent rather than
+          // empty.
+          ...(note === undefined ? {} : { UserNote: note }),
+        }).then(() => {
+          // Transient: the Approver asked for this and it happened, so it says so and
+          // then clears itself (R11's 4-8s window, which the toast's default sits in).
+          showToast({
+            variant: 'success',
+            title: decisionRecordedTitle(outcome),
+            message: decisionRecordedMessage(outcome, request.Reference),
+          });
+          // The answer carries no status, so the request's new state comes from a
+          // fresh read — which is also what withdraws its decide actions (R12).
+          return refreshList();
         });
-        // The answer carries no status, so the request's new state comes from a fresh
-        // read — which is also what withdraws its decide actions (R12).
-        return refreshList();
       })
       .catch((error: unknown) => {
-        // Something the Approver has to act on, so it waits for them (R11) — and it
-        // carries the service's own reason, never the client's placeholder.
+        // Either the service refused the decision, or the read that had to come first
+        // could not be made — and then nothing was sent, because a decision goes out
+        // only while the app can see the request is still awaiting one (BR1). Both
+        // are the same thing to the Approver: it was not recorded. So it waits for
+        // them (R11) and carries the service's own reason, never the client's
+        // placeholder.
         showToast({
           variant: 'error',
           title: DECISION_REFUSED_TITLE,
