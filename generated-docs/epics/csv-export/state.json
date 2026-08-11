@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "csv-export",
+    "name": "Export requests for the payment system",
+    "createdAt": "2026-08-11T09:21:41.898Z",
+    "dependsOn": [
+      "expense-request-list"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [
+      "Verify the account number in the exported file is the whole number: the app writes whatever the transactions service returns for each request. If that service already sends a shortened or masked account number, the export will carry the shortened value and the payment system will not be able to pay anyone — and nothing on screen would look wrong, because the list only ever shows the last four digits anyway.",
+      "Verify the transaction type column is the form your payment system expects: the app exports the service's own value untranslated, on purpose. Your two source documents disagree — the upload file uses single letters (C, D) while the service's own example spells it out (Debit) — so if the file carries the wrong one, the payment system may reject the whole batch.",
+      "Verify the transaction date column is in the format your payment system expects: the app writes the date exactly as the service sends it, with no reformatting. If the service's format differs from what the payment system reads, dates could be misread rather than refused, which is the more dangerous failure."
+    ],
+    "manualTestResults": []
+  },
+  "phase": "READY-TO-BUILD",
+  "stories": {
+    "1": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-11T09:35:00.000Z"
+}
