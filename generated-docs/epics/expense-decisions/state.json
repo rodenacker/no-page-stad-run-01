@@ -14,11 +14,12 @@
       "Verify a decision shows immediately: after you approve or reject, the app re-reads the request list to show the new status. If the service records the decision but takes a moment to report it, the request may still read Imported straight after you decided it, and look as though nothing happened.",
       "Verify the payments service accepts a decision on the strength of your sign-in alone: the app passes your existing session along when it records a decision. If that service expects something else for a server-to-server call, every decision will come back refused even though you are properly signed in — worth watching on the very first live approval.",
       "Check whether any of your Approvers has a name written in a non-Latin script (Cyrillic, Chinese, Arabic and similar — accented European names like Müller are fine). The payments service can only be told who decided a request through a plain HTTP header, which cannot carry those characters. Rather than record the decision under a mangled name, the app tells that person the decision could not be recorded. If this affects a real person, the service needs a way to accept their name — that is a change on the backend, not something the screens can fix.",
-      "Confirm a deliberate trade-off we had to choose for you: before sending a decision the app re-checks that the request is still undecided. If that check itself can't be made — the service blips for a moment — we do NOT send the decision; you're told it couldn't be recorded and can try again. We chose protecting the one-decision-per-request rule over pushing the decision through unchecked. Tell us if you'd rather it went through."
+      "Confirm a deliberate trade-off we had to choose for you: before sending a decision the app re-checks that the request is still undecided. If that check itself can't be made — the service blips for a moment — we do NOT send the decision; you're told it couldn't be recorded and can try again. We chose protecting the one-decision-per-request rule over pushing the decision through unchecked. Tell us if you'd rather it went through.",
+      "Have a look at the request table on a smaller laptop screen (around 1280px wide). Each row now carries four controls — Approve, Reject, Open and the menu. The page itself will never scroll sideways, but the table inside it still might. Tell me if it feels cramped."
     ],
     "manualTestResults": []
   },
-  "phase": "MANUAL-TEST",
+  "phase": "BUILD",
   "stories": {
     "1": {
       "status": "complete",
@@ -50,5 +51,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-11T10:59:10.124Z"
+  "lastUpdated": "2026-08-11T11:25:52.673Z"
 }

@@ -70,13 +70,14 @@
  *   live transactions service. This spec asserts nothing about that call's shape
  *   (`TransactionId` in the query, the server-populated `LastChangedUser` header): that
  *   is story 1's Vitest layer.
- * - The per-request Approve action lives in the EXISTING action overflow the request
- *   list already renders for every row (`RequestActions.tsx`, whose trigger is named
- *   "Actions for request <reference>" — the story's own §Infrastructure reuse notes
- *   name that overflow as the home for this epic's per-request actions). The
- *   confirmation is the Shadcn `alert-dialog` already installed, which Radix renders as
- *   `role="alertdialog"`, PORTALLED to the body — so dialog queries are scoped to the
- *   dialog itself, never to `main`.
+ * - The per-request Approve action is a DIRECT control on the request's own row
+ *   (`RequestActions.tsx`), reachable in one click — not an item inside the ⋯ action
+ *   overflow, which holds only Open. Because every listed request carries its own
+ *   Approve, each one's accessible name names the request it decides ("Approve request
+ *   <reference>"), which is also what lets this spec address one row's Approve without
+ *   matching every other row's. The confirmation is the Shadcn `alert-dialog` already
+ *   installed, which Radix renders as `role="alertdialog"`, PORTALLED to the body — so
+ *   dialog queries are scoped to the dialog itself, never to `main`.
  * - The confirmation CLOSES when the decision is submitted, whichever way it turns out:
  *   a failure is reported on the screen behind it, not inside a dialog the Approver is
  *   left sitting in. That is what makes the persistent notification below the story's
@@ -185,15 +186,18 @@ const WCAG_22_AA_TAGS = [
 ];
 
 /**
- * How the decide action reads, in the row's action overflow and as the confirming
- * choice in the dialog. Deliberately narrow: the dismissing choice is "Cancel" (R10 /
- * BR6 / NFR2), which cannot match this.
+ * How the decide action reads, on the request's own row and as the confirming choice in
+ * the dialog. Deliberately narrow: the dismissing choice is "Cancel" (R10 / BR6 / NFR2),
+ * which cannot match this.
  */
 const APPROVE_LABEL = /approve/i;
 
-/** The existing action overflow for one request (`RequestActions.tsx`, R15). */
-const requestActionsName = (reference: string): RegExp =>
-  new RegExp(`actions for request ${reference}`, 'i');
+/**
+ * The row's own Approve, named for the request it decides — which is what makes one
+ * row's control addressable while every other listed request carries one too (R15).
+ */
+const approveRequestName = (reference: string): RegExp =>
+  new RegExp(`approve request ${reference}`, 'i');
 
 /**
  * How the confirmation of a RECORDED decision reads. Loose on purpose — the developer
@@ -427,18 +431,18 @@ const notifications = (page: Page): Locator =>
   page.getByRole('region', { name: /notifications/i });
 
 /**
- * Opens the request's confirmation from its action overflow. A step, not an assertion:
- * that the confirmation names the request and holds focus on Cancel is AC-3's, in the
- * Vitest layer.
+ * Opens the request's confirmation from the Approve control on its own row — ONE click,
+ * which is the placement this story owns. A step, not an assertion: that the
+ * confirmation names the request and holds focus on Cancel is AC-3's, in the Vitest
+ * layer.
  */
 const openApproveConfirmation = async (
   page: Page,
   reference: string,
 ): Promise<Locator> => {
   await requestRow(page, reference)
-    .getByRole('button', { name: requestActionsName(reference) })
+    .getByRole('button', { name: approveRequestName(reference) })
     .click();
-  await page.getByRole('menuitem', { name: APPROVE_LABEL }).click();
 
   const dialog = confirmation(page);
   await expect(dialog).toBeVisible();
@@ -446,7 +450,7 @@ const openApproveConfirmation = async (
 };
 
 /**
- * Approves the request the way a user does: through the row's action overflow and the
+ * Approves the request the way a user does: the Approve on its row and then the
  * confirmation, which closes on submitting whichever way the decision turns out (see
  * the header's implementation assumptions).
  */

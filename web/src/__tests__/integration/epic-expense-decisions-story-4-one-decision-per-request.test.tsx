@@ -35,12 +35,17 @@
  *    passes (`rolesOf(session)`) — story 2's gating, re-used here, not re-plumbed.
  * 3. THE DECIDE CONTROLS (story 2's) are offered on a request ONLY while its
  *    `Status` is `Imported` (BR3), on both surfaces that carry per-request actions:
- *    the opened request's panel and the row's overflow menu. Their accessible names
- *    begin with "Approve" / "Reject" (naming the request after that is fine). On a
- *    DECIDED request they are ABSENT from both — not disabled, not `aria-hidden`
- *    (the project's hidden-never-disabled rule) — and in their place the opened
- *    request states where it stands in a sentence containing "already been approved"
- *    / "already been rejected", matching the status the request actually carries.
+ *    the opened request's panel, and the request's OWN ROW — as direct controls one
+ *    activation away, NOT as items inside the ⋯ overflow, which holds only Open.
+ *    Their accessible names begin with "Approve" / "Reject" and go on to name the
+ *    request, which they must: every listed request carries a pair of its own. On a
+ *    DECIDED request they are ABSENT from the row, from the overflow behind it and
+ *    from the panel — not disabled, not `aria-hidden` (the project's
+ *    hidden-never-disabled rule) — and in their place the opened request states
+ *    where it stands in a sentence containing "already been approved" / "already
+ *    been rejected", matching the status the request actually carries. The sweep
+ *    below covers all three places, so a decide control left behind in any of them
+ *    fails.
  * 4. THE AUDIT VALUES (R16) — `Status`, `UserNote`, `LastChangedUser`,
  *    `LastChangedDate` — are shown on the opened request exactly as the service sent
  *    them, to BOTH roles. `RequestDetailPanel` already renders all four; this story
@@ -379,7 +384,21 @@ describe('Epic expense-decisions, Story 4: a decided request, and only one decis
 
     // The request still awaiting a decision offers both actions — so every absence
     // below is about the decision having been made, not about a screen that offers
-    // an Approver nothing anywhere.
+    // an Approver nothing anywhere. On its own row first, which is where story 2
+    // puts them and where a decision costs one activation...
+    const importedRow = rowFor(imported.Reference);
+    expect(
+      within(importedRow).getByRole('button', {
+        name: new RegExp(`^approve\\b.*${imported.Reference}`, 'i'),
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(importedRow).getByRole('button', {
+        name: new RegExp(`^reject\\b.*${imported.Reference}`, 'i'),
+      }),
+    ).toBeInTheDocument();
+
+    // ...and in the opened request.
     const importedDetail = await openRequest(user, imported.Reference);
     expect(
       within(importedDetail).getByRole('button', { name: APPROVE }),
@@ -403,7 +422,7 @@ describe('Epic expense-decisions, Story 4: a decided request, and only one decis
 
       await returnToTheList(user);
 
-      // --- and the row, including the overflow the actions live in --------------
+      // --- and the row the actions live on, plus the overflow behind it ---------
       const row = rowFor(decided.Reference);
       expect(within(row).getByText(decided.Status)).toBeInTheDocument();
       expect(decideControlsIn(row)).toEqual([]);

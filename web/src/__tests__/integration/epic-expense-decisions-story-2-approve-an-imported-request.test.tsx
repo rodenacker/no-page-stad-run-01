@@ -49,12 +49,17 @@
  *        fixtured at all — the testable content of R5 is exactly that approve is
  *        offered on ANY `Imported` request, with no ownership condition anywhere
  *        in the code path. Do not add an owner field to have something to test.
- * 4. WHERE the controls live: as `menuitem`s in each request's existing actions
- *    overflow (the `dropdown-menu` `RequestActions` already renders, explicitly
- *    left in place as the home for this epic's per-request actions), and as
- *    controls inside the opened request's panel. Each accessible name begins
- *    with "Approve" / "Reject"; naming the request as well ("Approve request
- *    TXN-20260415-0001") is welcome and matches either query below.
+ * 4. WHERE the controls live: DIRECTLY on each request — in its own row (and, at
+ *    phone width, its own card), reachable in ONE activation — and as controls
+ *    inside the opened request's panel. They are NOT items in the ⋯ actions
+ *    overflow: that menu holds Open and nothing else, and this file asserts the
+ *    absence there as well as the presence on the row, so a second copy hidden
+ *    in the overflow fails as loudly as a missing control would. Each accessible
+ *    name begins with "Approve" / "Reject" and goes on to name the request
+ *    ("Approve request TXN-20260415-0001") — with one Approve per listed
+ *    request on screen, a bare "Approve" would be ambiguous to a screen-reader
+ *    user; the queries below match either form, and the assertions on the
+ *    per-request surfaces are what pin the naming.
  * 5. THE CONFIRMATION is the Shadcn `alert-dialog` already installed at
  *    `components/ui/alert-dialog.tsx` (do NOT regenerate it from the CLI —
  *    that reinstates a raw colour keyword over its token). Radix renders it with
@@ -334,15 +339,25 @@ const withStatusIn = (
   return match;
 };
 
+/**
+ * One of a request's two decide controls, on the row itself — the placement this
+ * story owns. A plain `button` in the row, not an item behind the ⋯ overflow: a
+ * decision is one activation away, not two.
+ */
+const decideControlOn = async (
+  reference: string,
+  action: RegExp,
+): Promise<HTMLElement> =>
+  await waitFor(() =>
+    within(rowFor(reference)).getByRole('button', { name: action }),
+  );
+
 /** Chooses Approve on a request and hands back the confirmation it opens. */
 const chooseApprove = async (
   user: User,
   reference: string,
 ): Promise<HTMLElement> => {
-  const menu = await openActionsMenuFor(user, reference);
-  await user.click(
-    within(menu).getByRole('menuitem', { name: APPROVE_ACTION }),
-  );
+  await user.click(await decideControlOn(reference, APPROVE_ACTION));
   return await screen.findByRole('alertdialog');
 };
 
@@ -401,22 +416,32 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
 
     renderList([ROLE_APPROVER]);
 
-    const smallestMenu = await openActionsMenuFor(user, smallest.Reference);
-    expect(
-      within(smallestMenu).getByRole('menuitem', { name: APPROVE_ACTION }),
-    ).toBeInTheDocument();
-    expect(
-      within(smallestMenu).getByRole('menuitem', { name: REJECT_ACTION }),
-    ).toBeInTheDocument();
-    await closeActionsMenu(user);
+    // Both decisions are on the request's own row, one activation away — and each
+    // says WHICH request it decides, since every listed request now carries a pair
+    // of its own and "Approve" alone would name nothing.
+    for (const request of [smallest, largest]) {
+      expect(
+        await decideControlOn(
+          request.Reference,
+          new RegExp(`^approve\\b.*${request.Reference}`, 'i'),
+        ),
+      ).toBeInTheDocument();
+      expect(
+        await decideControlOn(
+          request.Reference,
+          new RegExp(`^reject\\b.*${request.Reference}`, 'i'),
+        ),
+      ).toBeInTheDocument();
+    }
 
-    const largestMenu = await openActionsMenuFor(user, largest.Reference);
+    // ...and they are offered there INSTEAD of in the ⋯ overflow, not as well as:
+    // the same decision in two places on one request is two things to keep in step
+    // and two answers to "where is Approve?".
+    const overflow = await openActionsMenuFor(user, smallest.Reference);
     expect(
-      within(largestMenu).getByRole('menuitem', { name: APPROVE_ACTION }),
+      within(overflow).getByRole('menuitem', { name: /^open\b/i }),
     ).toBeInTheDocument();
-    expect(
-      within(largestMenu).getByRole('menuitem', { name: REJECT_ACTION }),
-    ).toBeInTheDocument();
+    expect(controlsNamed(overflow, DECIDE_ACTION).map(described)).toEqual([]);
     await closeActionsMenu(user);
 
     // ...and the opened request offers the same two decisions, so an Approver
@@ -443,17 +468,16 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
     // --- the Approver, who is the contrast the negatives are read against ----
     const approverView = renderList([ROLE_APPROVER]);
 
-    const awaitingMenu = await openActionsMenuFor(
-      user,
-      awaitingDecision.Reference,
-    );
     expect(
-      within(awaitingMenu).getByRole('menuitem', { name: APPROVE_ACTION }),
+      await decideControlOn(awaitingDecision.Reference, APPROVE_ACTION),
     ).toBeInTheDocument();
-    await closeActionsMenu(user);
 
     // A request somebody has already decided offers neither action — absent,
-    // not disabled (R6/BR3, R12).
+    // not disabled (R6/BR3, R12) — on its row, and in the overflow behind it.
+    expect(
+      controlsNamed(rowFor(approved.Reference), DECIDE_ACTION).map(described),
+    ).toEqual([]);
+
     const approvedMenu = await openActionsMenuFor(user, approved.Reference);
     expect(controlsNamed(approvedMenu, DECIDE_ACTION).map(described)).toEqual(
       [],
@@ -473,6 +497,17 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
     // --- the Finance Uploader, offered nothing anywhere (R14/BR7) ------------
     renderList([ROLE_IMPORTER]);
 
+    // Not on the row where an Approver has them...
+    await waitFor(() => {
+      expect(rowFor(awaitingDecision.Reference)).toBeInTheDocument();
+    });
+    expect(
+      controlsNamed(rowFor(awaitingDecision.Reference), DECIDE_ACTION).map(
+        described,
+      ),
+    ).toEqual([]);
+
+    // ...nor tucked back into the overflow they were moved out of.
     const uploaderMenu = await openActionsMenuFor(
       user,
       awaitingDecision.Reference,
@@ -541,12 +576,11 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
       screen.queryByRole('region', { name: /notifications/i }),
     ).not.toBeInTheDocument();
 
-    const reopenedMenu = await openActionsMenuFor(user, request.Reference);
     expect(
-      within(reopenedMenu).getByRole('menuitem', { name: APPROVE_ACTION }),
+      await decideControlOn(request.Reference, APPROVE_ACTION),
     ).toBeInTheDocument();
     expect(
-      within(reopenedMenu).getByRole('menuitem', { name: REJECT_ACTION }),
+      await decideControlOn(request.Reference, REJECT_ACTION),
     ).toBeInTheDocument();
   });
 
@@ -587,7 +621,14 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
     expect(notifications).toHaveTextContent(/approved/i);
 
     // ...and the decide actions are gone from that request — absent, not
-    // disabled (R12), in the overflow and in the opened request alike.
+    // disabled (R12), on its row, in the overflow behind it and in the opened
+    // request alike.
+    expect(
+      controlsNamed(rowFor(awaitingDecision.Reference), DECIDE_ACTION).map(
+        described,
+      ),
+    ).toEqual([]);
+
     const decidedMenu = await openActionsMenuFor(
       user,
       awaitingDecision.Reference,
@@ -636,13 +677,12 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
       TRANSACTION_STATUS_IMPORTED,
     );
 
-    // ...and the way to try again is the action itself, still on offer.
-    const menu = await openActionsMenuFor(user, request.Reference);
+    // ...and the way to try again is the action itself, still on offer on the row.
     expect(
-      within(menu).getByRole('menuitem', { name: APPROVE_ACTION }),
+      await decideControlOn(request.Reference, APPROVE_ACTION),
     ).toBeInTheDocument();
     expect(
-      within(menu).getByRole('menuitem', { name: REJECT_ACTION }),
+      await decideControlOn(request.Reference, REJECT_ACTION),
     ).toBeInTheDocument();
   });
 });

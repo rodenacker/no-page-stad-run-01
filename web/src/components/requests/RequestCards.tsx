@@ -16,9 +16,14 @@
  * - **The reference is the primary identifier** (source UI-23), with three key values
  *   beside it — status, amount and transaction date. Everything else about the request,
  *   the account number included, is in the panel the action overflow opens.
- * - **A card offers exactly what a row offers**, including the decisions: the same
- *   `RequestActions` overflow, given `onDecide` on the same condition (an Approver, a
- *   request still awaiting a decision). A phone-width reader is not a read-only reader.
+ * - **A card offers exactly what a row offers**, including the decisions as DIRECT
+ *   controls: the same `RequestActions`, given `onDecide` on the same condition (an
+ *   Approver, a request still awaiting a decision). A phone-width reader is not a
+ *   read-only reader, and a decision costs them one tap here too. Those controls sit in
+ *   a footer ROW of their own rather than in the card's action corner: four controls
+ *   squeezed beside the reference at 360px would either crowd it or push the card
+ *   sideways, and the whole point of the card presentation is that the page never
+ *   scrolls sideways (NFR-base-3's floor).
  * - **The possible-duplicate mark is here too** (brief R8): the mark has to be readable
  *   in the list itself at every width, so it is the same `PossibleDuplicateMark` the
  *   table row renders, beside the status. Which requests carry it is decided once per
@@ -36,8 +41,8 @@ import { RequestActions } from '@/components/requests/RequestActions';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import {
   Card,
-  CardAction,
   CardContent,
+  CardFooter,
   CardHeader,
 } from '@/components/ui/card';
 import { awaitsDecision } from '@/lib/transactions/deciding';
@@ -98,21 +103,6 @@ const RequestCard = memo(function RequestCard({
           />
           {possibleDuplicate && <PossibleDuplicateMark />}
         </div>
-        <CardAction>
-          <RequestActions
-            reference={request.Reference}
-            onOpen={() => {
-              onOpen(request);
-            }}
-            onDecide={
-              canDecide
-                ? (outcome) => {
-                    onDecide(request, outcome);
-                  }
-                : undefined
-            }
-          />
-        </CardAction>
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-2 gap-2 text-sm">
@@ -127,6 +117,23 @@ const RequestCard = memo(function RequestCard({
           </div>
         </dl>
       </CardContent>
+      {/* A row of its own, so the two decisions, Open and the overflow have the card's
+          whole width to sit across and wrap into at 360px. */}
+      <CardFooter className="justify-end">
+        <RequestActions
+          reference={request.Reference}
+          onOpen={() => {
+            onOpen(request);
+          }}
+          onDecide={
+            canDecide
+              ? (outcome) => {
+                  onDecide(request, outcome);
+                }
+              : undefined
+          }
+        />
+      </CardFooter>
     </Card>
   );
 });

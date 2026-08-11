@@ -36,8 +36,13 @@ export function AppHeader({ session }: { session: UserInfoRead }) {
         a menu button. Nothing in the header is ever taken off screen, so every
         destination stays one Tab away at any width, and the visual order stays the
         order a keyboard walks.
+
+        Full width, with the SAME horizontal padding the `(authenticated)` layout gives
+        its `<main>`: the header and the content below it have to start on the same
+        vertical line, so a width cap or a centring here — with none there — would
+        visibly misalign the app's name from the screen underneath it.
       */}
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
+      <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
         {/*
           The app's name is the way back to the landing screen — the one screen the
           navigation itself never lists, because it is where the entry points are

@@ -15,7 +15,7 @@ An Approver can approve a request that is still awaiting a decision, from the re
 
 ## Technical summary
 
-Introduces the epic's decide surface and the **project-wide confirmation convention**. Adds per-request Approve/Reject controls (offered only when `Status === 'Imported'` and only to `ROLE_APPROVER`, hidden rather than disabled) to the existing `RequestActions` overflow and `RequestDetailPanel`, plus a shared confirmation built on the Shadcn `alert-dialog` that names the request by `Reference`, holds initial focus on Cancel, and takes no effect until accepted.
+Introduces the epic's decide surface and the **project-wide confirmation convention**. Adds per-request Approve/Reject controls (offered only when `Status === 'Imported'` and only to `ROLE_APPROVER`, hidden rather than disabled) as **direct controls on the request's own row and card** in `RequestActions`, and in `RequestDetailPanel`, plus a shared confirmation built on the Shadcn `alert-dialog` that names the request by `Reference`, holds initial focus on Cancel, and takes no effect until accepted.
 
 Confirming calls story 1's decision endpoint, updates the request's on-screen status through the shared `StatusBadge`, withdraws the decide actions, and raises a transient toast through the root layout's existing `ToastProvider`; a failed decision leaves the request untouched behind a persistent, plainly-worded message.
 
@@ -32,7 +32,7 @@ Confirming calls story 1's decision endpoint, updates the request's on-screen st
 
 ## Manual test checklist
 
-- Sign in as an Approver, open Expense requests, and use the actions on a request that is still Imported → you are offered Approve and Reject
+- Sign in as an Approver and open Expense requests → each request that is still Imported carries Approve and Reject in its own row, reachable in one click; the `⋯` menu beside them offers only Open
 - Sign in as a Finance Uploader and look at the same request → neither Approve nor Reject appears anywhere, not even greyed out
 - Look at a request that is already Approved or Rejected → it offers no Approve or Reject either
 - Choose Approve → you are asked to confirm, the message names the request by its reference, and Cancel is already selected
@@ -42,7 +42,8 @@ Confirming calls story 1's decision endpoint, updates the request's on-screen st
 
 ## Infrastructure reuse notes
 
-- The decide surface **attaches to what `expense-request-list` already built — do not rebuild it**: `web/src/components/requests/ExpenseRequestList.tsx` (list, paging, narrowing, `openRequestId`), `RequestActions.tsx` (the per-request overflow, explicitly left in place as the home for this epic's per-request actions) and `RequestDetailPanel.tsx` (the opened request).
+- The decide surface **attaches to what `expense-request-list` already built — do not rebuild it**: `web/src/components/requests/ExpenseRequestList.tsx` (list, paging, narrowing, `openRequestId`), `RequestActions.tsx` (the per-request controls, shared by the table row and the phone-width card) and `RequestDetailPanel.tsx` (the opened request).
+- **Approve and Reject are DIRECT controls on the request's row and card — never items in the `⋯` overflow.** The user chose this at manual test, having found the overflow made every decision cost two clicks; the actions were MOVED, so the overflow holds only Open and the same decision is never offered twice on one request. A later epic adding a per-request action must not reinstate the overflow placement for a decision. Two consequences carry with it: every decide control's accessible name names the request it acts on (`decideActionName`), because a screen now holds one Approve per listed request and a bare "Approve" would be ambiguous to a screen-reader user; and the phone-width card gives those controls a footer row of their own rather than its action corner, so four controls at 360px neither crowd the reference nor push the page sideways.
 - The confirmation uses the Shadcn `alert-dialog` primitive already present at `web/src/components/ui/alert-dialog.tsx` — its overlay is already tokenised; do not regenerate it.
 - **A working example of this exact convention already shipped**: `web/src/components/files/SubmittedFileActions.tsx` (the cancel-file confirmation from `file-validation-and-retry`, which the brief required to follow R10/BR6). Read it first and match its shape — naming the object, Cancel holding focus, no effect until accepted. If the shared confirmation extracted here can absorb it, prefer extracting one component over leaving two near-identical dialogs; `web/src/components/session/SessionTimeoutWarning.tsx` is a third `AlertDialog` consumer but is a different pattern (a timed warning, not an action confirmation) — leave it alone.
 - Status display goes through `web/src/components/status/StatusBadge.tsx` with the list's own `STATUS_PRESENTATION` map (Imported = informational, Approved = positive, Rejected = negative) — never a new badge, never a colour value in a component.

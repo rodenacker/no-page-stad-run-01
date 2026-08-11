@@ -74,12 +74,13 @@
  *   posted body as text and looks for the note in it, so any field name is fine — what
  *   is pinned is that the typed words reach the service rather than being accepted on
  *   screen and dropped.
- * - **Reject is reached through the per-request action overflow** — the Shadcn
- *   `dropdown-menu` `RequestActions.tsx` already renders on every row and card (its
- *   trigger names itself "Actions for request <reference>", matching
- *   `REQUEST_ACTIONS_NAME`), holding a menu item worded with "reject". That is the
- *   epic's own reuse note ("the home for this epic's per-request actions") and the
- *   mechanism story 5 of `expense-request-list` already pinned at both widths.
+ * - **Reject is a DIRECT control on the request's own row** (`RequestActions.tsx`,
+ *   rendered on every row and card) — one activation, not a trip through the ⋯ action
+ *   overflow, which holds only Open. Because every listed request carries its own
+ *   Reject, each one's accessible name names the request it decides ("Reject request
+ *   <reference>", matching `rejectRequestName`), and that is what makes ONE row's
+ *   control addressable — and keeps this journey's Tab walk landing on the intended
+ *   request rather than on whichever Reject came first in the DOM.
  * - **Label contract** (kept narrow, because the two steps must not be confusable):
  *     the action, and the control that sends it at BOTH steps → /reject/i
  *     the note field's own label                              → /note|reason/i
@@ -173,8 +174,12 @@ const REJECT_NAME = /reject/i;
 const NOTE_FIELD_NAME = /note|reason/i;
 const CANCEL_NAME = /cancel/i;
 
-/** The per-request action overflow `RequestActions.tsx` already renders on every row. */
-const REQUEST_ACTIONS_NAME = /(action|more|option|menu)/i;
+/**
+ * The Reject on ONE request's own row, named for the request it decides — which is what
+ * distinguishes it from every other listed request's Reject (R15).
+ */
+const rejectRequestName = (reference: string): RegExp =>
+  new RegExp(`reject request ${reference}`, 'i');
 
 /**
  * WCAG 2.2 AA — this project's effective accessibility bar
@@ -516,23 +521,19 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
     const targetRow = requestRow(page, REQUEST_TO_REJECT.Reference);
     await expect(targetRow).toContainText(TRANSACTION_STATUS_IMPORTED);
 
-    // ---- 1. Reaching the action. Tab to the request's own action overflow, open it,
-    // and arrow down to Reject — never a pointer.
-    await operateByKeyboard(
-      page,
-      targetRow.getByRole('button', { name: REQUEST_ACTIONS_NAME }),
-    );
-
-    // Radix portals its menu out of the row, so it is addressed on its own.
-    const rejectAction = page
-      .getByRole('menu')
-      .getByRole('menuitem', { name: REJECT_NAME });
+    // ---- 1. Reaching the action. Tab to the Reject on the request's OWN ROW and press
+    // it — one control, no menu to open first, and never a pointer. Tab alone has to
+    // get there: the control is in the row's normal reading order, so a keyboard user
+    // walks to it exactly as a sighted user looks at it.
+    const rejectAction = targetRow.getByRole('button', {
+      name: rejectRequestName(REQUEST_TO_REJECT.Reference),
+    });
     await expect(
       rejectAction,
-      'a request still awaiting a decision offers an Approver no Reject action, so the ' +
-        'journey has nowhere to start (R2/BR3)',
+      'a request still awaiting a decision offers an Approver no Reject control on its ' +
+        'row, so the journey has nowhere to start (R2/BR3)',
     ).toBeVisible();
-    await operateByKeyboard(page, rejectAction, 'ArrowDown');
+    await operateByKeyboard(page, rejectAction);
 
     // ---- 2. The note is asked for, before anything is recorded.
     const note = noteField(page);

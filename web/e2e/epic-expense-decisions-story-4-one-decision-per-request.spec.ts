@@ -75,10 +75,12 @@
  * AC-3's, in the Vitest layer, where the call itself can be observed.)
  *
  * Implementation patterns this spec assumes (read these before implementing):
- * - The decide actions live on the EXISTING per-request overflow (`RequestActions.tsx`,
- *   a Shadcn `dropdown-menu` whose trigger is named "Actions for request <reference>"),
- *   as story 2's technical summary states — so Approve is reached as a `menuitem` inside
- *   that menu, not as a bare row button.
+ * - The decide actions are DIRECT controls on the request's own row
+ *   (`RequestActions.tsx`), as story 2 places them — so Approve is reached in ONE click
+ *   as a button in the row, not as a `menuitem` inside the ⋯ overflow (which holds only
+ *   Open). Each names the request it decides ("Approve request <reference>"), because
+ *   every listed request carries a pair of its own; that name is also how this spec
+ *   addresses one row's control without matching another row's.
  * - The confirmation is the Shadcn `alert-dialog` (Radix renders `role="alertdialog"`,
  *   portalled to the body, so it is NOT inside `main`), with the confirming control
  *   naming the action it takes — the convention `SubmittedFileActions.tsx` already ships
@@ -164,16 +166,17 @@ const LIVE_BACKEND_ORIGINS = [
 /**
  * How the controls read to a user.
  *
- * `REQUEST_ACTIONS_NAME` and `OPEN_REQUEST_NAME` are the wording `RequestActions.tsx`
- * already ships ("Actions for request <reference>" / "Open request <reference>"). The
- * two decide-side names are deliberately loose: the exact wording is the developer's,
- * only the sense of it is fixed — the action must name what it does, so a control a user
- * would read as "Approve" is what this spec drives. "Cancel" matches neither, so the
- * confirming control can never be confused with the way out.
+ * `OPEN_REQUEST_NAME` and `approveRequestName` are the wording `RequestActions.tsx`
+ * already ships ("Open request <reference>" / "Approve request <reference>") — every
+ * per-request control names the request it acts on, which is what lets this spec drive
+ * ONE row's Approve while every other listed request carries one too. The confirming
+ * control's name is deliberately loose: the exact wording is the developer's, only the
+ * sense of it is fixed. "Cancel" matches neither, so the confirming control can never be
+ * confused with the way out.
  */
-const REQUEST_ACTIONS_NAME = /actions for request/i;
 const OPEN_REQUEST_NAME = /open request/i;
-const APPROVE_ACTION_NAME = /approve/i;
+const approveRequestName = (reference: string): RegExp =>
+  new RegExp(`approve request ${reference}`, 'i');
 const CONFIRM_DECISION_NAME = /approve|confirm/i;
 
 /**
@@ -298,12 +301,13 @@ const requestRow = (page: Page, reference: string): Locator =>
 const notifications = (page: Page): Locator =>
   page.getByRole('region', { name: /notifications/i });
 
-/** Chooses Approve on one request, through its action overflow. */
-const chooseApprove = async (page: Page, row: Locator): Promise<void> => {
-  await row.getByRole('button', { name: REQUEST_ACTIONS_NAME }).click();
-  await page
-    .getByRole('menu')
-    .getByRole('menuitem', { name: APPROVE_ACTION_NAME })
+/** Chooses Approve on one request, from the control on its own row — one click. */
+const chooseApprove = async (
+  row: Locator,
+  reference: string,
+): Promise<void> => {
+  await row
+    .getByRole('button', { name: approveRequestName(reference) })
     .click();
 };
 
@@ -330,7 +334,7 @@ test.describe('Epic expense-decisions, Story 4: one decision per request', () =>
     await expect(row).toContainText(TRANSACTION_STATUS_IMPORTED);
 
     // They choose Approve, and are asked to confirm before anything is recorded.
-    await chooseApprove(page, row);
+    await chooseApprove(row, CONTESTED_REQUEST.Reference);
     const confirmation = page.getByRole('alertdialog');
     await expect(confirmation).toBeVisible();
 

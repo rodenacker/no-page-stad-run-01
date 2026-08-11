@@ -8,18 +8,24 @@
  *
  * Five things here are deliberate and easy to break:
  *
+ * - **Approve and Reject are DIRECT controls on the request, not overflow items.** A
+ *   decision is the whole reason an Approver is on this screen, and burying it behind
+ *   the ⋯ menu made every decision cost two clicks (user decision at manual test). They
+ *   were MOVED, not duplicated: the overflow now holds only Open, so the same action is
+ *   never offered twice in one place. The opened request (`RequestDetailPanel`) keeps
+ *   its own pair, which is a different surface rather than a second copy of this one.
  * - **The decide actions are OFFERED OR ABSENT, never disabled.** `onDecide` arriving
  *   is the whole condition: the list hands it over only for an Approver
  *   (`expense-decisions` R14/BR7) looking at a request that is still `Imported`
  *   (R6/BR3), and a greyed-out Approve on anything else would fail that rule exactly as
  *   a working one would. Nothing else here changes a request — no edit, no delete.
  * - **Every control names the REQUEST it acts on.** Several rows carry the same
- *   controls, so "Open" or "Approve" on its own would leave a screen-reader user with a
- *   list of identical items. The reference is in each accessible name.
+ *   controls, and there are now MANY Approve buttons on one screen, so "Approve" on its
+ *   own would leave a screen-reader user with a list of identical controls. The
+ *   reference is in each accessible name — and the visible word is the start of that
+ *   name, so the two never disagree (WCAG 2.5.3, label in name).
  * - **The overflow is a Shadcn `dropdown-menu`, and it is the mechanism that works at
  *   every width** (brief R16: at phone width each request offers an action overflow).
- *   It is also where this epic's decide actions live, which is why it exists beside the
- *   direct control rather than instead of it.
  * - **The menu is NOT modal** (`modal={false}`), per the project convention: a modal
  *   Radix menu marks the rest of the page `aria-hidden` while it stays focusable (which
  *   fails the accessibility scan) and parks `pointer-events: none` on the body — the
@@ -31,14 +37,13 @@
  *   screen-reader user are told the same thing.
  */
 
-import { MoreHorizontal, PanelRightOpen } from 'lucide-react';
+import { Check, MoreHorizontal, PanelRightOpen, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -46,6 +51,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { DECISION_APPROVE } from '@/lib/api/decisions';
 import {
   DECIDE_OUTCOMES,
   decideActionLabel,
@@ -88,7 +94,33 @@ export function RequestActions({
   const actionsName = requestActionsName(reference);
 
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      {/* The decisions, for a reader who is offered them on this request — reachable
+          in ONE activation, which is the whole reason they are here rather than in the
+          overflow. They sit to the LEFT of Open and the overflow so that those two,
+          which every row carries, stay in the same place down the column whether or
+          not a given request can still be decided. */}
+      {onDecide !== undefined &&
+        DECIDE_OUTCOMES.map((outcome) => (
+          <Button
+            key={outcome}
+            type="button"
+            variant={outcome === DECISION_APPROVE ? 'default' : 'secondary'}
+            size="sm"
+            aria-label={decideActionName(outcome, reference)}
+            onClick={() => {
+              onDecide(outcome);
+            }}
+          >
+            {outcome === DECISION_APPROVE ? (
+              <Check aria-hidden="true" />
+            ) : (
+              <X aria-hidden="true" />
+            )}
+            {decideActionLabel(outcome)}
+          </Button>
+        ))}
+
       {/* The direct way in. Its visible wording is short because the row already says
           WHICH request this is; its accessible name says so too, for a reader who
           arrives at the control on its own. */}
@@ -121,27 +153,13 @@ export function RequestActions({
           </TooltipTrigger>
           <TooltipContent>{actionsName}</TooltipContent>
         </Tooltip>
+        {/* Open, and only Open. The decisions used to live here too; moving them out
+            onto the row is what made a decision one activation instead of two, and
+            leaving a copy behind would mean the same action in two places on one
+            request — two things to keep in step, and two answers to "where is
+            Approve?". */}
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={onOpen}>{OPEN_LABEL}</DropdownMenuItem>
-          {/* The decisions, for a reader who is offered them on this request. The
-              visible wording is the bare verb — the item's own accessible name says
-              which request it decides, as every control on this screen does. */}
-          {onDecide !== undefined && (
-            <>
-              <DropdownMenuSeparator />
-              {DECIDE_OUTCOMES.map((outcome) => (
-                <DropdownMenuItem
-                  key={outcome}
-                  aria-label={decideActionName(outcome, reference)}
-                  onSelect={() => {
-                    onDecide(outcome);
-                  }}
-                >
-                  {decideActionLabel(outcome)}
-                </DropdownMenuItem>
-              ))}
-            </>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -2,8 +2,9 @@
  * Deciding one expense payment request, as the user meets it: when the two decisions
  * are offered at all, and every word the screen says about them.
  *
- * Stated once here because THREE surfaces have to agree on it — the per-request
- * overflow (`RequestActions`), the opened request (`RequestDetailPanel`) and the list
+ * Stated once here because THREE surfaces have to agree on it — the request's own row
+ * and card (`RequestActions`, where the two decisions are direct controls beside Open),
+ * the opened request (`RequestDetailPanel`) and the list
  * that holds the confirmation and the notification (`ExpenseRequestList`). A label
  * spelled out in each of them would let the control that asks, the control that
  * confirms and the message that reports drift apart from one another.
@@ -60,8 +61,9 @@ export const decideActionLabel = (outcome: DecisionOutcome): string =>
 
 /**
  * The control's accessible name. Every per-request control on this screen names the
- * request it acts on — several rows carry the same two actions, so "Approve" on its
- * own would leave a screen-reader user with a list of identical controls.
+ * request it acts on — every listed row carries its own Approve and Reject, so
+ * "Approve" on its own would leave a screen-reader user with a screenful of identical
+ * controls and no way to tell which request any of them decides.
  */
 export const decideActionName = (
   outcome: DecisionOutcome,

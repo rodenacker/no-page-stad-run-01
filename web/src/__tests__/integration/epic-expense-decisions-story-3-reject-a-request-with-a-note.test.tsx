@@ -27,18 +27,19 @@
  * 1. THE SURFACE. This story adds the note step to the decide surface story 2
  *    introduces — it does NOT build a second one. The unit under test is the client
  *    list `@/components/requests/ExpenseRequestList` (from `expense-request-list`),
- *    reached the way every per-request action on this screen is reached: the
- *    existing `RequestActions` overflow, whose trigger is already named
- *    "Actions for request <Reference>". The same reject flow is offered from the
- *    opened request (`RequestDetailPanel`); nothing here asserts that second entry
- *    point, only that the flow itself behaves — one flow, two ways in.
+ *    and Reject is reached the way story 2 places it: as a control on the request's
+ *    OWN ROW, one activation away, NOT as an item inside the ⋯ overflow (which now
+ *    holds only Open — its trigger is still named "Actions for request
+ *    <Reference>"). The same reject flow is offered from the opened request
+ *    (`RequestDetailPanel`); nothing here asserts that second entry point, only that
+ *    the flow itself behaves — one flow, two ways in.
  * 2. LABELS these tests query by (distinct words, so no query — and no user — can
  *    mistake the control that ASKS for the one that DOES it or the one that backs
  *    out, the discipline `SubmittedFileActions` already follows). Each is matched
  *    from the START of the accessible name, so a control may also name the request
- *    it acts on ("Reject request TXN-20260415-0001"), the way every per-request
- *    control on this screen already does:
- *      overflow item   "Reject…"         ·  overflow item (story 2)  "Approve…"
+ *    it acts on ("Reject request TXN-20260415-0001") — which the row controls MUST
+ *    do, since every listed request carries its own pair:
+ *      row control     "Reject…"         ·  row control (story 2)    "Approve…"
  *      note field      accessible name matching /note/i, composed from the Shadcn
  *                      `textarea` + `label` primitives — never a hand-rolled input
  *      note submit     "Continue…"
@@ -76,8 +77,9 @@
  *    renders `UserNote` ("Rejection note") — do not add a second place a note is
  *    shown, and do not put it in the list row.
  * 8. THE DECIDE ACTIONS ARE WITHDRAWN once the request is no longer `Imported`
- *    (R12/BR3) — absent from the overflow, not disabled, which is this project's
- *    rule everywhere. The Open action stays: the request is still readable.
+ *    (R12/BR3) — absent from the row AND from the overflow, not disabled, which is
+ *    this project's rule everywhere. The Open action stays: the request is still
+ *    readable.
  * 9. THE CONFIRMATION MESSAGE is a transient in-app notification through the
  *    existing `useToast()` (`@/contexts/ToastContext`) at its DEFAULT duration
  *    (R11/R15 — the 5s default already sits inside the 4–8s window); it names the
@@ -318,14 +320,20 @@ const openActionsFor = async (
   return await screen.findByRole('menu');
 };
 
-/** Takes one of a request's offered actions, by name. */
+/**
+ * One of a request's two decide controls, on the row itself (story 2's placement):
+ * a plain `button` in the row, not an item behind the ⋯ overflow.
+ */
+const decideControlOn = (reference: string, action: RegExp): HTMLElement =>
+  within(rowFor(reference)).getByRole('button', { name: action });
+
+/** Takes one of a request's offered decisions, by name. */
 const chooseAction = async (
   user: User,
   reference: string,
   action: RegExp,
 ): Promise<void> => {
-  const menu = await openActionsFor(user, reference);
-  await user.click(within(menu).getByRole('menuitem', { name: action }));
+  await user.click(decideControlOn(reference, action));
 };
 
 /** Starts a rejection and hands back the note field it must ask for. */
@@ -454,10 +462,11 @@ describe('Epic expense-decisions, Story 3: reject a request with a note', () => 
     await submitNote(user);
 
     expect(await screen.findByText(NOTE_REQUIRED_MESSAGE)).toBeVisible();
-    // The flow did not move on to the confirmation, and nothing was sent.
-    expect(
-      screen.queryByRole('button', { name: REJECT_ACTION }),
-    ).not.toBeInTheDocument();
+    // The flow did not move on to the confirmation, and nothing was sent. Asserted
+    // as the confirmation's ABSENCE rather than as "no Reject control anywhere":
+    // the request's row carries its own Reject the whole time (story 2's placement),
+    // so a name-based sweep would be answered by the row rather than by the step.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(decideRequests).toEqual([]);
     // The note is still being asked for — the refusal held the flow where it was.
     expect(note).toBeVisible();
@@ -467,9 +476,7 @@ describe('Epic expense-decisions, Story 3: reject a request with a note', () => 
     await submitNote(user);
 
     expect(await screen.findByText(NOTE_REQUIRED_MESSAGE)).toBeVisible();
-    expect(
-      screen.queryByRole('button', { name: REJECT_ACTION }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(decideRequests).toEqual([]);
 
     // The request itself was never touched by any of it.
@@ -514,10 +521,7 @@ describe('Epic expense-decisions, Story 3: reject a request with a note', () => 
     expect(rowFor(request.Reference)).toHaveTextContent(
       TRANSACTION_STATUS_IMPORTED,
     );
-    const menu = await openActionsFor(user, request.Reference);
-    expect(
-      within(menu).getByRole('menuitem', { name: REJECT_ACTION }),
-    ).toBeVisible();
+    expect(decideControlOn(request.Reference, REJECT_ACTION)).toBeVisible();
   });
 
   // AC-4
@@ -579,6 +583,21 @@ describe('Epic expense-decisions, Story 3: reject a request with a note', () => 
     expect(notification).toHaveTextContent(/rejected/i);
 
     // --- the decide actions are withdrawn from it (R12) ---------------------
+    // From the row, where they live...
+    const decidedRow = rowFor(request.Reference);
+    expect(
+      within(decidedRow).queryByRole('button', { name: REJECT_ACTION }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(decidedRow).queryByRole('button', { name: APPROVE_ACTION }),
+    ).not.toBeInTheDocument();
+    // ...and they have not reappeared in the overflow they were moved out of. The
+    // other request, still awaiting a decision, keeps both — so these are absences
+    // about THIS request rather than a screen that has stopped offering decisions.
+    expect(
+      decideControlOn(otherRequest.Reference, REJECT_ACTION),
+    ).toBeVisible();
+
     const menu = await openActionsFor(user, request.Reference);
     // The overflow really did open — so the two absences below are absences, not
     // an unopened menu.

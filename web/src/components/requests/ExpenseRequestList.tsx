@@ -154,6 +154,11 @@
  *   may not decide, or a request that has already been decided, has no decide control in
  *   its markup at all. Absent, never disabled: the project's rule everywhere, and the
  *   thing a greyed-out Approve would quietly break.
+ * - **The two decisions are DIRECT controls on the row and on the card** (user decision
+ *   at manual test), not items in the ⋯ overflow, which now holds only Open — so
+ *   deciding a request costs one activation rather than two. They are therefore on
+ *   screen once per listed request, which is why each one's accessible name carries the
+ *   request's reference; "Approve" alone would be a screenful of identical controls.
  * - **Nothing is sent until the confirmation is accepted** (R10/BR6). Choosing Approve
  *   or Reject only records WHICH decision is being asked about; the shared
  *   `ConfirmAction` then names the request by its reference, holds focus on the way out
@@ -1259,8 +1264,10 @@ export function ExpenseRequestList({
                     Imported expense payment requests: the file each came from,
                     its reference, transaction date, the last four digits of its
                     account number, its description, amount, transaction type
-                    and status, and a control that opens each request. Every
-                    value heading orders the list by its own column.
+                    and status, and the controls each request offers — opening
+                    it, and, where one is still awaiting a decision and you may
+                    make it, approving or rejecting it. Every value heading
+                    orders the list by its own column.
                   </TableCaption>
                   <TableHeader>
                     {/* Drawn from the column definitions, so every displayed

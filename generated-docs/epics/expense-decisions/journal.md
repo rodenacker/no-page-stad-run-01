@@ -25,6 +25,12 @@ What changed in this epic, in plain language.
 - A request that has already been decided now says so in the panel where Approve and Reject used to be — "This request has already been approved/rejected. A request carries only one decision…". It is shown to Finance Uploaders as well as Approvers, because it describes the request rather than what that person is allowed to do; who decided it, when, and the rejection note were already on that panel and are unchanged.
 - If that check-first read cannot be made at all (the service is unreachable for a moment), the decision is not sent and the Approver is told it could not be recorded, with the action still there to try again. Sending blind would be the one way a second decision could still slip through.
 
+## Changes you asked for at manual test
+
+- Signed-in screens are now full width and left-aligned. The app used to cap every screen at a centred column, which wasted space on the request and file tables; the cap is gone and only a small edge padding remains. The header keeps exactly the same padding, so the app's name still lines up with the content underneath it.
+- Approve and Reject now sit directly in each request's row (and each card on a phone), so a decision takes one click instead of two. They were moved rather than copied: the ⋯ menu beside them now offers only Open, so there is one place to look for each action. The opened request still offers both as before, and each button says which request it acts on, since a screenful of buttons all reading just "Approve" would tell a screen-reader user nothing.
+- Three test files and three browser tests were updated to drive the new placement. They still prove the same things: the decisions are only offered on requests awaiting one and only to an Approver, they are absent rather than greyed out for anyone else, the confirmation still names the request and starts on Cancel, a rejection still needs a note, and no request can be decided twice.
+
 ## Epic-end review
 
 - The safeguard that stops anyone recording a decision under someone else's name had a gap: the general forwarding address refused the two "decide" addresses, but only when they were spelled the obvious way. Spelling one differently — a different capitalisation, an encoded letter, a path that doubles back on itself — slipped past the refusal and reached the payments service with whatever name the caller had put on it. The refusal is now measured against the address the call would actually arrive at, not the spelling used to ask for it.
