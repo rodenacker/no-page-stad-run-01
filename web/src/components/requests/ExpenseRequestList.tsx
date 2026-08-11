@@ -268,6 +268,41 @@
  *   started, and choosing a named, smaller subset is itself the deliberate act — and
  *   taking it dismisses the report, so two answers about one batch are never on screen
  *   together.
+ *
+ * Keeping itself current while somebody is reading it (R3, BR6/BR7/BR8, NFR2/NFR4/NFR5):
+ *
+ * - **The refresh is this list's OWN read, on a timer** — `GET /v1/transactions` again,
+ *   from the browser, at `lib/transactions/refreshing.ts`'s cadence. There is no delta
+ *   channel and no single-request read to ask for instead (brief §Data Model), and a
+ *   read issued from the server could not be a self-refresh at all.
+ * - **It runs the WHOLE time the list is open**, which is this epic's deliberate
+ *   extension of the project's stop-when-idle convention (`SubmittedFilesList`, which
+ *   watches files that eventually finish). What this list watches is other people's
+ *   decisions, and those never finish — so there is no idle state to stop at. Everything
+ *   else about that convention is followed exactly: one timer at most, cleared when this
+ *   component goes away, and a re-read that fails leaves the last known rows on screen.
+ * - **Nothing is asked of a service nobody is watching** (BR6). The timer is gated on
+ *   the document being visible, watched as external state (`lib/layout/pageVisibility`),
+ *   and a reader who comes back to the tab gets a read STRAIGHT AWAY rather than waiting
+ *   out the tick they missed.
+ * - **It pauses around the reader's own bulk action** (BR7): while the bulk-approve
+ *   confirmation is open and while the batch is in flight, nothing polls — a refresh
+ *   must never race an action the Approver is part-way through. It resumes the moment
+ *   that action ends, whichever way it ended, backing out included. That pause is also
+ *   what satisfies NFR4: the batch's own pre-submit re-check and its read back are the
+ *   only reads of that interaction, so no poll can fire a second full-list read beside
+ *   them. The pause is NOT extended to a single request's confirmation: that flow takes
+ *   its own reads, and the dialog is unaffected by rows changing behind it.
+ * - **A refresh updates in place** (BR8). The reader's search term, filters, ordering,
+ *   page and keyboard are all untouched, an open dialog is left standing, and a request
+ *   that reads exactly as it already did keeps the very object it had — so a poll
+ *   re-renders only what moved (NFR5, and see `refreshedList`). The one deliberate
+ *   exception is the selection: a request a colleague has decided drops out of it and
+ *   the visible count corrects itself, with nothing raised about it.
+ * - **It is announced politely and nowhere else** (NFR2). One `role="status"` line,
+ *   present from the start so its contents CHANGING is what gets spoken; never an alert,
+ *   never a dialog, and never the app's notification surface — a background data change
+ *   must not interrupt whatever the reader is doing.
  */
 
 import {
@@ -332,6 +367,11 @@ import {
 } from '@/lib/api/transactions';
 import { UPLOAD_PATH } from '@/lib/auth/access-map';
 import {
+  isPageVisible,
+  isPageVisibleOnServer,
+  subscribeToPageVisibility,
+} from '@/lib/layout/pageVisibility';
+import {
   isNarrowViewport,
   isNarrowViewportOnServer,
   subscribeToViewportWidth,
@@ -384,6 +424,11 @@ import {
   sortStateOf,
 } from '@/lib/transactions/ordering';
 import {
+  LIST_REFRESH_INTERVAL_MS,
+  listRefreshedMessage,
+  refreshedList,
+} from '@/lib/transactions/refreshing';
+import {
   NOTHING_SELECTED,
   SELECTION_COLUMN_LABEL,
   SELECTION_COUNT_LABEL,
@@ -421,6 +466,7 @@ import type {
   RequestColumnDefinition,
   RequestSort,
 } from '@/lib/transactions/ordering';
+import type { RefreshedList } from '@/lib/transactions/refreshing';
 import type { ProjectRole } from '@/types/auth';
 import type {
   TransactionRead,
@@ -941,6 +987,56 @@ export function ExpenseRequestList({
   );
 
   /**
+   * Whether the reader is looking at this tab at all (BR6). The document knows before
+   * React runs, so — like the width above — it is watched rather than copied into state.
+   */
+  const readerIsHere = useSyncExternalStore(
+    subscribeToPageVisibility,
+    isPageVisible,
+    isPageVisibleOnServer,
+  );
+
+  /**
+   * The requests the last successful read left on screen.
+   *
+   * A ref rather than state because it is what a LATER read is compared against, not
+   * something rendered: the comparison happens inside a promise that resolved long
+   * after the render it was started from, so reading the rows out of `state` there
+   * would compare against whatever was on screen when the poll was scheduled.
+   */
+  const requestsOnScreen = useRef<TransactionRead[]>(NO_REQUESTS);
+
+  /**
+   * Puts a fresh read on screen without disturbing anything the reader arranged (BR8),
+   * and answers with what it left there.
+   *
+   * Every request the read describes exactly as it already stood keeps the object it
+   * had, and a read that changed nothing at all leaves the state object itself
+   * untouched — so the narrowing, ordering, paging and duplicate marks are not
+   * recomputed and no row re-renders (NFR5). The one thing it deliberately DOES change
+   * is the selection: a request that has stopped awaiting a decision comes out of it and
+   * the visible count corrects itself, with nothing raised about it.
+   */
+  const showFreshRequests = useCallback(
+    (incoming: TransactionRead[]): RefreshedList => {
+      const refreshed = refreshedList(requestsOnScreen.current, incoming);
+      requestsOnScreen.current = refreshed.requests;
+
+      setState((current) =>
+        current.phase !== 'loaded' || current.requests === refreshed.requests
+          ? current
+          : { phase: 'loaded', requests: refreshed.requests },
+      );
+      setSelectedIds((current) =>
+        withDecidedRequestsDropped(current, refreshed.requests),
+      );
+
+      return refreshed;
+    },
+    [],
+  );
+
+  /**
    * Reads the list and puts what came back on screen.
    *
    * `stillWatching` is how a caller says its read no longer matters: this component
@@ -953,7 +1049,9 @@ export function ExpenseRequestList({
           if (!stillWatching()) {
             return;
           }
-          setState({ phase: 'loaded', requests: requestsIn(body) });
+          const requests = requestsIn(body);
+          requestsOnScreen.current = requests;
+          setState({ phase: 'loaded', requests });
         })
         .catch((error: unknown) => {
           if (!stillWatching()) {
@@ -1113,14 +1211,10 @@ export function ExpenseRequestList({
    */
   const rereadRequests = useCallback(
     (): Promise<TransactionRead[]> =>
-      fetchTransactions().then((body) => {
-        const requests = requestsIn(body);
-        setState((current) =>
-          current.phase === 'loaded' ? { phase: 'loaded', requests } : current,
-        );
-        return requests;
-      }),
-    [],
+      fetchTransactions().then(
+        (body) => showFreshRequests(requestsIn(body)).requests,
+      ),
+    [showFreshRequests],
   );
 
   /**
@@ -1137,6 +1231,115 @@ export function ExpenseRequestList({
         }),
     [rereadRequests],
   );
+
+  /**
+   * How much of somebody else's work has arrived on this list since the reader opened
+   * it, and the polite line that says so (NFR2). A running total, because a live region
+   * announces its CONTENTS CHANGING — see `listRefreshedMessage`.
+   */
+  const changesFromElsewhere = useRef(0);
+  const [refreshNote, setRefreshNote] = useState('');
+
+  /** Whether a poll is still out, so a tick never starts a second one beside it. */
+  const pollInFlight = useRef(false);
+
+  /**
+   * One refresh: the list's own read again, put on screen in place, and announced
+   * quietly if it brought anything.
+   *
+   * A read that FAILS says nothing and changes nothing — the reader keeps the requests
+   * they had, exactly as every other re-read in this project behaves. What a screen says
+   * once refreshing has stopped working altogether is story 5's, not this.
+   */
+  const pollForChanges = useCallback(
+    (stillWatching: () => boolean): Promise<void> =>
+      fetchTransactions()
+        .then((body) => {
+          // A poll that lands after the reader started their own bulk action, or after
+          // this screen went away, must not put anything on it (BR7).
+          if (!stillWatching()) {
+            return;
+          }
+          const { changed } = showFreshRequests(requestsIn(body));
+          if (changed === 0) {
+            return;
+          }
+          changesFromElsewhere.current += changed;
+          setRefreshNote(listRefreshedMessage(changesFromElsewhere.current));
+        })
+        .catch(() => {
+          // The last known rows stay on screen (project convention).
+        }),
+    [showFreshRequests],
+  );
+
+  /** There are rows to keep current — nothing else is worth asking the service about. */
+  const listLoaded = state.phase === 'loaded';
+
+  /**
+   * Whether the reader is part-way through their own bulk approval (BR7): the
+   * confirmation is open, or the batch is running. Refreshing stops for both and
+   * resumes the moment either ends — including when they simply back out.
+   */
+  const ownBulkActionUnderWay = bulkApprovalAsked || bulkApprovalRunning;
+
+  /**
+   * Whether refreshing has been stopped since the last read — so the reader coming back
+   * to the tab is owed one STRAIGHT AWAY rather than being made to wait out the tick
+   * they were away for (BR6). A ref, because it records what has happened rather than
+   * anything rendered, and because the effect below is the only thing that reads it.
+   */
+  const owedACatchUp = useRef(false);
+
+  /**
+   * The list keeps itself current for as long as somebody is reading it (R3/BR6) — this
+   * epic's deliberate extension of the project's stop-when-idle convention, since what
+   * is being watched is other people's decisions and those never finish.
+   *
+   * One timer at most: it is tied to the three facts that decide whether it should be
+   * running at all, not to every render, so a keystroke in the search box neither
+   * restarts nor multiplies it. It goes when this component does.
+   */
+  useEffect(() => {
+    if (!listLoaded) {
+      return;
+    }
+    if (!readerIsHere) {
+      // Nothing is asked of the service while nobody is looking at the answer.
+      owedACatchUp.current = true;
+      return;
+    }
+    if (ownBulkActionUnderWay) {
+      // The reader's own action owns the list until it finishes; a poll now would race
+      // it. Whether one is owed on the other side is left exactly as it was.
+      return;
+    }
+
+    let watching = true;
+    const stillWatching = (): boolean => watching;
+
+    const refresh = (): void => {
+      if (pollInFlight.current) {
+        return;
+      }
+      pollInFlight.current = true;
+      void pollForChanges(stillWatching).finally(() => {
+        pollInFlight.current = false;
+      });
+    };
+
+    if (owedACatchUp.current) {
+      owedACatchUp.current = false;
+      refresh();
+    }
+
+    const ticking = setInterval(refresh, LIST_REFRESH_INTERVAL_MS);
+
+    return () => {
+      watching = false;
+      clearInterval(ticking);
+    };
+  }, [listLoaded, readerIsHere, ownBulkActionUnderWay, pollForChanges]);
 
   /**
    * The decision the reader has just accepted. The confirmation is already closing —
@@ -1554,6 +1757,23 @@ export function ExpenseRequestList({
 
   return (
     <div className="grid gap-4">
+      {/* What a refresh brought in, said quietly and to assistive technology only
+          (NFR2): the rows changing is what a sighted reader sees, and nothing here may
+          interrupt, steal the keyboard or need dismissing.
+
+          It is in the markup from the start, empty, because a live region announces its
+          CONTENTS changing — one added to the page at the moment it has something to
+          say may never be read out at all. It carries `aria-live` rather than
+          `role="status"` for the same reason it is here at all: an idle screen has no
+          announcement to make, and this project's screens are asserted to be saying
+          NOTHING while they wait, while they are empty and once they have simply
+          answered (`expense-request-list` story 1). A permanently present `status` would
+          be a permanent announcement region on a screen that is not announcing
+          anything. */}
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {refreshNote}
+      </p>
+
       {state.phase === 'loading' && state.wait !== 'brief' && (
         <div role="status" className="grid gap-2">
           <span className="sr-only">{LOADING_MESSAGE}</span>
