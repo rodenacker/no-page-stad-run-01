@@ -35,9 +35,18 @@
  *   keyboard user would never learn what the control does. The tooltip's wording and the
  *   accessible name are the same string, from one constant, so the sighted user and the
  *   screen-reader user are told the same thing.
+ * - **When the decide controls are withdrawn, the keyboard is HANDED OVER to Open**
+ *   (`handOffFocus`, NFR1). A decision is confirmed from the row's own Approve or
+ *   Reject; the confirmation gives focus back to the control that opened it, and the
+ *   fresh read then takes that very control off the screen. Nothing catches the focus
+ *   it was holding, so it falls to `<body>` and a keyboard user has to walk the whole
+ *   page again after every decision. Open is the surviving control ON THE SAME REQUEST,
+ *   so the user keeps their place. It is a real hand-off between two elements this
+ *   component owns — never a search of the page for a button by its wording.
  */
 
 import { Check, MoreHorizontal, PanelRightOpen, X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -83,18 +92,76 @@ interface RequestActionsProps {
    * decide, and which requests can still be decided, are the list's to answer.
    */
   onDecide?: (outcome: DecisionOutcome) => void;
+  /**
+   * The list saying "a decision has just landed on this request, so the controls it was
+   * offering are on their way out" — see this file's header. It stands until the
+   * hand-off below has had its moment, and it is asked for only where the offer is
+   * actually ending: a decision the service REFUSED leaves the decide controls exactly
+   * where they were, and focus goes back to them by itself.
+   */
+  handOffFocus?: boolean;
+  /**
+   * Says the hand-off has happened, so the list can put its request down. Called once,
+   * on the commit that withdrew the controls — whether or not focus needed moving.
+   */
+  onFocusHandedOff?: () => void;
 }
 
 export function RequestActions({
   reference,
   onOpen,
   onDecide,
+  handOffFocus = false,
+  onFocusHandedOff,
 }: RequestActionsProps) {
   const openName = openRequestName(reference);
   const actionsName = requestActionsName(reference);
 
+  /** The control the keyboard is handed to, and the group it is handed from. */
+  const controls = useRef<HTMLDivElement | null>(null);
+  const openControl = useRef<HTMLButtonElement | null>(null);
+
+  /**
+   * Whether the decisions were on offer at the previous commit. The hand-off happens on
+   * the commit that WITHDRAWS them, never on the earlier one that merely knows a
+   * decision was recorded — because the confirmation gives focus back to whatever opened
+   * it (a deferred restore, in Radix's case) and moving the keyboard before that lands
+   * would simply be undone, leaving the user back on a control about to disappear.
+   */
+  const decideOffered = onDecide !== undefined;
+  const decideWasOffered = useRef(decideOffered);
+
+  useEffect(() => {
+    const justWithdrawn = decideWasOffered.current && !decideOffered;
+    decideWasOffered.current = decideOffered;
+
+    if (!justWithdrawn || !handOffFocus) {
+      return;
+    }
+
+    // Taken only FROM this request's own controls, or from nowhere at all — which is
+    // where the keyboard has just been left if the control holding it was the one that
+    // went. Anywhere else and the user has moved on under their own steam (the search
+    // box, another request, the opened panel), and pulling them back here would be the
+    // same rudeness in the other direction.
+    const open = openControl.current;
+    const focused = document.activeElement;
+    const heldHere =
+      focused !== null && controls.current?.contains(focused) === true;
+    const heldNowhere = focused === null || focused === document.body;
+
+    if (open !== null && (heldHere || heldNowhere)) {
+      open.focus();
+    }
+    // Spent either way: the controls have gone, so there is no second chance to take.
+    onFocusHandedOff?.();
+  }, [decideOffered, handOffFocus, onFocusHandedOff]);
+
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
+    <div
+      ref={controls}
+      className="flex flex-wrap items-center justify-end gap-1"
+    >
       {/* The decisions, for a reader who is offered them on this request — reachable
           in ONE activation, which is the whole reason they are here rather than in the
           overflow. They sit to the LEFT of Open and the overflow so that those two,
@@ -125,6 +192,7 @@ export function RequestActions({
           WHICH request this is; its accessible name says so too, for a reader who
           arrives at the control on its own. */}
       <Button
+        ref={openControl}
         type="button"
         variant="ghost"
         size="sm"

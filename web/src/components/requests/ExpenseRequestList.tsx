@@ -193,6 +193,15 @@
  *   recorded decision confirms itself on the toast's default 5s (inside the 4-8s
  *   window) and fades; a decision that was NOT recorded is something the Approver has to
  *   act on, so it is raised with `duration: 0` and waits for them.
+ * - **A decision that STICKS hands the keyboard back** (NFR1). The decide controls the
+ *   Approver was standing on are withdrawn the moment the request stops awaiting a
+ *   decision, and a control that is removed while it holds focus drops it on the floor —
+ *   the whole page has to be walked again to reach anything. So this component names the
+ *   request whose controls are going (`handOffFocusTo`) and the request's own surface
+ *   moves focus to its Open control; see `RequestActions`. It is asked for wherever the
+ *   offer ENDS — the decision the Approver recorded, and the one a fresh read shows
+ *   somebody else had already recorded — and nowhere the request is left exactly as it
+ *   was: a refused decision keeps its controls, and focus comes back to them by itself.
  */
 
 import {
@@ -482,6 +491,8 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
   canDecide,
+  handOffFocus,
+  onFocusHandedOff,
   onOpen,
   onDecide,
 }: {
@@ -493,6 +504,9 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
    * still holds and the row itself judges nothing.
    */
   canDecide: boolean;
+  /** Whether this row's decide controls are the ones going away (see `RequestActions`). */
+  handOffFocus: boolean;
+  onFocusHandedOff: () => void;
   onOpen: (request: TransactionRead) => void;
   onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }) {
@@ -527,6 +541,8 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
       <TableCell>
         <RequestActions
           reference={request.Reference}
+          handOffFocus={handOffFocus}
+          onFocusHandedOff={onFocusHandedOff}
           onOpen={() => {
             onOpen(request);
           }}
@@ -681,6 +697,24 @@ export function ExpenseRequestList({
   const [decisionsInFlight, setDecisionsInFlight] = useState<
     DecisionInFlight[]
   >([]);
+
+  /**
+   * The request whose decide controls are being taken off the screen, by id — the one
+   * the Approver just decided, or the one a fresh read has just shown was decided by
+   * somebody else. Its surface hands the keyboard to its own Open control rather than
+   * letting a control disappear with focus on it (NFR1 — see this file's header).
+   *
+   * `null` the rest of the time. It STANDS until the request's own controls report the
+   * hand-off done, because the read that withdraws them is a round trip away — and it
+   * cannot fire twice or fire late, since the controls hand the keyboard over only on
+   * the commit that takes them off the screen, which happens once per decision.
+   */
+  const [handOffFocusTo, setHandOffFocusTo] = useState<number | null>(null);
+
+  /** The hand-off has happened; nothing is waiting for the keyboard any more. */
+  const focusHandedOff = useCallback((): void => {
+    setHandOffFocusTo(null);
+  }, []);
 
   /** The app's one notification surface, in the root layout (R21, and R11/R15). */
   const { showToast } = useToast();
@@ -966,6 +1000,10 @@ export function ExpenseRequestList({
             // waits for them rather than fading while they read elsewhere (R11).
             duration: 0,
           });
+          // Nothing was sent, but the request has still stopped awaiting a decision —
+          // the read above put somebody else's decision on screen — so its controls are
+          // going with the same commit and the keyboard needs somewhere to land.
+          setHandOffFocusTo(request.Id);
           return;
         }
 
@@ -984,6 +1022,10 @@ export function ExpenseRequestList({
             title: decisionRecordedTitle(outcome),
             message: decisionRecordedMessage(outcome, request.Reference),
           });
+          // The keyboard is handed over BEFORE that read can withdraw the control the
+          // Approver is standing on (NFR1): asked for here, taken by the request's own
+          // controls, whether they see this commit or the one the re-read brings.
+          setHandOffFocusTo(request.Id);
           // The answer carries no status, so the request's new state comes from a
           // fresh read — which is also what withdraws its decide actions (R12).
           return refreshList();
@@ -1255,6 +1297,8 @@ export function ExpenseRequestList({
                   presentationOf={presentationOf}
                   possibleDuplicateIds={possibleDuplicateIds}
                   mayDecide={isApprover}
+                  handOffFocusTo={handOffFocusTo}
+                  onFocusHandedOff={focusHandedOff}
                   onOpenRequest={openRequest}
                   onDecideRequest={askToDecide}
                 />
@@ -1296,6 +1340,8 @@ export function ExpenseRequestList({
                         request={request}
                         possibleDuplicate={possibleDuplicateIds.has(request.Id)}
                         canDecide={isApprover && awaitsDecision(request)}
+                        handOffFocus={handOffFocusTo === request.Id}
+                        onFocusHandedOff={focusHandedOff}
                         onOpen={openRequest}
                         onDecide={askToDecide}
                       />

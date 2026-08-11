@@ -81,6 +81,12 @@
  *   <reference>", matching `rejectRequestName`), and that is what makes ONE row's
  *   control addressable — and keeps this journey's Tab walk landing on the intended
  *   request rather than on whichever Reject came first in the DOM.
+ * - **A recorded decision HANDS THE KEYBOARD OVER.** Recording withdraws the control the
+ *   Approver decided from, and a control removed while it holds focus drops it — the
+ *   journey below ends by asserting focus is on that same request's Open control rather
+ *   than on `<body>`. NFR1 is about finishing the flow AND being able to carry on
+ *   afterwards; a keyboard user who has to Tab from the top of the page again after
+ *   every decision has not been left where they were.
  * - **Label contract** (kept narrow, because the two steps must not be confusable):
  *     the action, and the control that sends it at BOTH steps → /reject/i
  *     the note field's own label                              → /note|reason/i
@@ -180,6 +186,14 @@ const CANCEL_NAME = /cancel/i;
  */
 const rejectRequestName = (reference: string): RegExp =>
   new RegExp(`reject request ${reference}`, 'i');
+
+/**
+ * The control that survives a decision on that same row — where the keyboard has to end
+ * up once the rejection is recorded. Named for the request too, for the same reason
+ * Reject is.
+ */
+const openRequestName = (reference: string): RegExp =>
+  new RegExp(`open request ${reference}`, 'i');
 
 /**
  * WCAG 2.2 AA — this project's effective accessibility bar
@@ -576,19 +590,33 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
     await pressUntilFocused(page, 'Tab', note);
     await page.keyboard.type(WHITESPACE_ONLY_NOTE);
     await operateByKeyboard(page, sendRejection);
+
+    // The refused state is one this story ADDS to the screen, so it is scanned here
+    // rather than only in its happy state — violations are usually state-specific. It
+    // also does real browser work between sending this note and judging what came of
+    // it, which the assertions below need: the refusal raised by the EMPTY submit above
+    // is still on screen (BR4 is re-checked on submit and typing clears nothing), so
+    // re-reading that same sentence the instant Enter returns would pass whether or not
+    // this second submit had been handled at all.
+    await expectNoAccessibilityViolations(page, 'the note step, refused');
+
+    // Spaces got no further than nothing did. Judged on the flow NOT advancing, which
+    // is the part only this submit can have caused: a whitespace note accepted as a
+    // reason would have closed this step and opened the confirmation.
+    await expect(
+      confirmation(page),
+      'a note made only of spaces was accepted as a reason and moved the rejection on ' +
+        'to its confirmation (BR4)',
+    ).toHaveCount(0);
     await expect(
       step,
       'a note made only of spaces was accepted as a reason (BR4)',
     ).toContainText(MISSING_NOTE_REFUSAL);
     expect(
       decision.timesSent(),
-      'a note made only of spaces was sent on as a reason (BR4)',
+      'a decision was sent while the note held nothing but spaces (BR4)',
     ).toBe(0);
     await expect(rowUnderTheStep).toContainText(TRANSACTION_STATUS_IMPORTED);
-
-    // The refused state is one this story ADDS to the screen, so it is scanned here
-    // rather than only in its happy state — violations are usually state-specific.
-    await expectNoAccessibilityViolations(page, 'the note step, refused');
 
     // ---- 5. The real note, cleared and typed from the keyboard alone.
     await pressUntilFocused(page, 'Tab', note);
@@ -637,5 +665,21 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
       decision.bodySent(),
       'the rejection was sent without the note the Approver typed (R2/R7)',
     ).toContain(REJECTION_NOTE);
+
+    // ---- 8. And the keyboard survives the decision. Recording it withdraws the very
+    // control the journey was standing on — the confirmation hands focus back to this
+    // row's Reject, and the fresh read then takes that button away. Nothing catching it
+    // would drop focus to <body>, so an Approver working through a list would have to
+    // Tab from the top of the page again after every single decision, which is exactly
+    // what NFR1 says this flow must not do. It lands on the control this request still
+    // offers, so they keep their place.
+    await expect(
+      targetRow.getByRole('button', {
+        name: openRequestName(REQUEST_TO_REJECT.Reference),
+      }),
+      'the keyboard was dropped when the recorded rejection withdrew the Reject control ' +
+        'it was on, so the next decision cannot be reached without Tabbing from the top ' +
+        'of the page again (NFR1)',
+    ).toBeFocused();
   });
 });

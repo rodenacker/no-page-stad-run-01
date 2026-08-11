@@ -73,6 +73,15 @@ interface RequestCardProps {
    * below still holds.
    */
   canDecide: boolean;
+  /**
+   * Whether this card's decide controls are the ones being taken away by a decision
+   * that has just landed — in which case they hand the keyboard to Open rather than
+   * dropping it (NFR1). A phone-width reader with a keyboard is a keyboard user, so
+   * this travels to exactly the same `RequestActions` the table row uses.
+   */
+  handOffFocus: boolean;
+  /** Reports that hand-off done, so the list can put the request down. */
+  onFocusHandedOff: () => void;
   /** Opens this request's read-only detail panel. */
   onOpen: (request: TransactionRead) => void;
   /** Starts recording a decision on this request; the list asks for confirmation. */
@@ -89,6 +98,8 @@ const RequestCard = memo(function RequestCard({
   presentationOf,
   possibleDuplicate,
   canDecide,
+  handOffFocus,
+  onFocusHandedOff,
   onOpen,
   onDecide,
 }: RequestCardProps) {
@@ -122,6 +133,8 @@ const RequestCard = memo(function RequestCard({
       <CardFooter className="justify-end">
         <RequestActions
           reference={request.Reference}
+          handOffFocus={handOffFocus}
+          onFocusHandedOff={onFocusHandedOff}
           onOpen={() => {
             onOpen(request);
           }}
@@ -154,6 +167,14 @@ interface RequestCardsProps {
    * still be decided is asked per request below, so this stays one stable boolean.
    */
   mayDecide: boolean;
+  /**
+   * The request whose decide controls are going away with a decision that has just
+   * landed, by id — `null` when nothing has just been decided. The list owns it; see
+   * `ExpenseRequestList` and `RequestActions`.
+   */
+  handOffFocusTo: number | null;
+  /** Reports a hand-off done, so the list can put the request down. */
+  onFocusHandedOff: () => void;
   /** Opens one request's read-only detail panel. */
   onOpenRequest: (request: TransactionRead) => void;
   /** Starts recording a decision on one request; the list asks for confirmation. */
@@ -165,6 +186,8 @@ export function RequestCards({
   presentationOf,
   possibleDuplicateIds,
   mayDecide,
+  handOffFocusTo,
+  onFocusHandedOff,
   onOpenRequest,
   onDecideRequest,
 }: RequestCardsProps) {
@@ -177,6 +200,8 @@ export function RequestCards({
             presentationOf={presentationOf}
             possibleDuplicate={possibleDuplicateIds.has(request.Id)}
             canDecide={mayDecide && awaitsDecision(request)}
+            handOffFocus={handOffFocusTo === request.Id}
+            onFocusHandedOff={onFocusHandedOff}
             onOpen={onOpenRequest}
             onDecide={onDecideRequest}
           />

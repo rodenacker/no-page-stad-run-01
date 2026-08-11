@@ -84,6 +84,12 @@
  *    below answer every fresh `GET /v1/transactions` with the decided request
  *    from the moment the decide call is accepted, so an on-screen update and a
  *    re-read (the arrangement story 4 needs for BR1) both satisfy this.
+ *    WITHDRAWING THEM MUST HAND THE KEYBOARD OVER (NFR1): the decision is
+ *    confirmed from the request's own Approve, the confirmation gives focus back
+ *    to it, and removing a focused control drops focus to `<body>` — leaving a
+ *    keyboard user to walk the page from the top again after every decision. The
+ *    request's surviving Open control takes it, so they keep their place on the
+ *    request they just acted on.
  * 8. THE NOTIFICATION is the root layout's existing `ToastProvider` /
  *    `ToastContainer` and `useToast()` — `role="region"`, named "Notifications".
  *    Do not build a second notification surface. The confirmation of a recorded
@@ -628,6 +634,20 @@ describe('Epic expense-decisions, Story 2: approve an imported request', () => {
         described,
       ),
     ).toEqual([]);
+
+    // Taking that control away must not take the KEYBOARD with it (NFR1). The
+    // Approver confirmed from the request's own Approve button, and the control
+    // holding focus is exactly the one this decision withdraws — so the request
+    // hands focus to the control it still offers, on the same request, rather
+    // than letting it fall back to <body> and making a keyboard user walk the
+    // whole page again after every decision.
+    await waitFor(() => {
+      expect(
+        within(rowFor(awaitingDecision.Reference)).getByRole('button', {
+          name: /^open\b/i,
+        }),
+      ).toHaveFocus();
+    });
 
     const decidedMenu = await openActionsMenuFor(
       user,
