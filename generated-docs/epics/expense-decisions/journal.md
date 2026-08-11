@@ -36,3 +36,11 @@ What changed in this epic, in plain language.
 - The safeguard that stops anyone recording a decision under someone else's name had a gap: the general forwarding address refused the two "decide" addresses, but only when they were spelled the obvious way. Spelling one differently — a different capitalisation, an encoded letter, a path that doubles back on itself — slipped past the refusal and reached the payments service with whatever name the caller had put on it. The refusal is now measured against the address the call would actually arrive at, not the spelling used to ask for it.
 - The same request could be decided twice by pressing confirm again before the first decision came back. A decision already on its way for a request now blocks a second.
 - A signed-in person whose name is written in a non-Latin script (Cyrillic, Chinese, and so on) used to make the decision endpoint crash outright, because the payments service requires the decider's name in an HTTP header and a header can only carry Latin-1 characters. The name is still never altered to fit — that would record the decision under a mangled name — but the app now reports the decision as failed and logs why on the server, instead of falling over.
+
+## Manual test
+
+Accepted as-is on 2026-08-11 — approved wholesale at the manual-test approval rather than ticked item by item, so no per-item results were recorded.
+
+## Merge preparation
+
+Before the PR, the branch was 9 commits behind `main` — the `csv-export` epic had merged in the meantime, touching the same request list. The branch was rebased onto `origin/main`; the only conflicts were in the shared explanation block at the top of `ExpenseRequestList.tsx` and in that component's entry in the reuse registry, where the two epics had each added their own paragraph. Both were resolved by keeping both epics' text. The full quality gates, all 129 unit tests, and the epic's 4 live end-to-end specs were re-run against the merged code and passed.
