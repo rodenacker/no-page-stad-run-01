@@ -153,6 +153,19 @@ const decideCall = (
   });
 };
 
+/**
+ * The gate. Nothing reaches the transactions service until this has established WHO is
+ * calling (a live session) and THAT THEY MAY (the Approver role) — see the 401/403
+ * below, which the story's tests pin.
+ *
+ * The validator looks for `requireSession()` and does not recognise this shape. It
+ * cannot be used here: `requireSession()` answers an unauthenticated caller with a
+ * `redirect()` to the sign-in screen, which is right for a page and meaningless to a
+ * `fetch` — this route has to answer a status a caller can act on. So the gate is
+ * spelled out with the same pieces `requireSession()` is built from (`fetchUserInfo`)
+ * plus the role check, and the exception is declared rather than the check skipped.
+ */
+// security-ignore: rbac — authorization IS enforced below (401 without a live session, 403 without ROLE_APPROVER). requireSession() is unusable in a route handler because it redirects instead of returning a status.
 export async function POST(request: NextRequest): Promise<Response> {
   const sessionValue = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!sessionValue) {
