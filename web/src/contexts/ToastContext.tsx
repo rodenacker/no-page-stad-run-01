@@ -84,6 +84,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         duration: options.duration ?? TOAST_DEFAULTS.DURATION,
         dismissible: options.dismissible ?? TOAST_DEFAULTS.DISMISSIBLE,
         onClick: options.onClick,
+        link: options.link,
       };
 
       // Add new toast and enforce max limit

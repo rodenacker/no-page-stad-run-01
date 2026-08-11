@@ -11,48 +11,55 @@
     "unverifiedAssumptions": [
       "Verify the rejected rows show your file's real values under the right headings: the app assumes each rejected row arrives shaped like an imported request (reference, date, account number, description, amount, type, currency). The service's own documentation only ever shows an example from an unrelated system, so if the live response names its fields differently you could see blank columns, or values under the wrong heading, with the tests still passing.",
       "Verify each rejected row says the right thing about what is wrong with it: the app assumes the response identifies which field failed for each row, so it can show its own fixed wording for a missing reference, a bad amount, an unreadable date or an unsupported currency, and the service's own reason for a transaction-type problem. If the response carries only one general message per row, or none, rows could all show the same explanation — or the wrong one.",
-      "Verify each download gives you the file you expect: the app uses one address for your original file and a different one for the error file, chosen from the requirements' own mapping. The service publishes a third, very similar address, and the source contract flags this as a known ambiguity — so if the mapping is wrong you could get the error file when you asked for your original CSV, or the wrong file entirely."
+      "Verify each download gives you the file you expect: the app uses one address for your original file and a different one for the error file, chosen from the requirements' own mapping. The service publishes a third, very similar address, and the source contract flags this as a known ambiguity — so if the mapping is wrong you could get the error file when you asked for your original CSV, or the wrong file entirely.",
+      "Check the wording a refused user sees on a file's page reads the way you would expect: it says the missing permission is \"Read a file's processing history\". Your requirements name the resource and whether each role may read it, but not the words to show someone who lacks it, so that phrasing is ours — worth a glance to confirm it matches what whoever grants access would recognise.",
+      "Check that a rejected row's explanation is the RIGHT one when the problem is an unusual one: for the four fields this app owns a rule for (reference, amount, date, currency) the app replaces the service's technical text with its own fixed sentence. If your service can also reject one of those same fields for a DIFFERENT reason — say an amount that is a valid number but over a limit — you would read the app's wording for a missing-or-unreadable value instead of the real reason. Worth trying against a live failed file.",
+      "Check the column headings on the rejected-rows table read the way your team names those fields: they are this app's own wording (Reference, Transaction date, Account number, Description, Amount, Transaction type, Currency, What is wrong). The service does publish a list of column names, but its only documented example comes from an unrelated system, so we did not use it.",
+      "Check what you see if a failed file comes back with an EMPTY list of rejected rows. The app treats that as the service reporting nothing to show and says so plainly, rather than as something having gone wrong. Nothing in your requirements says whether that combination can actually happen.",
+      "Glance at the NAME the downloaded error file is saved under. The app saves it under whatever the service holds against the file as its error-file reference, assuming that is a plain file name. Your requirements call it a \"reference\", so if the live service puts a path or an identifier there instead, that text becomes the saved file's name.",
+      "Check the NAME recorded against a cancelled file is the one you expect. When a file is cancelled the app tells the service who did it, and it sends the person's name as it appears in the app (for example \"Frances Nkosi\"), taken from the signed-in account and never from anything typed on screen. Your service might instead expect an email address or a login name in that field — worth confirming against a real cancel, since nothing in the contract says which it wants.",
+      "Confirm you are happy that the rejected-rows notification is only kept from someone we KNOW is an Approver, rather than only shown to someone we know is the uploader. On the real screens this never differs — the Expense files list is always told who is signed in — so it changes nothing you can see. It is flagged because settling it the other way was the alternative, and it is your call which reads right."
     ],
     "manualTestResults": []
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-06T06:15:00.873Z",
+      "completedAt": "2026-08-06T06:35:23.727Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-06T06:37:00.000Z",
+      "completedAt": "2026-08-06T06:51:41.437Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-06T06:53:00.000Z",
+      "completedAt": "2026-08-06T07:04:21.160Z"
     },
     "4": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-06T07:06:00.000Z",
+      "completedAt": "2026-08-06T07:21:16.388Z"
     },
     "5": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-06T07:23:00.000Z",
+      "completedAt": "2026-08-06T07:39:30.171Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-05T07:35:00.000Z"
+  "lastUpdated": "2026-08-11T00:00:00.000Z"
 }

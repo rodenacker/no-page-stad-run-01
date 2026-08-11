@@ -227,3 +227,54 @@ export const uploadErrorResponse = (
   message = 'The file could not be uploaded. Please try again.',
   error = 'INVALID_REQUEST',
 ): ErrorResponse => ({ Error: error, Message: message });
+
+/**
+ * `POST /v1/files/retry-validation?LogId={id}` success body. The service answers the
+ * generic `DefaultResponse` envelope and says nothing about the file's new status —
+ * so a caller learns the outcome only by re-reading {@link fileLogListResponse}
+ * (which is why a retry test pairs this with `fileLogProgression`).
+ */
+export const retrySuccessResponse = (): DefaultResponse => ({
+  Id: 5001,
+  MessageType: 'SUCCESS',
+  Messages: ['Validation retry started'],
+});
+
+/**
+ * The wording the SERVICE itself gives for a refused retry — deliberately phrased
+ * as only a backend would phrase it, so a test can tell it apart from wording the
+ * screen wrote for itself (`serviceMessageOf ?? serviceDetailOf ?? own wording`,
+ * `lib/api/errors.ts`).
+ */
+export const RETRY_REFUSED_MESSAGE =
+  'The file could not be re-queued for validation (process instance not found).';
+
+/**
+ * `POST /v1/files/retry-validation` failure body. The transactions service reports a
+ * refusal as a 500 with the `DefaultResponse` envelope, so `Messages[]` is where its
+ * reason travels — `apiClient` keeps it on the failure's `details`.
+ */
+export const retryFailureResponse = (
+  message: string = RETRY_REFUSED_MESSAGE,
+): DefaultResponse => ({ Id: 0, MessageType: 'ERROR', Messages: [message] });
+
+/**
+ * `DELETE /v1/files?LogId={id}` (cancel) success body. That call requires a
+ * `LastChangedUser` header taken from the authenticated identity — never from user
+ * input (epic brief §Notes & Caveats); the retry call declares no such header, and
+ * that asymmetry is as-documented.
+ */
+export const cancelSuccessResponse = (): DefaultResponse => ({
+  Id: 5001,
+  MessageType: 'SUCCESS',
+  Messages: ['File cancelled'],
+});
+
+/** The wording the SERVICE itself gives for a refused cancel (see {@link RETRY_REFUSED_MESSAGE}). */
+export const CANCEL_REFUSED_MESSAGE =
+  'The file could not be deactivated (staging rows are locked by another process).';
+
+/** `DELETE /v1/files` failure body — same envelope as {@link retryFailureResponse}. */
+export const cancelFailureResponse = (
+  message: string = CANCEL_REFUSED_MESSAGE,
+): DefaultResponse => ({ Id: 0, MessageType: 'ERROR', Messages: [message] });

@@ -45,6 +45,14 @@ export const LANDING_PATH = '/';
 /** Submit an expense file, and the list of submitted files (ships with its own epic). */
 export const UPLOAD_PATH = '/upload';
 
+/**
+ * One submitted file: its own values, its processing history, and what may be done to
+ * it. Reached from a file's row in the list at {@link UPLOAD_PATH}, with the file
+ * identified in the query (`?LogId=<id>`) — which is why its entry below carries no
+ * entry-point copy: on its own, without a file, the address means nothing.
+ */
+export const SUBMITTED_FILE_PATH = '/upload/file';
+
 /** The shared expense request list, where requests are reviewed and decided. */
 export const REQUESTS_PATH = '/requests';
 
@@ -104,6 +112,22 @@ export const ACCESS_MAP: readonly AccessMapEntry[] = [
       description:
         'See every expense file that has been sent for import and how each one is getting on. New CSV files of employee expense payment requests are submitted here too.',
     },
+  },
+  {
+    /**
+     * BOTH roles, deliberately: §6.5 grants `FileProcessLog` READ to the Finance
+     * Uploader and the Approver alike, and epic `file-validation-and-retry` BR4 gives
+     * a file's processing history to both. Retrying or cancelling a file is the
+     * Importer's alone (BR3) and is a role check on those controls INSIDE the screen,
+     * never on the address.
+     *
+     * NO `entryPoint`, deliberately: this screen is reached from a file's row, and both
+     * the landing screen and the header navigation render exactly what the map offers —
+     * so advertising it there would offer a screen that means nothing without a file.
+     */
+    path: SUBMITTED_FILE_PATH,
+    permission: "Read a file's processing history",
+    allowedRoles: [ROLE_IMPORTER, ROLE_APPROVER],
   },
   {
     /**

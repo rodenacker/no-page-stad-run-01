@@ -35,7 +35,7 @@ import type { LucideIcon } from 'lucide-react';
  * - `negative` — refused or rejected
  * - `neutral` — inert, cancelled, or a value this app does not recognise
  */
-const STATUS_INTENTS = [
+export const STATUS_INTENTS = [
   'informational',
   'positive',
   'attention',

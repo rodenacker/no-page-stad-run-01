@@ -43,11 +43,12 @@
  *    implementation does want to limit the notification to the Finance Uploader,
  *    that must arrive as an OPTIONAL prop whose default still notifies — these
  *    tests render the list exactly as Story 1 does.
- * 4. A file resolving to `Validation failed` raises NO notification at all in this
- *    epic. Telling the uploader anything about the invalid rows is the next epic's
- *    R91 and must not be pre-empted here — which is why the assertion below is
- *    "the notification surface is not rendered", not merely "it does not say
- *    imported".
+ * 4. A file resolving to `Validation failed` must not be reported as an import.
+ *    Telling the uploader anything ABOUT the invalid rows was the next epic's R91,
+ *    which this epic did not pre-empt; that notification now exists
+ *    (`file-validation-and-retry` story 5) and its own tests own it, so what is
+ *    pinned below is this story's own criterion: nothing on this screen says a file
+ *    that failed validation imported.
  * 5. A failed background re-read must not blank the list, must not replace the
  *    screen with Story 1's failed-load state (its `role="alert"` + "Try again"),
  *    and must not throw: every row keeps the values from the last successful read.
@@ -289,11 +290,18 @@ describe('Epic expense-file-upload, Story 3: watching a file finish importing', 
       { timeout: REFRESH_WINDOW_MS },
     );
 
-    // Nothing has been announced at all: the toast surface renders nothing while
-    // there is nothing to tell the user, so its absence is the assertion. Telling
-    // the uploader about the invalid rows is the NEXT epic's R91 — this epic must
-    // not pre-empt it, and certainly must not claim the file imported.
-    expect(notificationSurface()).not.toBeInTheDocument();
+    // Nothing reports an import: this file did not import, so neither the row nor
+    // any notification may say it did.
+    //
+    // What the user IS told about the rejected rows arrived with
+    // `file-validation-and-retry` story 5 (R91), which this epic deliberately left
+    // unbuilt — that story's own tests own everything about that notification
+    // (that it names the file, that it does not fade, that it leads to the rejected
+    // rows, and who is told). This assertion was originally "the notification
+    // surface is not rendered at all", which was only ever true for as long as R91
+    // was unimplemented; scoped to this story's own criterion, what it pins is that
+    // nothing here claims an import.
+    expect(notificationSurface()).not.toHaveTextContent(/import/i);
     // The row itself does not describe the file as imported either.
     expect(rowFor(failed.CurrentFileName)).not.toHaveTextContent(
       FILE_STATUS_IMPORTED,

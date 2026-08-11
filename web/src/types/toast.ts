@@ -9,6 +9,21 @@
 export type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
 /**
+ * ToastLink - somewhere a notification takes the user.
+ *
+ * A REAL link (an anchor), never a click handler on the notification's body: a
+ * clickable non-link cannot be reached or operated by keyboard, which the project's
+ * WCAG 2.2 AA bar forbids. So a notification that offers the user somewhere to go
+ * carries this rather than `onClick`.
+ */
+export interface ToastLink {
+  /** Where it goes, as one of the app's own addresses. */
+  href: string;
+  /** What the link reads as — wording that names the destination. */
+  label: string;
+}
+
+/**
  * Toast - Individual toast notification object
  */
 export interface Toast {
@@ -16,9 +31,10 @@ export interface Toast {
   variant: ToastVariant;
   title: string;
   message?: string;
-  duration?: number; // Duration in milliseconds (default: 5000)
+  duration?: number; // Duration in milliseconds (default: 5000; 0 never auto-dismisses)
   dismissible?: boolean; // Whether user can manually dismiss (default: true)
   onClick?: () => void; // Optional click handler for interactive toasts
+  link?: ToastLink; // Optional destination the notification takes the user to
 }
 
 /**
@@ -29,9 +45,15 @@ export interface ToastOptions {
   variant: ToastVariant;
   title: string;
   message?: string;
+  /**
+   * How long it stays, in milliseconds. OMITTED takes `TOAST_DEFAULTS.DURATION`;
+   * `0` means it never fades on its own, which is how a notification the user must
+   * act on stays until they act on it or dismiss it (source UI-19).
+   */
   duration?: number;
   dismissible?: boolean;
   onClick?: () => void;
+  link?: ToastLink;
 }
 
 /**

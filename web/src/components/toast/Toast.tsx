@@ -8,9 +8,22 @@
  * Every colour here comes from the theme tokens (`text-success`, `text-destructive`,
  * `bg-card`, …) rather than a fixed palette value, so a toast follows the app into its
  * dark version like everything else does (styling-centralisation.md rules 1-5).
+ *
+ * A notification can also offer somewhere to GO (`toast.link`), and that is a real
+ * anchor rather than a click handler on the notification's body: a clickable non-link
+ * is not in the tab order, is not announced as a destination, and cannot be opened in
+ * a new tab — which the project's WCAG 2.2 AA bar does not allow for something the
+ * user is expected to act on. Following it dismisses the notification, because acting
+ * on it is one of the two ways it goes away (the other being the dismiss control).
+ *
+ * A `duration` of 0 (or none at all on the toast object) is a notification that never
+ * fades: what the user must act on stays until they do (source UI-19).
  */
 
+import Link from 'next/link';
 import { useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { ToastProps } from '@/types/toast';
 
 export function Toast({ toast, onDismiss }: ToastProps) {
@@ -143,6 +156,21 @@ export function Toast({ toast, onDismiss }: ToastProps) {
         <p className="text-sm font-semibold">{toast.title}</p>
         {toast.message && (
           <p className="text-muted-foreground text-sm mt-1">{toast.message}</p>
+        )}
+        {toast.link && (
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            {/* A real link, so it can be tabbed to, announced as somewhere to go and
+                opened in a new tab. Following it is acting on the notification, so
+                the notification goes with it. */}
+            <Link
+              href={toast.link.href}
+              onClick={() => {
+                onDismiss(toast.id);
+              }}
+            >
+              {toast.link.label}
+            </Link>
+          </Button>
         )}
       </div>
 
