@@ -50,6 +50,8 @@
  *   completable — feedback included — without a mouse.
  * - **It confirms COMPLETION, not the click.** The file is handed over first and the
  *   confirmation follows, so it can never claim an export that failed to be produced.
+ *   A file that could NOT be produced or handed over is reported in the same one
+ *   surface, because the alternative is a control that answers nothing at all.
  * - **The count is the count of the file**, taken from the array actually written, and
  *   nothing else is named beside it. Naming the unfiltered total as well ("2 of 8
  *   requests") invites exactly the misreading BR1 exists to prevent: what left the
@@ -88,6 +90,20 @@ export const EXPORT_ACTION_LABEL = 'Export requests to CSV';
 
 /** Heads the answer when there was nothing to hand over. */
 const NOTHING_TO_EXPORT_TITLE = 'Nothing to export';
+
+/**
+ * What the user is told when the file could not be produced or handed over.
+ *
+ * Activating a control that looks usable must never be a no-op — the same reason
+ * `FileDownloadActions` reports a refused download rather than falling silent. Without
+ * this the user presses Export, no file arrives, nothing is said, and the failure
+ * surfaces only as an unhandled rejection in a console they will never open. The wording
+ * is the user's own and names the way forward; an internal error message never reaches
+ * them (project.md NFR-base-5).
+ */
+const EXPORT_FAILED_TITLE = 'Could not export the requests';
+const EXPORT_FAILED_MESSAGE =
+  'The file could not be produced. Please ask for the export again.';
 
 /**
  * Heads a completed export: HOW MANY requests went into the file, with the number
@@ -146,15 +162,25 @@ export function ExportRequestsAction({
       return;
     }
 
-    void buildRequestExportCsv(exported).then((contents) => {
-      deliverFile(contents, expenseRequestExportFileName(producedAt));
-      // After the hand-over, so this confirms what the user actually received.
-      showToast({
-        variant: 'success',
-        title: exportedTitle(exported.length),
-        message: attributionOf(producedAt, exportedBy),
+    void buildRequestExportCsv(exported)
+      .then((contents) => {
+        deliverFile(contents, expenseRequestExportFileName(producedAt));
+        // After the hand-over, so this confirms what the user actually received.
+        showToast({
+          variant: 'success',
+          title: exportedTitle(exported.length),
+          message: attributionOf(producedAt, exportedBy),
+        });
+      })
+      .catch(() => {
+        // An `error` toast, so it is announced assertively and can never be mistaken for
+        // the confirmation of an export that did not happen.
+        showToast({
+          variant: 'error',
+          title: EXPORT_FAILED_TITLE,
+          message: EXPORT_FAILED_MESSAGE,
+        });
       });
-    });
   };
 
   return (

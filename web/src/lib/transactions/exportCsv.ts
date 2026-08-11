@@ -43,6 +43,8 @@
  *   §Goal) and a leading mark is data some parsers hand back as part of the first
  *   column. The encoding is declared on the blob's media type instead.
  */
+import { calendarDayOf, twoDigits } from '@/lib/utils/dateTime';
+
 import type { TransactionRead } from '@/types/transactions';
 
 /** One exported column: the heading a receiving system reads, and the value under it. */
@@ -151,13 +153,17 @@ export const buildRequestExportCsv = async (
     written < requests.length;
     written += ROWS_BETWEEN_YIELDS
   ) {
-    const chunk = requests.slice(written, written + ROWS_BETWEEN_YIELDS);
-    for (const request of chunk) {
-      records.push(exportRecordFor(request));
+    const chunkEnd = Math.min(written + ROWS_BETWEEN_YIELDS, requests.length);
+    for (let row = written; row < chunkEnd; row += 1) {
+      records.push(exportRecordFor(requests[row]));
     }
-    // Between chunks, never inside one — so the yield count is bounded by the volume
-    // rather than by the row count.
-    await yieldToBrowser();
+    // BETWEEN chunks: never inside one (so the yield count is bounded by the volume and
+    // not by the row count), and never after the last row either. A yield there would
+    // hold every export — including the ordinary short one — back a whole task for no
+    // rows, and the file is finished by then.
+    if (chunkEnd < requests.length) {
+      await yieldToBrowser();
+    }
   }
 
   // A trailing record separator, which RFC 4180 permits and most readers expect.
@@ -165,9 +171,6 @@ export const buildRequestExportCsv = async (
     type: EXPORT_MEDIA_TYPE,
   });
 };
-
-/** Two digits, so a file name's date and time sort and read the same way every time. */
-const twoDigits = (value: number): string => String(value).padStart(2, '0');
 
 /**
  * What the saved file is called (brief BR7): what it holds, then the day and the time of
@@ -177,21 +180,21 @@ const twoDigits = (value: number): string => String(value).padStart(2, '0');
  * The time is separated with DASHES, not colons: a colon is illegal in a Windows file
  * name and the browser rewrites it silently, so the user would be handed a name the app
  * never chose. Everything here is the reader's OWN clock — the file is named for when
- * they produced it, not for a server's timezone.
+ * they produced it, not for a server's timezone, which is why the day comes from
+ * `lib/utils/dateTime.ts`, the one place the app writes a day of its own.
+ *
+ * Seconds are the part that is only here: they are what tells two exports in the same
+ * minute apart, and a moment shown to a PERSON (the export's confirmation) is accurate
+ * to the minute instead.
  */
 export const expenseRequestExportFileName = (
   producedAt: Date = new Date(),
 ): string => {
-  const day = [
-    String(producedAt.getFullYear()),
-    twoDigits(producedAt.getMonth() + 1),
-    twoDigits(producedAt.getDate()),
-  ].join('-');
   const timeOfDay = [
     twoDigits(producedAt.getHours()),
     twoDigits(producedAt.getMinutes()),
     twoDigits(producedAt.getSeconds()),
   ].join('-');
 
-  return `expense-requests-export-${day}-${timeOfDay}.csv`;
+  return `expense-requests-export-${calendarDayOf(producedAt)}-${timeOfDay}.csv`;
 };

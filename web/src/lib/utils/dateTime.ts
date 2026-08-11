@@ -25,18 +25,30 @@
  */
 
 /** Two digits, so every part of a written moment is the same width every time. */
-const twoDigits = (value: number): string => String(value).padStart(2, '0');
+export const twoDigits = (value: number): string =>
+  String(value).padStart(2, '0');
 
-/** A moment as the app writes one: `2026-04-30 14:35`, on the reader's own clock. */
-export const onScreenDateTime = (at: Date): string => {
-  const day = [
+/**
+ * The DAY a moment falls on, `2026-04-30`, on the reader's own clock — largest unit
+ * first, which is what makes day order and text order the same thing.
+ *
+ * Stated here rather than beside each writer because the app writes this same day in two
+ * places: on screen (below) and in the export's file name
+ * (`lib/transactions/exportCsv.ts`, which adds a time of day of its own and cannot use a
+ * colon in it). Two spellings of one date is exactly what this module exists to prevent.
+ */
+export const calendarDayOf = (at: Date): string =>
+  [
     String(at.getFullYear()),
     twoDigits(at.getMonth() + 1),
     twoDigits(at.getDate()),
   ].join('-');
+
+/** A moment as the app writes one: `2026-04-30 14:35`, on the reader's own clock. */
+export const onScreenDateTime = (at: Date): string => {
   const timeOfDay = [twoDigits(at.getHours()), twoDigits(at.getMinutes())].join(
     ':',
   );
 
-  return `${day} ${timeOfDay}`;
+  return `${calendarDayOf(at)} ${timeOfDay}`;
 };
