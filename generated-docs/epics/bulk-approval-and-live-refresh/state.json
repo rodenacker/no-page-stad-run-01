@@ -12,18 +12,20 @@
       "Verify that approving cannot overturn a colleague's rejection: the app assumes the service refuses (or harmlessly ignores) an approve call for a request that is already Rejected, and it only guards against that by checking each request's state a moment before sending. The written contract for the approve call says only that it 'sets the Status to Approved', with no mention of a guard. If it really does overwrite, a bulk approval could silently flip a rejection your colleague recorded seconds earlier — and nothing on screen would say so.",
       "Verify the result counts match reality: the report of 'how many approved, how many left unchanged' is worked out by re-reading the list immediately after the approvals are sent. If the service takes a moment to reflect them, the report could tell you 0 approved when everything in fact worked. Approve a handful, note the numbers you are told, then reload the page and count the Approved rows — they should agree.",
       "Verify a 15-second refresh is comfortable against your real data volumes: the list re-reads every request each time (the service offers no way to ask for just what changed), and this was only ever exercised against small test data. On a batch near the 10,000-request ceiling you may notice the screen stutter every 15 seconds or the refresh not finishing before the next one is due.",
-      "Confirm the exact shape of the single-request approve call, its confirmation composition and its staleness re-check against the merged main once expense-decisions lands. This epic was planned while that epic was still building, so those three reuse points were planned from its story files rather than observed in code — the story files mark them as dependency seams to check before building."
+      "Resolved before building on 2026-08-11: the three reuse points from expense-decisions were confirmed against the merged main. The approve call and the confirmation are as planned; the staleness re-check was inlined in the list component rather than extracted, which story 2 already plans to correct.",
+      "Unticking the 'Select all listed requests' control clears the WHOLE selection — including requests the current search or filters are hiding. Nothing in the requirements says what the clearing action should cover, and this is the only clear-selection control the screen offers; the alternative (clear only what is currently listed) would leave an invisible remainder ticked. Confirm that clearing everything is what you'd expect.",
+      "The 'select everything currently listed' control ADDS to the selection rather than replacing it, so narrowing the list and taking what is left keeps anything ticked beforehand. Also not stated in the requirements — it is the reading consistent with a selection that survives narrowing."
     ],
     "manualTestResults": []
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "BUILD",
   "stories": {
     "1": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-11T13:05:00.000Z",
+      "completedAt": "2026-08-11T13:19:00.000Z"
     },
     "2": {
       "status": "pending",

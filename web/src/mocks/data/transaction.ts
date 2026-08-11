@@ -55,6 +55,16 @@
  *     happened, so the response cannot be parsed to detect an already-decided
  *     request. Detection is a fresh re-read before submitting, not a body check.
  *
+ * APPROVING MANY AT ONCE, AND A LIST THAT REFRESHES ITSELF (epic
+ * `bulk-approval-and-live-refresh`): the last section of this file. It adds no new
+ * entity and no new call — bulk approval is N of the same single approve call, and
+ * the self-refresh is the same `GET /v1/transactions` read on a timer. What it does
+ * add is the one thing those stories turn on: SUCCESSIVE SNAPSHOTS of the same
+ * list, where a named few requests have been decided between one read and the next.
+ * `transactionsAfterColleagueDecided` / `transactionsAfterApproving` produce them
+ * from a list you already have, in the same order, so a test never hand-builds a
+ * second list and accidentally changes something else too.
+ *
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
@@ -654,6 +664,15 @@ export const TRANSACTION_LIST_FAILURE_MESSAGE =
  * For the OTHER half of AC-5 — a failure the service gave no readable reason for —
  * answer with no body at all rather than with an empty envelope: that is what leaves
  * the client holding only its own placeholder, which must never reach the user.
+ *
+ * A FAILED REFRESH POLL is this same body (epic `bulk-approval-and-live-refresh`,
+ * R6/BR9) — there is no separate poll endpoint and so no separate failure fixture.
+ * What differs is only what the screen does with it: a failed initial read leaves
+ * the user with nothing and gets the failed-load state, while a failed re-read
+ * leaves the rows already on screen exactly where they are, and only a SECOND
+ * consecutive failure raises the "cannot refresh itself" notice. Answer two reads in
+ * a row with this (or with a rejection) to reach it, and one to prove nothing
+ * changes.
  */
 export const transactionListFailureResponse = (
   message: string = TRANSACTION_LIST_FAILURE_MESSAGE,
@@ -802,3 +821,167 @@ export const DECISION_REFUSED_MESSAGE =
 export const decisionFailureResponse = (
   message: string = DECISION_REFUSED_MESSAGE,
 ): DefaultResponse => ({ Id: 0, MessageType: 'ERROR', Messages: [message] });
+
+/* -------------------------------------------------------------------------- */
+/* Approving many at once, and a list that refreshes itself                    */
+/* (epic `bulk-approval-and-live-refresh`)                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The list a bulk-selection screen starts from: `importedCount` requests still
+ * awaiting a decision, followed by one already Approved and one already Rejected.
+ *
+ * The two decided rows are the point of the fixture, not padding — only an
+ * `Imported` request may be selected or bulk-approved (brief BR1), so a set of
+ * nothing but selectable rows cannot tell a correct implementation from one that
+ * offers a tick on everything.
+ *
+ * `importedCount` is what reaches the count thresholds: pass 100 or more for the
+ * ambient indicator's `99+` form (R4), a handful for the ordinary case. The
+ * imported rows come from {@link manyTransactions} unchanged — this is a
+ * composition of the existing generator, not a second one — and the decided pair's
+ * ids and references are derived from the highest imported id, so no id can ever
+ * collide with a generated row however large the count grows. That matters more
+ * here than elsewhere: the selection is held as a SET OF IDS (story 1), so two rows
+ * sharing an id would silently select two requests with one tick.
+ *
+ * No two rows share {@link DUPLICATE_KEY}, so a selection test is never disturbed
+ * by an unrelated duplicate mark. Compose {@link duplicatePair} in where duplicates
+ * are the point.
+ *
+ * @example transactionsForBulkSelection(100)
+ */
+export const transactionsForBulkSelection = (
+  importedCount = 6,
+): TransactionRead[] => {
+  const imported = manyTransactions(importedCount);
+  const highestId = imported.reduce(
+    (highest, transaction) => Math.max(highest, transaction.Id),
+    0,
+  );
+  const decided = [
+    TRANSACTION_STATUS_APPROVED,
+    TRANSACTION_STATUS_REJECTED,
+  ].map((status, index) =>
+    transactionWithStatus(status, {
+      Id: highestId + 1 + index,
+      Reference: `TXN-20260501-000${String(1 + index)}`,
+      TransactionDate: `2026-05-0${String(1 + index)} 09:20:00`,
+      AccountNumber: `2044-8871-99${String(10 + index)}`,
+      Description: ['Absa card settlement', 'Vodacom airtime bundle'][index],
+      Amount: [3120.4, 899][index],
+      TransactionType: TRANSACTION_TYPE_DEBIT_CODE,
+    }),
+  );
+  return [...imported, ...decided];
+};
+
+/**
+ * The SAME list as read a moment later, with only the named requests now decided —
+ * the next snapshot of `GET /v1/transactions`.
+ *
+ * This is the shape every read after the first one takes in this epic, because the
+ * transactions service has no delta channel and no single-request GET: the
+ * pre-submit re-check (BR2), the post-batch reconciliation read (BR5), the 15s
+ * refresh poll (BR6) and the retry's re-check (BR11) are all just another full-list
+ * read that differs from the last one. Deriving that read from the list you already
+ * have — rather than authoring a second list — is what keeps the difference between
+ * two polls limited to the thing under test.
+ *
+ * Order, and every request not named, are preserved exactly. Both matter: BR8
+ * requires a refresh to update in place without reordering or otherwise disturbing
+ * the reader, and a test can only prove that if the fixture itself changed nothing
+ * else. Only `Status`, `UserNote`, `LastChangedUser` and `LastChangedDate` move (see
+ * {@link transactionDecided}).
+ *
+ * Throws on an id that is not in the list — a snapshot meant to show a request being
+ * decided, that silently decides nothing, turns a race test into a test of nothing.
+ *
+ * Prefer the two named wrappers, which say WHO decided:
+ * {@link transactionsAfterColleagueDecided} and {@link transactionsAfterApproving}.
+ */
+export const transactionsAfterDeciding = (
+  transactions: TransactionRead[],
+  ids: readonly number[],
+  {
+    status = TRANSACTION_STATUS_APPROVED,
+    by = DECIDING_APPROVER,
+    note,
+    at,
+  }: {
+    status?: string;
+    by?: string;
+    note?: string;
+    at?: string;
+  } = {},
+): TransactionRead[] => {
+  const missing = ids.filter(
+    (id) => !transactions.some((transaction) => transaction.Id === id),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Cannot decide transaction id(s) ${missing.join(', ')}: no such request in ` +
+        `this list (it holds ${String(transactions.length)} request(s)). A snapshot ` +
+        `that decides nothing would make a staleness test pass without a race ever ` +
+        `happening.`,
+    );
+  }
+  const targeted = new Set(ids);
+  return transactions.map((transaction) =>
+    targeted.has(transaction.Id)
+      ? transactionDecided(transaction, { status, by, note, at })
+      : transaction,
+  );
+};
+
+/**
+ * The next read of the list, with the named requests decided by SOMEONE ELSE
+ * ({@link OTHER_APPROVER}) — a colleague got there first.
+ *
+ * This is the state the whole epic is built around, and it is read in three places:
+ * the pre-submit re-check that drops those requests from the batch without ever
+ * calling approve for them (BR1/BR2), the outcome's "left unchanged because they
+ * had already been decided" count (R5), and the refresh that quietly prunes them
+ * from an active selection so the visible count corrects itself (BR8).
+ *
+ * Deliberately NOT {@link DECIDING_APPROVER}, so a test can tell "someone else
+ * decided this" apart from "my own batch approved this" — the distinction the
+ * outcome report's first two buckets rest on.
+ *
+ * @example
+ *   const before = transactionsForBulkSelection(5);
+ *   const after = transactionsAfterColleagueDecided(before, [before[1].Id]);
+ *   mockGet
+ *     .mockResolvedValueOnce(transactionListResponse(before))
+ *     .mockResolvedValue(transactionListResponse(after));
+ */
+export const transactionsAfterColleagueDecided = (
+  transactions: TransactionRead[],
+  ids: readonly number[],
+  status: string = TRANSACTION_STATUS_APPROVED,
+): TransactionRead[] =>
+  transactionsAfterDeciding(transactions, ids, { status, by: OTHER_APPROVER });
+
+/**
+ * The reconciliation read (BR5): the list as it stands once this user's own batch
+ * has landed, with exactly the named requests now Approved by
+ * {@link DECIDING_APPROVER}.
+ *
+ * The approved count in the outcome report is computed by comparing each selected
+ * request's status BEFORE the batch to its status in this read — never from the
+ * individual approve responses, which carry the same body whatever happened
+ * ({@link alreadyDecidedResponse}). So this fixture is what an implementation that
+ * trusts the call bodies instead will fail against: name here only the requests
+ * that genuinely changed, and any request reported as approved without appearing
+ * here is a false success.
+ *
+ * @example transactionListResponse(transactionsAfterApproving(before, selectedIds))
+ */
+export const transactionsAfterApproving = (
+  transactions: TransactionRead[],
+  ids: readonly number[],
+): TransactionRead[] =>
+  transactionsAfterDeciding(transactions, ids, {
+    status: TRANSACTION_STATUS_APPROVED,
+    by: DECIDING_APPROVER,
+  });

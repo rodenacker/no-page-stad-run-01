@@ -202,6 +202,27 @@
  *   offer ENDS — the decision the Approver recorded, and the one a fresh read shows
  *   somebody else had already recorded — and nowhere the request is left exactly as it
  *   was: a refused decision keeps its controls, and focus comes back to them by itself.
+ *
+ * Selecting several requests to approve together (`bulk-approval-and-live-refresh`
+ * R2/R4/R7, BR1/BR10):
+ *
+ * - **The selection is a set of transaction IDS, held here, above the pipeline.** So a
+ *   tick follows the REQUEST: a search that hides it, an ordering that moves it and a
+ *   page nobody is reading all leave the selection and its count exactly where they
+ *   were. The deliberate consequence, accepted at the stories approval, is that a bulk
+ *   action may cover requests that are not on screen — which is why the count is always
+ *   visible and why the action that uses it names an exact figure.
+ * - **Each row and card gets a plain `selected` boolean, never the set.** Handing the
+ *   set down would defeat the memo on every row on every tick — and, once this list
+ *   refreshes itself, on every poll. Same shape as `possibleDuplicate` and `canDecide`.
+ * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick, no
+ *   selection column, no "select everything listed" and no count. Absent from the
+ *   markup, never disabled — the rule this project applies everywhere.
+ * - **"Select everything currently listed" means the NARROWED set**, not the page on
+ *   screen and not the whole fetched set, and it covers only requests still awaiting a
+ *   decision (BR1). Unticking it is this screen's clear-the-selection action.
+ * - **`99+` is the ambient indicator's alone** (R4): anything that gates an action
+ *   states the literal count. Both forms live in `lib/transactions/selecting.ts`.
  */
 
 import {
@@ -219,6 +240,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -239,6 +261,8 @@ import { RequestNarrowingControls } from '@/components/requests/RequestNarrowing
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -297,6 +321,17 @@ import {
   pageOf,
   sortStateOf,
 } from '@/lib/transactions/ordering';
+import {
+  NOTHING_SELECTED,
+  SELECTION_COLUMN_LABEL,
+  SELECTION_COUNT_LABEL,
+  SELECT_EVERYTHING_LISTED_LABEL,
+  selectRequestLabel,
+  selectableIdsIn,
+  selectionCountMessage,
+  withIdsSelected,
+  withSelectionToggled,
+} from '@/lib/transactions/selecting';
 import {
   rememberSort,
   rememberedSort,
@@ -480,16 +515,24 @@ const presentationOf = (
  * the controls that open it.
  *
  * Memoised, and its props kept stable for that reason — the request itself, whether the
- * load marked it a possible duplicate (a plain boolean, so the memo still holds), and
- * one callback that takes the request rather than a fresh closure per row. A row's
- * contents depend on nothing else, so a keystroke in the search box or a range bound
- * that leaves the page unchanged re-renders no rows at all. That is what keeps a page
- * render inside the feature NFR's 400ms p95 at the 10,000-row ceiling, where every row
- * carries an action overflow of its own.
+ * load marked it a possible duplicate, whether it is selected (plain booleans, so the
+ * memo still holds), and callbacks that take the request rather than fresh closures per
+ * row. A row's contents depend on nothing else, so a keystroke in the search box or a
+ * range bound that leaves the page unchanged re-renders no rows at all. That is what
+ * keeps a page render inside the feature NFR's 400ms p95 at the 10,000-row ceiling,
+ * where every row carries an action overflow of its own.
+ *
+ * `selected` being a BOOLEAN rather than the selection itself is the load-bearing half
+ * of that: the list holds a set of ids, and handing that set to every row would defeat
+ * this memo on every tick — and, once the list refreshes itself, on every poll.
  */
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
+  selectionOffered,
+  selectable,
+  selected,
+  onToggleSelection,
   canDecide,
   handOffFocus,
   onFocusHandedOff,
@@ -498,6 +541,22 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
 }: {
   request: TransactionRead;
   possibleDuplicate: boolean;
+  /**
+   * Whether the list is offering selection at all — i.e. whether there IS a selection
+   * column. Separate from `selectable` so a request nobody may select still keeps the
+   * column's cell and the rows stay aligned with the heading row.
+   */
+  selectionOffered: boolean;
+  /**
+   * Whether THIS request may be selected: an Approver, and a request still awaiting a
+   * decision (BR1). False means no control at all in the cell — absent, never a
+   * disabled tick (BR10).
+   */
+  selectable: boolean;
+  /** Whether this request is in the selection. A plain boolean, so the memo holds. */
+  selected: boolean;
+  /** Ticks or unticks this request; the list owns what is selected. */
+  onToggleSelection: (request: TransactionRead) => void;
   /**
    * Whether this reader is offered a decision on THIS request. A plain boolean, worked
    * out by the list from who is signed in and the request's own status, so the memo
@@ -512,6 +571,22 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
 }) {
   return (
     <TableRow>
+      {selectionOffered && (
+        <TableCell className="w-10">
+          {selectable && (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => {
+                onToggleSelection(request);
+              }}
+              // Every listed request carries one of these, so the control says WHICH
+              // request it selects rather than leaving a screen-reader user with a
+              // column of identical "Select"s.
+              aria-label={selectRequestLabel(request.Reference)}
+            />
+          )}
+        </TableCell>
+      )}
       <TableCell>{request.FileName}</TableCell>
       <TableCell className="font-medium">{request.Reference}</TableCell>
       <TableCell className="whitespace-nowrap">
@@ -677,6 +752,30 @@ export function ExpenseRequestList({
    * shows is always the fetched set's own values. `null` is "the reader is on the list".
    */
   const [openRequestId, setOpenRequestId] = useState<number | null>(null);
+
+  /**
+   * Which requests are selected to be acted on together, by id (bulk-approval R2/R4).
+   *
+   * Ids, never row positions: the selection sits ABOVE the narrow → order → slice
+   * pipeline, so a tick follows the request through a search that hides it, an ordering
+   * that moves it and a page nobody is reading. The accepted consequence — a bulk action
+   * may cover requests that are not on screen — is why the count is on screen at all
+   * times and why the confirmation that gates the action names an exact figure.
+   */
+  const [selectedIds, setSelectedIds] =
+    useState<ReadonlySet<number>>(NOTHING_SELECTED);
+
+  /**
+   * One request ticked or unticked. Stable, because every row and card holds it — and
+   * it takes the REQUEST rather than being rebuilt per row, which is what keeps them
+   * memoised through a selection change (see `ExpenseRequestRow`).
+   */
+  const toggleSelectionOf = useCallback((request: TransactionRead): void => {
+    setSelectedIds((current) => withSelectionToggled(current, request.Id));
+  }, []);
+
+  /** The id the select-everything control and its wording are wired together by. */
+  const selectEverythingId = useId();
 
   /**
    * The decision the reader is being asked to confirm, if any. Choosing Approve or
@@ -1158,6 +1257,44 @@ export function ExpenseRequestList({
   );
 
   /**
+   * What "select everything currently listed" covers: every still-`Imported` request
+   * the search and filters LEFT (BR1) — read from the narrowed set, not from the page
+   * on screen, which would quietly select twenty of a hundred, and not from the fetched
+   * set, which would ignore the narrowing the user applied.
+   */
+  const selectableListedIds = useMemo(
+    () => selectableIdsIn(visibleRequests),
+    [visibleRequests],
+  );
+
+  /** How many requests are selected — the figure the ambient indicator reads out. */
+  const selectedCount = selectedIds.size;
+
+  /**
+   * Whether everything currently listed is already selected. Deliberately binary rather
+   * than a three-state tick: a partly-filled selection reads as "not everything", which
+   * is the truth, and the exact figure is beside it in the count.
+   */
+  const everythingListedSelected =
+    selectableListedIds.length > 0 &&
+    selectableListedIds.every((id) => selectedIds.has(id));
+
+  /**
+   * Taking everything currently listed ADDS to the selection, so narrowing the list and
+   * taking what is left cannot silently drop a request selected earlier. Unticking is
+   * this screen's way to clear a selection, so it clears the whole of it — including
+   * anything the current narrowing is hiding, which is the only reading under which
+   * "clear" means what the user meant by it.
+   */
+  const changeEverythingListed = (takeEverything: boolean): void => {
+    setSelectedIds((current) =>
+      takeEverything
+        ? withIdsSelected(current, selectableListedIds)
+        : NOTHING_SELECTED,
+    );
+  };
+
+  /**
    * The request the panel is showing, resolved from the fetched set rather than kept as
    * a copy — so the panel can never show a value the list no longer holds. A request
    * that is no longer there closes the panel rather than freezing an old version of it.
@@ -1228,7 +1365,48 @@ export function ExpenseRequestList({
               LEFT, in the order the list is sorted, never the page on screen and never
               the whole fetched set (BR1). It sits above the controls that decide that
               set, so a keyboard user reaches it early. */}
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+            {/* The selection controls, offered to an Approver and to nobody else —
+                absent from the markup for anyone else rather than disabled (R7/BR10),
+                which is what makes the exclusion structural. They sit AHEAD of the rows
+                so a keyboard user meets "take everything listed" before the requests
+                themselves, and beside the count, which is where the bulk action joins
+                them. */}
+            {isApprover && (
+              <div className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id={selectEverythingId}
+                    checked={everythingListedSelected}
+                    onCheckedChange={(takeEverything) => {
+                      changeEverythingListed(takeEverything === true);
+                    }}
+                    // Named here as well as beside itself, so what a screen reader is
+                    // given and what a sighted reader sees are one string.
+                    aria-label={SELECT_EVERYTHING_LISTED_LABEL}
+                  />
+                  <Label htmlFor={selectEverythingId} className="font-normal">
+                    {SELECT_EVERYTHING_LISTED_LABEL}
+                  </Label>
+                </div>
+
+                {/* R4: on screen the whole time a selection is live, and NOT on it at
+                    all once nothing is selected — an indicator reading "0 selected" is
+                    a permanent fixture rather than an answer. Announced politely
+                    (`status`), since the figure moves under a reader who is doing
+                    something else. */}
+                {selectedCount > 0 && (
+                  <p
+                    role="status"
+                    aria-label={SELECTION_COUNT_LABEL}
+                    className="text-sm font-medium"
+                  >
+                    {selectionCountMessage(selectedCount)}
+                  </p>
+                )}
+              </div>
+            )}
+
             <ExportRequestsAction
               listedRequests={orderedRequests}
               exportedBy={exportedBy}
@@ -1296,6 +1474,9 @@ export function ExpenseRequestList({
                   requests={requestsOnPage}
                   presentationOf={presentationOf}
                   possibleDuplicateIds={possibleDuplicateIds}
+                  maySelect={isApprover}
+                  selectedIds={selectedIds}
+                  onToggleSelection={toggleSelectionOf}
                   mayDecide={isApprover}
                   handOffFocusTo={handOffFocusTo}
                   onFocusHandedOff={focusHandedOff}
@@ -1310,7 +1491,8 @@ export function ExpenseRequestList({
                     account number, its description, amount, transaction type
                     and status, and the controls each request offers — opening
                     it, and, where one is still awaiting a decision and you may
-                    make it, approving or rejecting it. Every value heading
+                    make it, selecting it to be approved with others, or
+                    approving or rejecting it on its own. Every value heading
                     orders the list by its own column.
                   </TableCaption>
                   <TableHeader>
@@ -1318,6 +1500,15 @@ export function ExpenseRequestList({
                         column has a sort control (R13) rather than most of them
                         having one. */}
                     <TableRow>
+                      {/* The selection column, for an Approver only: nothing to
+                          order by, and the ticks in it name themselves. */}
+                      {isApprover && (
+                        <TableHead scope="col" className="w-10">
+                          <span className="sr-only">
+                            {SELECTION_COLUMN_LABEL}
+                          </span>
+                        </TableHead>
+                      )}
                       {REQUEST_COLUMNS.map((column) => (
                         <SortableColumnHeading
                           key={column.key}
@@ -1339,6 +1530,10 @@ export function ExpenseRequestList({
                         key={request.Id}
                         request={request}
                         possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+                        selectionOffered={isApprover}
+                        selectable={isApprover && awaitsDecision(request)}
+                        selected={selectedIds.has(request.Id)}
+                        onToggleSelection={toggleSelectionOf}
                         canDecide={isApprover && awaitsDecision(request)}
                         handOffFocus={handOffFocusTo === request.Id}
                         onFocusHandedOff={focusHandedOff}
