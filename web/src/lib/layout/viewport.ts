@@ -1,7 +1,7 @@
 /**
  * How wide the reader's screen is, for the one case where a narrow viewport needs a
  * genuinely DIFFERENT presentation rather than a re-flowed one (brief R16: on a narrow
- * viewport each expense request is a card with an action overflow, not a wide table
+ * viewport each expense request is a card carrying its own controls, not a wide table
  * inside a sideways-scrolling wrapper).
  *
  * Three things here are deliberate:

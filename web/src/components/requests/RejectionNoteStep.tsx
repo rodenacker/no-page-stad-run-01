@@ -24,8 +24,8 @@
  *   run on (NFR1). It stays enabled and answers with the refusal.
  * - **The wording of the rule is the requirement's own**, from
  *   `lib/validation/schemas.ts` — never spelled out here, and never softened.
- * - **The three phrases of a rejection do not read alike**: "Reject" asks (the row's
- *   overflow), "Continue" moves on (here), "Reject request" does it (the
+ * - **The three phrases of a rejection do not read alike**: "Reject" asks (the row's own
+ *   control), "Continue" moves on (here), "Reject request" does it (the
  *   confirmation), "Cancel" backs out. Neither a user nor a query can confuse them.
  * - **It hands focus over to the confirmation rather than back to the list.** Radix
  *   returns focus to whatever was focused before a dialog opened, on a timer, as it

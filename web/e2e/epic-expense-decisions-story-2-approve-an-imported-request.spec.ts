@@ -71,8 +71,9 @@
  *   (`TransactionId` in the query, the server-populated `LastChangedUser` header): that
  *   is story 1's Vitest layer.
  * - The per-request Approve action is a DIRECT control on the request's own row
- *   (`RequestActions.tsx`), reachable in one click — not an item inside the ⋯ action
- *   overflow, which holds only Open. Because every listed request carries its own
+ *   (`RequestActions.tsx`), reachable in one click. A request carries no ⋯ action
+ *   overflow at all — every control it offers, Open included, sits on the row (the menu
+ *   was removed at a later manual test). Because every listed request carries its own
  *   Approve, each one's accessible name names the request it decides ("Approve request
  *   <reference>"), which is also what lets this spec address one row's Approve without
  *   matching every other row's. The confirmation is the Shadcn `alert-dialog` already
@@ -109,7 +110,7 @@
  * TIMING — why nothing here waits real time, and why the clock is RESUMED:
  * `page.clock.install()` is called before navigating (so no timer escapes the fake
  * clock) and then immediately `resume()`d, which leaves time flowing normally while the
- * dropdown and the dialog are driven — Radix's own focus and animation work runs on
+ * dialog is driven — Radix's own focus and animation work runs on
  * `requestAnimationFrame`, which the installed clock also fakes, so a PAUSED clock
  * would stall the very interaction under test. The two notification lifetimes are then
  * measured with `fastForward()` at the app's REAL durations: no test-only "short
@@ -117,7 +118,7 @@
  * accessibility test runs with no clock at all — axe is never run under faked timers.
  *
  * These tests WILL FAIL until the story is implemented (TDD red): `/requests` offers no
- * decide action at all today, so the action overflow holds only "Open".
+ * decide action at all today — a request's only control is the one that opens it.
  * ---------------------------------------------------------------------------
  */
 import AxeBuilder from '@axe-core/playwright';
@@ -499,8 +500,7 @@ test.describe('Epic expense-decisions, Story 2: approve an imported request', ()
     context,
   }) => {
     // Take the browser clock before anything schedules a timer — then let it flow, so
-    // the dropdown and the dialog behave exactly as they do for a user (see the
-    // header's TIMING note).
+    // the dialog behaves exactly as it does for a user (see the header's TIMING note).
     await page.clock.install();
     await page.clock.resume();
 

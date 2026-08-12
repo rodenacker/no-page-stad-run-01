@@ -12,48 +12,58 @@
       "Verify that approving cannot overturn a colleague's rejection: the app assumes the service refuses (or harmlessly ignores) an approve call for a request that is already Rejected, and it only guards against that by checking each request's state a moment before sending. The written contract for the approve call says only that it 'sets the Status to Approved', with no mention of a guard. If it really does overwrite, a bulk approval could silently flip a rejection your colleague recorded seconds earlier — and nothing on screen would say so.",
       "Verify the result counts match reality: the report of 'how many approved, how many left unchanged' is worked out by re-reading the list immediately after the approvals are sent. If the service takes a moment to reflect them, the report could tell you 0 approved when everything in fact worked. Approve a handful, note the numbers you are told, then reload the page and count the Approved rows — they should agree.",
       "Verify a 15-second refresh is comfortable against your real data volumes: the list re-reads every request each time (the service offers no way to ask for just what changed), and this was only ever exercised against small test data. On a batch near the 10,000-request ceiling you may notice the screen stutter every 15 seconds or the refresh not finishing before the next one is due.",
-      "Confirm the exact shape of the single-request approve call, its confirmation composition and its staleness re-check against the merged main once expense-decisions lands. This epic was planned while that epic was still building, so those three reuse points were planned from its story files rather than observed in code — the story files mark them as dependency seams to check before building."
+      "Unticking the 'Select all listed requests' control clears the WHOLE selection — including requests the current search or filters are hiding. Nothing in the requirements says what the clearing action should cover, and this is the only clear-selection control the screen offers; the alternative (clear only what is currently listed) would leave an invisible remainder ticked. Confirm that clearing everything is what you'd expect.",
+      "The 'select everything currently listed' control ADDS to the selection rather than replacing it, so narrowing the list and taking what is left keeps anything ticked beforehand. Also not stated in the requirements — it is the reading consistent with a selection that survives narrowing.",
+      "The visible form of the 'last up to date' time is the project's own YYYY-MM-DD HH:MM on the reader's clock (the same notation every other app-written moment uses). The brief fixes only that the moment is shown, not how it reads — worth a glance that a bare timestamp is clear enough there, rather than something like 'about 2 minutes ago'.",
+      "A refresh announces itself only to assistive technology (an invisible polite line naming how much has changed); there is no visible 'list updated' indicator, because a sighted reader sees the rows change. Confirm that is the wanted behaviour rather than a visible banner.",
+      "The wording of the bulk-approval result is the app's own: it is headed 'Selection approved' (or 'Nothing was approved' / 'Some approvals could not be submitted') and reads 'Of the 3 requests selected: 2 approved, 1 left unchanged because it had already been decided.' The requirements fix the two figures and the reason but not the sentence — confirm it reads the way a finance approver would want."
     ],
-    "manualTestResults": []
+    "manualTestResults": [
+      {
+        "recordedAt": "2026-08-12",
+        "allPassed": true,
+        "summary": "All 28 manual tests and the 8 check-these-first assumptions confirmed by the user in chat (no per-item breakdown pasted back)."
+      }
+    ]
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed-after-fix",
+      "startedAt": "2026-08-11T13:05:00.000Z",
+      "completedAt": "2026-08-11T13:19:00.000Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-11T13:20:00.000Z",
+      "completedAt": "2026-08-11T13:38:00.000Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-11T13:40:00.000Z",
+      "completedAt": "2026-08-11T13:50:00.000Z"
     },
     "4": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-11T13:52:00.000Z",
+      "completedAt": "2026-08-11T14:13:00.000Z"
     },
     "5": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-11T14:15:00.000Z",
+      "completedAt": "2026-08-11T17:20:00.000Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-11T10:05:00.000Z"
+  "lastUpdated": "2026-08-11T16:36:58.332Z"
 }

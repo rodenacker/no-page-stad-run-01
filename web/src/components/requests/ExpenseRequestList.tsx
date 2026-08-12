@@ -88,9 +88,9 @@
  *   at the stories approval, over an expandable row. This component holds only WHICH
  *   request is open (by id); the panel holds the reveal, so closing it returns the
  *   reader to their place, ordering and page untouched. See `RequestDetailPanel`.
- * - **Still nothing changes a request** (BR1/R5). The only per-request controls are
- *   "open it" — offered directly and through an action overflow, the mechanism R16 asks
- *   for at phone width and the place a later epic's actions will go.
+ * - **Still nothing changes a request** (BR1/R5). The only per-request control is
+ *   "open it", a direct control on the row and on the card alike — see `RequestActions`
+ *   for why there is no ⋯ overflow behind it.
  * - **At phone width the requests are CARDS, not a table.** Which presentation is
  *   rendered is decided by the browser's own media query, watched as external state, so
  *   only one of the two is ever in the markup: a table hidden by CSS would still be read
@@ -155,8 +155,8 @@
  *   its markup at all. Absent, never disabled: the project's rule everywhere, and the
  *   thing a greyed-out Approve would quietly break.
  * - **The two decisions are DIRECT controls on the row and on the card** (user decision
- *   at manual test), not items in the ⋯ overflow, which now holds only Open — so
- *   deciding a request costs one activation rather than two. They are therefore on
+ *   at manual test), and there is no ⋯ overflow anywhere on a request — so deciding one
+ *   costs one activation rather than two. They are therefore on
  *   screen once per listed request, which is why each one's accessible name carries the
  *   request's reference; "Approve" alone would be a screenful of identical controls.
  * - **Nothing is sent until the confirmation is accepted** (R10/BR6). Choosing Approve
@@ -202,6 +202,127 @@
  *   offer ENDS — the decision the Approver recorded, and the one a fresh read shows
  *   somebody else had already recorded — and nowhere the request is left exactly as it
  *   was: a refused decision keeps its controls, and focus comes back to them by itself.
+ *
+ * Selecting several requests to approve together (`bulk-approval-and-live-refresh`
+ * R2/R4/R7, BR1/BR10):
+ *
+ * - **The selection is a set of transaction IDS, held here, above the pipeline.** So a
+ *   tick follows the REQUEST: a search that hides it, an ordering that moves it and a
+ *   page nobody is reading all leave the selection and its count exactly where they
+ *   were. The deliberate consequence, accepted at the stories approval, is that a bulk
+ *   action may cover requests that are not on screen — which is why the count is always
+ *   visible and why the action that uses it names an exact figure.
+ * - **Each row and card gets a plain `selected` boolean, never the set.** Handing the
+ *   set down would defeat the memo on every row on every tick — and, once this list
+ *   refreshes itself, on every poll. Same shape as `possibleDuplicate` and `canDecide`.
+ * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick, no
+ *   selection column, no "select everything listed" and no count. Absent from the
+ *   markup, never disabled — the rule this project applies everywhere.
+ * - **"Select everything currently listed" means the NARROWED set**, not the page on
+ *   screen and not the whole fetched set, and it covers only requests still awaiting a
+ *   decision (BR1). Unticking it is this screen's clear-the-selection action.
+ * - **`99+` is the ambient indicator's alone** (R4): anything that gates an action
+ *   states the literal count. Both forms live in `lib/transactions/selecting.ts`.
+ *
+ * Approving the whole selection at once (R1/R5/R8/R9, BR1-BR5, NFR3):
+ *
+ * - **The batch is N single-request approve calls** — there is no bulk endpoint (BR3).
+ *   They run a few at a time, at the bound stated in `lib/transactions/bulkApproval.ts`,
+ *   so a selection that can run to thousands neither floods the service nor leaves the
+ *   screen unusable while it works through them (NFR3).
+ * - **Nothing is sent until a FRESH read says it may be** (BR1/BR2), and the read is the
+ *   same one a single decision takes — the check itself now lives in
+ *   `lib/transactions/bulkApproval.ts` and both paths ask it, so "already decided"
+ *   cannot come to mean two things on one screen. A selected request the read shows
+ *   decided is dropped from the batch with no call made for it at all, and reported as
+ *   left unchanged.
+ * - **The outcome is a comparison of two reads, never the call answers** (BR5). The
+ *   service answers the same envelope whether it approved a request or found it already
+ *   decided, so the approved count comes from the read taken AFTER the batch against the
+ *   one taken before it. That second read is load-bearing, not a refresh.
+ * - **The selection controls are DISABLED while the batch runs** — the one place this
+ *   screen shows a disabled control rather than an absent one. It is transient state,
+ *   not a permission: BR10's hidden-never-disabled rule governs who may act, and that
+ *   still never reaches the markup. The list itself stays readable throughout, and the
+ *   batch announces itself politely, since no row changes until the read.
+ * - **What the batch decided stops being selected** (BR8): approved requests, and
+ *   requests a colleague decided first, drop out of the selection and the count corrects
+ *   itself. Anything still awaiting a decision keeps its tick.
+ *
+ * When part of a batch fails (R5/R10, BR11):
+ *
+ * - **Three buckets, never two.** A call that FAILED is not the same thing as a request
+ *   nobody sent a call for. "Left unchanged" means a colleague decided it first and
+ *   nothing went wrong; "could not be submitted" means the call itself was refused. The
+ *   report names all three, empty ones included, and gives the SERVICE's own reason for
+ *   the failures — never the client's placeholder (project.md NFR-base-5).
+ * - **The report waits, and carries the way out.** Something the Approver has to act on
+ *   does not fade (`duration: 0`), and the way to act on it is a real button inside the
+ *   notification (`action` on the toast surface) — not a click handler on its body,
+ *   which no keyboard can reach.
+ * - **Trying again is scoped, re-checks, and asks nothing.** It covers exactly the
+ *   requests whose calls failed, and it runs the SAME batch (`runBulkApproval`), so the
+ *   eligibility re-check happens again over that subset: a request decided in the
+ *   interim comes back as left unchanged rather than approved a second time (BR11). It
+ *   does not ask for confirmation again — this bulk approval was confirmed when it
+ *   started, and choosing a named, smaller subset is itself the deliberate act — and
+ *   taking it dismisses the report, so two answers about one batch are never on screen
+ *   together.
+ *
+ * Keeping itself current while somebody is reading it (R3, BR6/BR7/BR8, NFR2/NFR4/NFR5):
+ *
+ * - **The refresh is this list's OWN read, on a timer** — `GET /v1/transactions` again,
+ *   from the browser, at `lib/transactions/refreshing.ts`'s cadence. There is no delta
+ *   channel and no single-request read to ask for instead (brief §Data Model), and a
+ *   read issued from the server could not be a self-refresh at all.
+ * - **It runs the WHOLE time the list is open**, which is this epic's deliberate
+ *   extension of the project's stop-when-idle convention (`SubmittedFilesList`, which
+ *   watches files that eventually finish). What this list watches is other people's
+ *   decisions, and those never finish — so there is no idle state to stop at. Everything
+ *   else about that convention is followed exactly: one timer at most, cleared when this
+ *   component goes away, and a re-read that fails leaves the last known rows on screen.
+ * - **Nothing is asked of a service nobody is watching** (BR6). The timer is gated on
+ *   the document being visible, watched as external state (`lib/layout/pageVisibility`),
+ *   and a reader who comes back to the tab gets a read STRAIGHT AWAY rather than waiting
+ *   out the tick they missed.
+ * - **It pauses around the reader's own bulk action** (BR7): while the bulk-approve
+ *   confirmation is open and while the batch is in flight, nothing polls — a refresh
+ *   must never race an action the Approver is part-way through. It resumes the moment
+ *   that action ends, whichever way it ended, backing out included. That pause is also
+ *   what satisfies NFR4: the batch's own pre-submit re-check and its read back are the
+ *   only reads of that interaction, so no poll can fire a second full-list read beside
+ *   them. The pause is NOT extended to a single request's confirmation: that flow takes
+ *   its own reads, and the dialog is unaffected by rows changing behind it.
+ * - **A refresh updates in place** (BR8). The reader's search term, filters, ordering,
+ *   page and keyboard are all untouched, an open dialog is left standing, and a request
+ *   that reads exactly as it already did keeps the very object it had — so a poll
+ *   re-renders only what moved (NFR5, and see `refreshedList`). The one deliberate
+ *   exception is the selection: a request a colleague has decided drops out of it and
+ *   the visible count corrects itself, with nothing raised about it.
+ * - **It is announced politely and nowhere else** (NFR2). One `role="status"` line,
+ *   present from the start so its contents CHANGING is what gets spoken; never an alert,
+ *   never a dialog, and never the app's notification surface — a background data change
+ *   must not interrupt whatever the reader is doing.
+ *
+ * And when refreshing itself stops working (R6, BR9):
+ *
+ * - **Two strikes, never one.** One failed read changes nothing whatsoever on screen —
+ *   transient failures are ordinary, and a notice on each would be noise. Only the SECOND
+ *   consecutive failure raises the notice, and the count is failures since the last
+ *   SUCCESS: a read that works in between puts it back to nothing.
+ * - **The moment named is the last read that SUCCEEDED**, held in a ref and written into
+ *   the notice as a machine-readable `<time>`. It is recorded when a read lands and never
+ *   when one fails — "last up to date: now", stamped on the failure, is the easy
+ *   implementation and it misleads the reader about the one thing they are being told.
+ * - **The rows are never blanked.** The failed-load state — the alert, the service's own
+ *   reason and Try again — belongs to a read that left the reader with NOTHING (the
+ *   convention `SubmittedFilesList` established). Here they have rows, so they keep them,
+ *   in their order, with their narrowing, ordering, page and keyboard untouched.
+ * - **Nothing is asked of the reader.** The notice carries no button and no link, and
+ *   recovery is the next successful poll clearing it — the timer never stopped, so there
+ *   is nothing to restart.
+ * - **It is polite, and one of it** (NFR2, inherited from the announcement above): a
+ *   single `role="status"` region, never an alert, however many further polls fail.
  */
 
 import {
@@ -219,6 +340,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -239,6 +361,8 @@ import { RequestNarrowingControls } from '@/components/requests/RequestNarrowing
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -249,9 +373,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/contexts/ToastContext';
 import {
+  DECISION_APPROVE,
   DECISION_REJECT,
   decisionFailureMessage,
   recordDecision,
@@ -262,14 +386,35 @@ import {
 } from '@/lib/api/transactions';
 import { UPLOAD_PATH } from '@/lib/auth/access-map';
 import {
+  isPageVisible,
+  isPageVisibleOnServer,
+  subscribeToPageVisibility,
+} from '@/lib/layout/pageVisibility';
+import {
   isNarrowViewport,
   isNarrowViewportOnServer,
   subscribeToViewportWidth,
 } from '@/lib/layout/viewport';
 import {
-  ALREADY_DECIDED_MESSAGE,
+  BULK_APPROVE_ACTION_LABEL,
+  BULK_APPROVE_CONFIRMATION_MESSAGE,
+  BULK_APPROVE_CONFIRM_LABEL,
+  BULK_APPROVE_REFUSED_TITLE,
+  NOTHING_SENT_MESSAGE,
+  OUTCOME_UNKNOWN_MESSAGE,
+  approvedIn,
+  bulkApprovalInFlightMessage,
+  bulkApprovalOutcomeMessage,
+  bulkApprovalOutcomeTitle,
+  bulkApproveConfirmationTitle,
+  eligibilityIn,
+  retryRefusedApprovalsLabel,
+  staleDecisionMessage,
+  stalenessIn,
+  submitApprovals,
+} from '@/lib/transactions/bulkApproval';
+import {
   DECISION_REFUSED_TITLE,
-  REQUEST_NO_LONGER_LISTED_MESSAGE,
   WAY_OUT_OF_CONFIRMATION,
   awaitsDecision,
   confirmDecisionLabel,
@@ -298,12 +443,34 @@ import {
   sortStateOf,
 } from '@/lib/transactions/ordering';
 import {
+  CANNOT_REFRESH_MESSAGE,
+  FAILED_REFRESHES_BEFORE_STALE,
+  LAST_UP_TO_DATE_LEAD,
+  LIST_REFRESH_INTERVAL_MS,
+  REFRESH_RESUMES_MESSAGE,
+  listRefreshedMessage,
+  refreshedList,
+} from '@/lib/transactions/refreshing';
+import {
+  NOTHING_SELECTED,
+  SELECTION_COLUMN_LABEL,
+  SELECTION_COUNT_LABEL,
+  SELECT_EVERYTHING_LISTED_LABEL,
+  selectRequestLabel,
+  selectableIdsIn,
+  selectionCountMessage,
+  withDecidedRequestsDropped,
+  withIdsSelected,
+  withSelectionToggled,
+} from '@/lib/transactions/selecting';
+import {
   rememberSort,
   rememberedSort,
   rememberedSortOnServer,
   subscribeToSort,
 } from '@/lib/transactions/sortPreference';
 import { PAGINATION } from '@/lib/utils/constants';
+import { onScreenDateTime } from '@/lib/utils/dateTime';
 import { ROLE_APPROVER } from '@/types/auth';
 import {
   TRANSACTION_STATUS_APPROVED,
@@ -323,6 +490,7 @@ import type {
   RequestColumnDefinition,
   RequestSort,
 } from '@/lib/transactions/ordering';
+import type { RefreshedList } from '@/lib/transactions/refreshing';
 import type { ProjectRole } from '@/types/auth';
 import type {
   TransactionRead,
@@ -480,16 +648,25 @@ const presentationOf = (
  * the controls that open it.
  *
  * Memoised, and its props kept stable for that reason — the request itself, whether the
- * load marked it a possible duplicate (a plain boolean, so the memo still holds), and
- * one callback that takes the request rather than a fresh closure per row. A row's
- * contents depend on nothing else, so a keystroke in the search box or a range bound
- * that leaves the page unchanged re-renders no rows at all. That is what keeps a page
- * render inside the feature NFR's 400ms p95 at the 10,000-row ceiling, where every row
- * carries an action overflow of its own.
+ * load marked it a possible duplicate, whether it is selected (plain booleans, so the
+ * memo still holds), and callbacks that take the request rather than fresh closures per
+ * row. A row's contents depend on nothing else, so a keystroke in the search box or a
+ * range bound that leaves the page unchanged re-renders no rows at all. That is what
+ * keeps a page render inside the feature NFR's 400ms p95 at the 10,000-row ceiling,
+ * where every row carries controls of its own.
+ *
+ * `selected` being a BOOLEAN rather than the selection itself is the load-bearing half
+ * of that: the list holds a set of ids, and handing that set to every row would defeat
+ * this memo on every tick — and, once the list refreshes itself, on every poll.
  */
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
+  selectionOffered,
+  selectable,
+  selected,
+  selectionLocked,
+  onToggleSelection,
   canDecide,
   handOffFocus,
   onFocusHandedOff,
@@ -498,6 +675,29 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
 }: {
   request: TransactionRead;
   possibleDuplicate: boolean;
+  /**
+   * Whether the list is offering selection at all — i.e. whether there IS a selection
+   * column. Separate from `selectable` so a request nobody may select still keeps the
+   * column's cell and the rows stay aligned with the heading row.
+   */
+  selectionOffered: boolean;
+  /**
+   * Whether THIS request may be selected: an Approver, and a request still awaiting a
+   * decision (BR1). False means no control at all in the cell — absent, never a
+   * disabled tick (BR10).
+   */
+  selectable: boolean;
+  /** Whether this request is in the selection. A plain boolean, so the memo holds. */
+  selected: boolean;
+  /**
+   * Whether the selection is being acted on right now, in which case the tick cannot be
+   * moved (bulk-approval AC-4). This is the ONE place this screen shows a disabled
+   * control rather than an absent one: it is transient state — the batch is in flight —
+   * and not a permission, which BR10 keeps out of the markup entirely.
+   */
+  selectionLocked: boolean;
+  /** Ticks or unticks this request; the list owns what is selected. */
+  onToggleSelection: (request: TransactionRead) => void;
   /**
    * Whether this reader is offered a decision on THIS request. A plain boolean, worked
    * out by the list from who is signed in and the request's own status, so the memo
@@ -512,6 +712,23 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
 }) {
   return (
     <TableRow>
+      {selectionOffered && (
+        <TableCell className="w-10">
+          {selectable && (
+            <Checkbox
+              checked={selected}
+              disabled={selectionLocked}
+              onCheckedChange={() => {
+                onToggleSelection(request);
+              }}
+              // Every listed request carries one of these, so the control says WHICH
+              // request it selects rather than leaving a screen-reader user with a
+              // column of identical "Select"s.
+              aria-label={selectRequestLabel(request.Reference)}
+            />
+          )}
+        </TableCell>
+      )}
       <TableCell>{request.FileName}</TableCell>
       <TableCell className="font-medium">{request.Reference}</TableCell>
       <TableCell className="whitespace-nowrap">
@@ -679,6 +896,59 @@ export function ExpenseRequestList({
   const [openRequestId, setOpenRequestId] = useState<number | null>(null);
 
   /**
+   * Which requests are selected to be acted on together, by id (bulk-approval R2/R4).
+   *
+   * Ids, never row positions: the selection sits ABOVE the narrow → order → slice
+   * pipeline, so a tick follows the request through a search that hides it, an ordering
+   * that moves it and a page nobody is reading. The accepted consequence — a bulk action
+   * may cover requests that are not on screen — is why the count is on screen at all
+   * times and why the confirmation that gates the action names an exact figure.
+   */
+  const [selectedIds, setSelectedIds] =
+    useState<ReadonlySet<number>>(NOTHING_SELECTED);
+
+  /**
+   * One request ticked or unticked. Stable, because every row and card holds it — and
+   * it takes the REQUEST rather than being rebuilt per row, which is what keeps them
+   * memoised through a selection change (see `ExpenseRequestRow`).
+   */
+  const toggleSelectionOf = useCallback((request: TransactionRead): void => {
+    setSelectedIds((current) => withSelectionToggled(current, request.Id));
+  }, []);
+
+  /** The id the select-everything control and its wording are wired together by. */
+  const selectEverythingId = useId();
+
+  /**
+   * Whether the Approver has been asked to confirm approving the whole selection
+   * (R8/BR4). Nothing is read and nothing is sent while this is merely open: choosing
+   * the bulk action only asks the question.
+   */
+  const [bulkApprovalAsked, setBulkApprovalAsked] = useState(false);
+
+  /**
+   * How many requests the batch now running was asked to approve, or `null` when no
+   * batch is running. It is the selection's own size, announced the moment the Approver
+   * accepts: the read that decides which of them are still eligible is a round trip
+   * away, and a screen that says nothing at all after an accepted, irreversible action
+   * is the worse answer. What the batch actually did is the outcome's business (R5).
+   */
+  const [bulkApprovalSubmitting, setBulkApprovalSubmitting] = useState<
+    number | null
+  >(null);
+
+  /** Whether a batch is in flight — which locks the selection controls (AC-4). */
+  const bulkApprovalRunning = bulkApprovalSubmitting !== null;
+
+  /**
+   * The same fact as a ref, for the ONE caller that cannot read it from state: the
+   * "try again" control the failed-batch report carries (R10) is created while a batch
+   * is still running, so the state it closed over says "running" forever. The ref is
+   * read at the moment the control is taken, which is what the guard actually means.
+   */
+  const bulkApprovalInFlight = useRef(false);
+
+  /**
    * The decision the reader is being asked to confirm, if any. Choosing Approve or
    * Reject only sets this: nothing is sent until the confirmation is accepted (R10).
    */
@@ -741,6 +1011,121 @@ export function ExpenseRequestList({
   );
 
   /**
+   * Whether the reader is looking at this tab at all (BR6). The document knows before
+   * React runs, so — like the width above — it is watched rather than copied into state.
+   */
+  const readerIsHere = useSyncExternalStore(
+    subscribeToPageVisibility,
+    isPageVisible,
+    isPageVisibleOnServer,
+  );
+
+  /**
+   * The requests the last successful read left on screen.
+   *
+   * A ref rather than state because it is what a LATER read is compared against, not
+   * something rendered: the comparison happens inside a promise that resolved long
+   * after the render it was started from, so reading the rows out of `state` there
+   * would compare against whatever was on screen when the poll was scheduled.
+   */
+  const requestsOnScreen = useRef<TransactionRead[]>(NO_REQUESTS);
+
+  /**
+   * When this list was last genuinely current: the instant of the last read that
+   * SUCCEEDED (R6/AC-5). A ref, because it is written on every read that lands and read
+   * only when the notice below is raised — holding it in state would re-render the whole
+   * list four times a minute to record something nobody is looking at.
+   *
+   * It starts as the moment the screen opened, which is the only honest answer before the
+   * first read lands; every read that succeeds — the first load included — moves it on,
+   * and no failure ever touches it.
+   */
+  const lastCurrentAt = useRef(Date.now());
+
+  /**
+   * How many reads in a row have failed SINCE THE LAST ONE THAT WORKED (BR9). A ref for
+   * the same reason: counting to one changes nothing on screen.
+   */
+  const failedRefreshes = useRef(0);
+
+  /**
+   * When the list was last current, while it can no longer refresh itself — and `null`
+   * whenever refreshing is working, which is what takes the notice away again.
+   *
+   * This is the ONE piece of all this that is rendered, so it is the one piece held in
+   * state. It is set on the failure that reaches BR9's threshold and cleared by the next
+   * read that succeeds, with no user action in between (R6).
+   */
+  const [cannotRefreshSince, setCannotRefreshSince] = useState<number | null>(
+    null,
+  );
+
+  /**
+   * A read landed: this is the moment the list was last current, and nothing is failing
+   * any more.
+   *
+   * The state is touched only when there was something to clear, so the ordinary case —
+   * a poll that simply worked — costs no render at all (NFR5).
+   */
+  const listIsCurrent = useCallback((): void => {
+    lastCurrentAt.current = Date.now();
+    if (failedRefreshes.current === 0) {
+      return;
+    }
+    failedRefreshes.current = 0;
+    setCannotRefreshSince(null);
+  }, []);
+
+  /**
+   * A read failed. One is a hiccup and says nothing (AC-2); the second in a row is what
+   * raises the notice, naming the moment recorded above rather than this one (AC-5).
+   *
+   * Further failures beyond the second re-state the same instant, so React holds the
+   * render and the notice never stacks (AC-3).
+   */
+  const refreshFailed = useCallback((): void => {
+    failedRefreshes.current += 1;
+    if (failedRefreshes.current < FAILED_REFRESHES_BEFORE_STALE) {
+      return;
+    }
+    setCannotRefreshSince(lastCurrentAt.current);
+  }, []);
+
+  /**
+   * Puts a fresh read on screen without disturbing anything the reader arranged (BR8),
+   * and answers with what it left there.
+   *
+   * Every request the read describes exactly as it already stood keeps the object it
+   * had, and a read that changed nothing at all leaves the state object itself
+   * untouched — so the narrowing, ordering, paging and duplicate marks are not
+   * recomputed and no row re-renders (NFR5). The one thing it deliberately DOES change
+   * is the selection: a request that has stopped awaiting a decision comes out of it and
+   * the visible count corrects itself, with nothing raised about it.
+   */
+  const showFreshRequests = useCallback(
+    (incoming: TransactionRead[]): RefreshedList => {
+      // Whatever asked for it, this read landed — so this is the moment the list was
+      // last current, and refreshing is working again (R6).
+      listIsCurrent();
+
+      const refreshed = refreshedList(requestsOnScreen.current, incoming);
+      requestsOnScreen.current = refreshed.requests;
+
+      setState((current) =>
+        current.phase !== 'loaded' || current.requests === refreshed.requests
+          ? current
+          : { phase: 'loaded', requests: refreshed.requests },
+      );
+      setSelectedIds((current) =>
+        withDecidedRequestsDropped(current, refreshed.requests),
+      );
+
+      return refreshed;
+    },
+    [listIsCurrent],
+  );
+
+  /**
    * Reads the list and puts what came back on screen.
    *
    * `stillWatching` is how a caller says its read no longer matters: this component
@@ -753,7 +1138,11 @@ export function ExpenseRequestList({
           if (!stillWatching()) {
             return;
           }
-          setState({ phase: 'loaded', requests: requestsIn(body) });
+          const requests = requestsIn(body);
+          requestsOnScreen.current = requests;
+          // The first load is the last moment the list was current, too (R6).
+          listIsCurrent();
+          setState({ phase: 'loaded', requests });
         })
         .catch((error: unknown) => {
           if (!stillWatching()) {
@@ -767,7 +1156,7 @@ export function ExpenseRequestList({
             message: transactionListFailureMessage(error),
           });
         }),
-    [],
+    [listIsCurrent],
   );
 
   useEffect(() => {
@@ -811,6 +1200,10 @@ export function ExpenseRequestList({
 
   const readAgain = (): void => {
     setState(LOADING);
+    // Asking for the list again starts the count over: what happens next is this read,
+    // not the polls that failed before it.
+    failedRefreshes.current = 0;
+    setCannotRefreshSince(null);
     setReadsRequested((reads) => reads + 1);
   };
 
@@ -913,14 +1306,10 @@ export function ExpenseRequestList({
    */
   const rereadRequests = useCallback(
     (): Promise<TransactionRead[]> =>
-      fetchTransactions().then((body) => {
-        const requests = requestsIn(body);
-        setState((current) =>
-          current.phase === 'loaded' ? { phase: 'loaded', requests } : current,
-        );
-        return requests;
-      }),
-    [],
+      fetchTransactions().then(
+        (body) => showFreshRequests(requestsIn(body)).requests,
+      ),
+    [showFreshRequests],
   );
 
   /**
@@ -937,6 +1326,128 @@ export function ExpenseRequestList({
         }),
     [rereadRequests],
   );
+
+  /**
+   * How much of somebody else's work has arrived on this list since the reader opened
+   * it, and the polite line that says so (NFR2). A running total, because a live region
+   * announces its CONTENTS CHANGING — see `listRefreshedMessage`.
+   */
+  const changesFromElsewhere = useRef(0);
+  const [refreshNote, setRefreshNote] = useState('');
+
+  /** Whether a poll is still out, so a tick never starts a second one beside it. */
+  const pollInFlight = useRef(false);
+
+  /**
+   * One refresh: the list's own read again, put on screen in place, and announced
+   * quietly if it brought anything.
+   *
+   * A read that FAILS says nothing and changes nothing — the reader keeps the requests
+   * they had, exactly as every other re-read in this project behaves. What a screen says
+   * once refreshing has stopped working altogether is story 5's, not this.
+   */
+  const pollForChanges = useCallback(
+    (stillWatching: () => boolean): Promise<void> =>
+      fetchTransactions()
+        .then((body) => {
+          // A poll that lands after the reader started their own bulk action, or after
+          // this screen went away, must not put anything on it (BR7).
+          if (!stillWatching()) {
+            return;
+          }
+          const { changed } = showFreshRequests(requestsIn(body));
+          if (changed === 0) {
+            return;
+          }
+          changesFromElsewhere.current += changed;
+          setRefreshNote(listRefreshedMessage(changesFromElsewhere.current));
+        })
+        .catch(() => {
+          // Guarded exactly as the landing path above is, and for the same reason: a
+          // poll whose answer no longer matters must not report on this screen either
+          // way. Counting a failure that arrived after the reader started their own
+          // bulk action, backgrounded the tab or left the screen would raise "this list
+          // cannot refresh itself" about a read nothing was waiting for — and, on the
+          // way out, would set state on a component that has gone.
+          if (!stillWatching()) {
+            return;
+          }
+          // The last known rows stay on screen (project convention) — a failed poll
+          // never blanks the list, whichever way it failed. What it DOES do is count
+          // (BR9): the second failure in a row is where the screen stops looking
+          // current and says so.
+          refreshFailed();
+        }),
+    [showFreshRequests, refreshFailed],
+  );
+
+  /** There are rows to keep current — nothing else is worth asking the service about. */
+  const listLoaded = state.phase === 'loaded';
+
+  /**
+   * Whether the reader is part-way through their own bulk approval (BR7): the
+   * confirmation is open, or the batch is running. Refreshing stops for both and
+   * resumes the moment either ends — including when they simply back out.
+   */
+  const ownBulkActionUnderWay = bulkApprovalAsked || bulkApprovalRunning;
+
+  /**
+   * Whether refreshing has been stopped since the last read — so the reader coming back
+   * to the tab is owed one STRAIGHT AWAY rather than being made to wait out the tick
+   * they were away for (BR6). A ref, because it records what has happened rather than
+   * anything rendered, and because the effect below is the only thing that reads it.
+   */
+  const owedACatchUp = useRef(false);
+
+  /**
+   * The list keeps itself current for as long as somebody is reading it (R3/BR6) — this
+   * epic's deliberate extension of the project's stop-when-idle convention, since what
+   * is being watched is other people's decisions and those never finish.
+   *
+   * One timer at most: it is tied to the three facts that decide whether it should be
+   * running at all, not to every render, so a keystroke in the search box neither
+   * restarts nor multiplies it. It goes when this component does.
+   */
+  useEffect(() => {
+    if (!listLoaded) {
+      return;
+    }
+    if (!readerIsHere) {
+      // Nothing is asked of the service while nobody is looking at the answer.
+      owedACatchUp.current = true;
+      return;
+    }
+    if (ownBulkActionUnderWay) {
+      // The reader's own action owns the list until it finishes; a poll now would race
+      // it. Whether one is owed on the other side is left exactly as it was.
+      return;
+    }
+
+    let watching = true;
+    const stillWatching = (): boolean => watching;
+
+    const refresh = (): void => {
+      if (pollInFlight.current) {
+        return;
+      }
+      pollInFlight.current = true;
+      void pollForChanges(stillWatching).finally(() => {
+        pollInFlight.current = false;
+      });
+    };
+
+    if (owedACatchUp.current) {
+      owedACatchUp.current = false;
+      refresh();
+    }
+
+    const ticking = setInterval(refresh, LIST_REFRESH_INTERVAL_MS);
+
+    return () => {
+      watching = false;
+      clearInterval(ticking);
+    };
+  }, [listLoaded, readerIsHere, ownBulkActionUnderWay, pollForChanges]);
 
   /**
    * The decision the reader has just accepted. The confirmation is already closing —
@@ -981,9 +1492,12 @@ export function ExpenseRequestList({
     // the only thing that can tell an Approver somebody got there first.
     void rereadRequests()
       .then((requests) => {
-        const asRecorded = requests.find((listed) => listed.Id === request.Id);
+        // The check itself lives in `lib/transactions/bulkApproval.ts` — one request
+        // here, a whole selection there, and one rule for both: a decision goes out
+        // only while a fresh read still shows the request awaiting one.
+        const staleness = stalenessIn(requests, request.Id);
 
-        if (asRecorded === undefined || !awaitsDecision(asRecorded)) {
+        if (staleness !== undefined) {
           // Refused here, with NOTHING sent (R4/R13): a decide call at this point
           // would be a second decision on the request, and its answer would look
           // exactly like a first one. The read above has already put what was
@@ -992,10 +1506,7 @@ export function ExpenseRequestList({
           showToast({
             variant: 'error',
             title: DECISION_REFUSED_TITLE,
-            message:
-              asRecorded === undefined
-                ? REQUEST_NO_LONGER_LISTED_MESSAGE
-                : ALREADY_DECIDED_MESSAGE,
+            message: staleDecisionMessage(staleness),
             // Something the Approver has to act on (choose another request), so it
             // waits for them rather than fading while they read elsewhere (R11).
             duration: 0,
@@ -1051,6 +1562,149 @@ export function ExpenseRequestList({
         );
       });
   };
+
+  /**
+   * One batch of approvals over the requests named (bulk-approval R1/R5/R9/R10,
+   * BR1-BR5/BR11, NFR3). Four steps, in this order, and none of them is optional:
+   *
+   * 1. **A fresh read** — the requests are judged against the list as it stands NOW,
+   *    not as it stood when the ticks were put in (BR2). A read that fails sends
+   *    nothing at all: approvals go out only while the app can see which requests are
+   *    still awaiting one.
+   * 2. **The split** — every named request the read no longer shows awaiting a
+   *    decision is dropped from the batch and no approve call is ever made for it
+   *    (BR1). It is reported as left unchanged instead (R5).
+   * 3. **One call per remaining request** (BR3), at a bounded concurrency (NFR3) so a
+   *    selection that can run to thousands neither floods the service nor leaves the
+   *    screen unusable. The selection and the bulk action are locked for the duration
+   *    and the list itself stays readable.
+   * 4. **A read back** — and the approved count comes from comparing that read with the
+   *    one in step 1 (BR5), NEVER from the call answers. The service returns the same
+   *    envelope whether it approved a request or found it already decided, so an
+   *    implementation that trusted the answers would report a colleague's decision as
+   *    one of this Approver's own.
+   *
+   * It takes the requests to act on as an ARGUMENT rather than reading the selection,
+   * because it is run twice for the same batch: once for the whole selection, and
+   * again — from the report's own "try again" control — for just the requests whose
+   * calls FAILED (R10). That second run is the whole of BR11: the same four steps, so
+   * the eligibility re-check happens again over the smaller subset and a request a
+   * colleague decided in between comes back as left unchanged rather than being
+   * approved twice. There is deliberately no second batch path.
+   *
+   * The three buckets it reports are kept strictly apart (R5/R10): approved is what
+   * step 4's comparison shows changed, left unchanged is what step 2 never sent
+   * (nothing went wrong — a colleague got there first), and could-not-be-submitted is
+   * a call that failed. Only the last of those is a failure, and only it is retried.
+   */
+  const runBulkApproval = async (ids: readonly number[]): Promise<void> => {
+    if (ids.length === 0 || bulkApprovalInFlight.current) {
+      return;
+    }
+    bulkApprovalInFlight.current = true;
+    setBulkApprovalSubmitting(ids.length);
+
+    try {
+      let before: TransactionRead[];
+      try {
+        before = await rereadRequests();
+      } catch (error: unknown) {
+        // Nothing was sent (BR2), so the selection is exactly as it was and the
+        // Approver can simply ask again. The service's own reason, never the client's
+        // placeholder (project.md NFR-base-5).
+        showToast({
+          variant: 'error',
+          title: BULK_APPROVE_REFUSED_TITLE,
+          message: `${transactionListFailureMessage(error)} ${NOTHING_SENT_MESSAGE}`,
+          duration: 0,
+        });
+        return;
+      }
+
+      const { eligible, leftUnchanged } = eligibilityIn(before, ids);
+
+      const attempts =
+        eligible.length === 0
+          ? []
+          : await submitApprovals(eligible, (id) =>
+              recordDecision({ TransactionId: id, Decision: DECISION_APPROVE }),
+            );
+
+      const refused = attempts.filter((attempt) => attempt.refused);
+      const submitted = attempts
+        .filter((attempt) => !attempt.refused)
+        .map((attempt) => attempt.id);
+
+      // Only worth a second read if something was actually sent; where nothing was,
+      // the read taken before the batch is already the current state (NFR4).
+      let after = before;
+      if (submitted.length > 0) {
+        try {
+          after = await rereadRequests();
+        } catch {
+          showToast({
+            variant: 'error',
+            title: BULK_APPROVE_REFUSED_TITLE,
+            message: OUTCOME_UNKNOWN_MESSAGE,
+            duration: 0,
+          });
+          return;
+        }
+      }
+
+      const tally = {
+        selected: ids.length,
+        approved: approvedIn(after, submitted).length,
+        leftUnchanged: leftUnchanged.length,
+        refused: refused.length,
+      };
+
+      /** Exactly the requests whose own call failed — the only bucket a retry covers. */
+      const refusedIds = refused.map((attempt) => attempt.id);
+
+      showToast({
+        variant: refused.length === 0 ? 'success' : 'error',
+        title: bulkApprovalOutcomeTitle(tally),
+        message: bulkApprovalOutcomeMessage(
+          tally,
+          refused.length === 0
+            ? undefined
+            : decisionFailureMessage(refused[0].failure),
+        ),
+        // A completed batch confirms itself and fades (R11's window); one carrying
+        // requests that could not be submitted is something the Approver has to act on,
+        // so it waits for them and carries the way to act on it (R10, NFR-base-5).
+        ...(refused.length === 0
+          ? {}
+          : {
+              duration: 0,
+              action: {
+                label: retryRefusedApprovalsLabel(refusedIds.length),
+                onAction: () => {
+                  // No second confirmation: this bulk approval was confirmed when it
+                  // started, and choosing a named, smaller subset is itself the
+                  // deliberate act. Taking it dismisses this report, so the Approver
+                  // is never left with two answers about the same batch.
+                  void runBulkApproval(refusedIds);
+                },
+              },
+            }),
+      });
+
+      // Whatever the batch decided — and whatever a colleague decided first — has
+      // stopped awaiting a decision, so it stops being selectable and the count
+      // corrects itself (BR8). Anything still awaiting one keeps its tick, which is
+      // what leaves a refused request ready to be tried again.
+      setSelectedIds((current) => withDecidedRequestsDropped(current, after));
+    } finally {
+      bulkApprovalInFlight.current = false;
+      setBulkApprovalSubmitting(null);
+    }
+  };
+
+  /** The bulk approval the Approver has just accepted: the whole selection (R1/R8). */
+  const approveSelection = (): Promise<void> =>
+    runBulkApproval([...selectedIds]);
 
   /**
    * What the listed requests and the summary are worked out from. It can trail the
@@ -1158,6 +1812,44 @@ export function ExpenseRequestList({
   );
 
   /**
+   * What "select everything currently listed" covers: every still-`Imported` request
+   * the search and filters LEFT (BR1) — read from the narrowed set, not from the page
+   * on screen, which would quietly select twenty of a hundred, and not from the fetched
+   * set, which would ignore the narrowing the user applied.
+   */
+  const selectableListedIds = useMemo(
+    () => selectableIdsIn(visibleRequests),
+    [visibleRequests],
+  );
+
+  /** How many requests are selected — the figure the ambient indicator reads out. */
+  const selectedCount = selectedIds.size;
+
+  /**
+   * Whether everything currently listed is already selected. Deliberately binary rather
+   * than a three-state tick: a partly-filled selection reads as "not everything", which
+   * is the truth, and the exact figure is beside it in the count.
+   */
+  const everythingListedSelected =
+    selectableListedIds.length > 0 &&
+    selectableListedIds.every((id) => selectedIds.has(id));
+
+  /**
+   * Taking everything currently listed ADDS to the selection, so narrowing the list and
+   * taking what is left cannot silently drop a request selected earlier. Unticking is
+   * this screen's way to clear a selection, so it clears the whole of it — including
+   * anything the current narrowing is hiding, which is the only reading under which
+   * "clear" means what the user meant by it.
+   */
+  const changeEverythingListed = (takeEverything: boolean): void => {
+    setSelectedIds((current) =>
+      takeEverything
+        ? withIdsSelected(current, selectableListedIds)
+        : NOTHING_SELECTED,
+    );
+  };
+
+  /**
    * The request the panel is showing, resolved from the fetched set rather than kept as
    * a copy — so the panel can never show a value the list no longer holds. A request
    * that is no longer there closes the panel rather than freezing an old version of it.
@@ -1173,6 +1865,50 @@ export function ExpenseRequestList({
 
   return (
     <div className="grid gap-4">
+      {/* What a refresh brought in, said quietly and to assistive technology only
+          (NFR2): the rows changing is what a sighted reader sees, and nothing here may
+          interrupt, steal the keyboard or need dismissing.
+
+          It is in the markup from the start, empty, because a live region announces its
+          CONTENTS changing — one added to the page at the moment it has something to
+          say may never be read out at all. It carries `aria-live` rather than
+          `role="status"` for the same reason it is here at all: an idle screen has no
+          announcement to make, and this project's screens are asserted to be saying
+          NOTHING while they wait, while they are empty and once they have simply
+          answered (`expense-request-list` story 1). A permanently present `status` would
+          be a permanent announcement region on a screen that is not announcing
+          anything. */}
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {refreshNote}
+      </p>
+
+      {/* The list has stopped keeping itself current, and says so rather than going on
+          looking live (R6/BR9). Deliberately NOT the failed-load `Alert`: that state is
+          for a read that left the reader with nothing, this one leaves every row exactly
+          where it was — and an `alert` would interrupt whatever they are doing, which
+          NFR2 forbids for anything the background refresh does. So it is one polite
+          `status` region, carrying no control of any kind: the timer never stopped, and
+          the next read that works clears this by itself.
+
+          The moment named is the last read that SUCCEEDED, written as a `<time>` so it
+          means "a time" to assistive technology as well as to the eye. */}
+      {cannotRefreshSince !== null && (
+        <div
+          role="status"
+          className="border-border bg-muted/50 grid gap-1 rounded-md border p-3 text-sm"
+        >
+          <p className="font-medium">{CANNOT_REFRESH_MESSAGE}</p>
+          <p>
+            {LAST_UP_TO_DATE_LEAD}{' '}
+            <time dateTime={new Date(cannotRefreshSince).toISOString()}>
+              {onScreenDateTime(new Date(cannotRefreshSince))}
+            </time>
+            .
+          </p>
+          <p className="text-muted-foreground">{REFRESH_RESUMES_MESSAGE}</p>
+        </div>
+      )}
+
       {state.phase === 'loading' && state.wait !== 'brief' && (
         <div role="status" className="grid gap-2">
           <span className="sr-only">{LOADING_MESSAGE}</span>
@@ -1228,7 +1964,69 @@ export function ExpenseRequestList({
               LEFT, in the order the list is sorted, never the page on screen and never
               the whole fetched set (BR1). It sits above the controls that decide that
               set, so a keyboard user reaches it early. */}
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+            {/* The selection controls, offered to an Approver and to nobody else —
+                absent from the markup for anyone else rather than disabled (R7/BR10),
+                which is what makes the exclusion structural. They sit AHEAD of the rows
+                so a keyboard user meets "take everything listed" before the requests
+                themselves, and beside the count, which is where the bulk action joins
+                them. */}
+            {isApprover && (
+              <div className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id={selectEverythingId}
+                    checked={everythingListedSelected}
+                    disabled={bulkApprovalRunning}
+                    onCheckedChange={(takeEverything) => {
+                      changeEverythingListed(takeEverything === true);
+                    }}
+                    // Named here as well as beside itself, so what a screen reader is
+                    // given and what a sighted reader sees are one string.
+                    aria-label={SELECT_EVERYTHING_LISTED_LABEL}
+                  />
+                  <Label htmlFor={selectEverythingId} className="font-normal">
+                    {SELECT_EVERYTHING_LISTED_LABEL}
+                  </Label>
+                </div>
+
+                {/* R4: on screen the whole time a selection is live, and NOT on it at
+                    all once nothing is selected — an indicator reading "0 selected" is
+                    a permanent fixture rather than an answer. Announced politely
+                    (`status`), since the figure moves under a reader who is doing
+                    something else. */}
+                {selectedCount > 0 && (
+                  <p
+                    role="status"
+                    aria-label={SELECTION_COUNT_LABEL}
+                    className="text-sm font-medium"
+                  >
+                    {selectionCountMessage(selectedCount)}
+                  </p>
+                )}
+
+                {/* The action the selection leads to (R1), beside the count it acts
+                    on and offered only while there IS a selection — an Approve with
+                    nothing selected has nothing to act on, and the count and the
+                    action belong on screen together. Named for the SELECTION, so it
+                    can never be confused with the "Approve request TXN-…" control
+                    every listed request carries. Disabled only while a batch of its
+                    own is running (AC-4): transient state, not a permission. */}
+                {selectedCount > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={bulkApprovalRunning}
+                    onClick={() => {
+                      setBulkApprovalAsked(true);
+                    }}
+                  >
+                    {BULK_APPROVE_ACTION_LABEL}
+                  </Button>
+                )}
+              </div>
+            )}
+
             <ExportRequestsAction
               listedRequests={orderedRequests}
               exportedBy={exportedBy}
@@ -1280,6 +2078,15 @@ export function ExpenseRequestList({
             </p>
           ))}
 
+          {/* The batch on its way, announced the same polite way and in ONE element:
+              the rows keep their place and their statuses until the read that follows
+              the calls, so without this the screen would look inert for the duration. */}
+          {bulkApprovalSubmitting !== null && (
+            <p role="status" className="text-muted-foreground text-sm">
+              {bulkApprovalInFlightMessage(bulkApprovalSubmitting)}
+            </p>
+          )}
+
           {visibleRequests.length === 0 ? (
             <div className="grid gap-2">
               <p className="max-w-prose">{NARROWED_EMPTY_MESSAGE}</p>
@@ -1288,14 +2095,17 @@ export function ExpenseRequestList({
               </p>
             </div>
           ) : (
-            /* One presentation or the other, never both: see this file's header. The
-               tooltip provider is context only and renders nothing of its own. */
-            <TooltipProvider>
+            /* One presentation or the other, never both: see this file's header. */
+            <>
               {narrowViewport ? (
                 <RequestCards
                   requests={requestsOnPage}
                   presentationOf={presentationOf}
                   possibleDuplicateIds={possibleDuplicateIds}
+                  maySelect={isApprover}
+                  selectedIds={selectedIds}
+                  selectionLocked={bulkApprovalRunning}
+                  onToggleSelection={toggleSelectionOf}
                   mayDecide={isApprover}
                   handOffFocusTo={handOffFocusTo}
                   onFocusHandedOff={focusHandedOff}
@@ -1310,7 +2120,8 @@ export function ExpenseRequestList({
                     account number, its description, amount, transaction type
                     and status, and the controls each request offers — opening
                     it, and, where one is still awaiting a decision and you may
-                    make it, approving or rejecting it. Every value heading
+                    make it, selecting it to be approved with others, or
+                    approving or rejecting it on its own. Every value heading
                     orders the list by its own column.
                   </TableCaption>
                   <TableHeader>
@@ -1318,6 +2129,15 @@ export function ExpenseRequestList({
                         column has a sort control (R13) rather than most of them
                         having one. */}
                     <TableRow>
+                      {/* The selection column, for an Approver only: nothing to
+                          order by, and the ticks in it name themselves. */}
+                      {isApprover && (
+                        <TableHead scope="col" className="w-10">
+                          <span className="sr-only">
+                            {SELECTION_COLUMN_LABEL}
+                          </span>
+                        </TableHead>
+                      )}
                       {REQUEST_COLUMNS.map((column) => (
                         <SortableColumnHeading
                           key={column.key}
@@ -1339,6 +2159,11 @@ export function ExpenseRequestList({
                         key={request.Id}
                         request={request}
                         possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+                        selectionOffered={isApprover}
+                        selectable={isApprover && awaitsDecision(request)}
+                        selected={selectedIds.has(request.Id)}
+                        selectionLocked={bulkApprovalRunning}
+                        onToggleSelection={toggleSelectionOf}
                         canDecide={isApprover && awaitsDecision(request)}
                         handOffFocus={handOffFocusTo === request.Id}
                         onFocusHandedOff={focusHandedOff}
@@ -1349,7 +2174,7 @@ export function ExpenseRequestList({
                   </TableBody>
                 </Table>
               )}
-            </TooltipProvider>
+            </>
           )}
 
           {/* Always on the screen, whether or not there is anywhere to page to
@@ -1404,7 +2229,7 @@ export function ExpenseRequestList({
         />
       )}
 
-      {/* Asked from the row's overflow and from the opened request alike, so it lives
+      {/* Asked from the row's own controls and from the opened request alike, so it lives
           out here with the flow it belongs to rather than inside either of them. It is
           mounted only while a decision is pending: closing it is what ends the ask. */}
       {pendingDecision !== null && (
@@ -1423,6 +2248,39 @@ export function ExpenseRequestList({
           confirmLabel={confirmDecisionLabel(pendingDecision.outcome)}
           wayOutLabel={WAY_OUT_OF_CONFIRMATION}
           onConfirm={recordPendingDecision}
+        />
+      )}
+
+      {/* The same shared confirmation, asked of the whole selection (R8/BR4): the
+          SAME dialog the single decision uses, never a second convention. Its title
+          carries the selection's literal count however large it is — the `99+` form
+          belongs to the ambient indicator alone — and it names no account number, the
+          confirmation being a listing surface like the list behind it.
+
+          It is gated on `bulkApprovalAsked` ALONE — never also on there still being a
+          selection. The control that opens it exists only while something is selected,
+          so it can never open empty; but a selection CAN empty underneath it (a single
+          decision started a moment earlier lands and prunes the one request that was
+          ticked), and a dialog that unmounts on its own never reports itself closed.
+          `bulkApprovalAsked` would then stay true for good — which is also what pauses
+          the self-refresh, so the list would silently stop keeping itself current for
+          the rest of the session. Confirming an empty selection does nothing
+          (`runBulkApproval` refuses it), and either answer clears the flag. */}
+      {bulkApprovalAsked && (
+        <ConfirmAction
+          open
+          onOpenChange={(stillAsking) => {
+            if (!stillAsking) {
+              setBulkApprovalAsked(false);
+            }
+          }}
+          title={bulkApproveConfirmationTitle(selectedCount)}
+          description={BULK_APPROVE_CONFIRMATION_MESSAGE}
+          confirmLabel={BULK_APPROVE_CONFIRM_LABEL}
+          wayOutLabel={WAY_OUT_OF_CONFIRMATION}
+          onConfirm={() => {
+            void approveSelection();
+          }}
         />
       )}
     </div>

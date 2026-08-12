@@ -27,7 +27,7 @@
  *    component `web/src/components/requests/ExpenseRequestList.tsx` (named export
  *    `ExpenseRequestList`), with the opened request's read-only panel
  *    (`RequestDetailPanel`, `role="dialog"`, named for the request) and the
- *    per-request overflow (`RequestActions`) it already renders. jsdom cannot render
+ *    per-request controls (`RequestActions`) it already renders. jsdom cannot render
  *    `requests/page.tsx` itself (an async server component resolving the session),
  *    which is the split every epic here uses: the server page gates, the client
  *    component is the unit under test. Do NOT add a second list, panel or audit view.
@@ -36,16 +36,15 @@
  * 3. THE DECIDE CONTROLS (story 2's) are offered on a request ONLY while its
  *    `Status` is `Imported` (BR3), on both surfaces that carry per-request actions:
  *    the opened request's panel, and the request's OWN ROW — as direct controls one
- *    activation away, NOT as items inside the ⋯ overflow, which holds only Open.
- *    Their accessible names begin with "Approve" / "Reject" and go on to name the
- *    request, which they must: every listed request carries a pair of its own. On a
- *    DECIDED request they are ABSENT from the row, from the overflow behind it and
- *    from the panel — not disabled, not `aria-hidden` (the project's
- *    hidden-never-disabled rule) — and in their place the opened request states
- *    where it stands in a sentence containing "already been approved" / "already
- *    been rejected", matching the status the request actually carries. The sweep
- *    below covers all three places, so a decide control left behind in any of them
- *    fails.
+ *    activation away. A request carries no ⋯ overflow menu at all; Open is a direct
+ *    control too. Their accessible names begin with "Approve" / "Reject" and go on
+ *    to name the request, which they must: every listed request carries a pair of
+ *    its own. On a DECIDED request they are ABSENT from the row and from the panel
+ *    — not disabled, not `aria-hidden` (the project's hidden-never-disabled rule) —
+ *    and in their place the opened request states where it stands in a sentence
+ *    containing "already been approved" / "already been rejected", matching the
+ *    status the request actually carries. The sweep below covers both places, so a
+ *    decide control left behind in either of them fails.
  * 4. THE AUDIT VALUES (R16) — `Status`, `UserNote`, `LastChangedUser`,
  *    `LastChangedDate` — are shown on the opened request exactly as the service sent
  *    them, to BOTH roles. `RequestDetailPanel` already renders all four; this story
@@ -422,25 +421,15 @@ describe('Epic expense-decisions, Story 4: a decided request, and only one decis
 
       await returnToTheList(user);
 
-      // --- and the row the actions live on, plus the overflow behind it ---------
+      // --- and the row the actions live on --------------------------------------
       const row = rowFor(decided.Reference);
       expect(within(row).getByText(decided.Status)).toBeInTheDocument();
       expect(decideControlsIn(row)).toEqual([]);
-
-      await user.click(
-        within(row).getByRole('button', { name: /^actions for request/i }),
-      );
-      const menu = await screen.findByRole('menu');
-      // The menu really did open — so the absence beneath it is a real absence.
+      // The row is still rendering its controls — so the absence above is a real
+      // absence rather than a row that has stopped offering anything at all.
       expect(
-        within(menu).getByRole('menuitem', { name: /^open/i }),
+        within(row).getByRole('button', { name: /^open/i }),
       ).toBeInTheDocument();
-      expect(decideControlsIn(menu)).toEqual([]);
-
-      await user.keyboard('{Escape}');
-      await waitFor(() => {
-        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-      });
     }
   });
 

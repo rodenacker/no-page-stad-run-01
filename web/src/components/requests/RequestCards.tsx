@@ -15,7 +15,11 @@
  *   and a bulletless list loses its role in some browsers.
  * - **The reference is the primary identifier** (source UI-23), with three key values
  *   beside it — status, amount and transaction date. Everything else about the request,
- *   the account number included, is in the panel the action overflow opens.
+ *   the account number included, is in the panel the Open control opens.
+ * - **The selection tick is here too**, sitting with the reference it selects and
+ *   offered on the same condition the table row applies (an Approver, a request still
+ *   awaiting a decision). Each card is handed a plain `selected` boolean rather than
+ *   the selection itself, so the memo below survives a selection change.
  * - **A card offers exactly what a row offers**, including the decisions as DIRECT
  *   controls: the same `RequestActions`, given `onDecide` on the same condition (an
  *   Approver, a request still awaiting a decision). A phone-width reader is not a
@@ -45,7 +49,9 @@ import {
   CardFooter,
   CardHeader,
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { awaitsDecision } from '@/lib/transactions/deciding';
+import { selectRequestLabel } from '@/lib/transactions/selecting';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
 import type { DecisionOutcome } from '@/lib/api/decisions';
@@ -67,6 +73,22 @@ interface RequestCardProps {
   presentationOf: (request: TransactionRead) => StatusPresentation | undefined;
   /** Whether this load marked the request a possible duplicate (brief BR2/BR3). */
   possibleDuplicate: boolean;
+  /**
+   * Whether THIS request may be selected to be approved with others — an Approver, and
+   * a request still awaiting a decision (bulk-approval BR1/BR10). False means no
+   * control at all, never a disabled one.
+   */
+  selectable: boolean;
+  /** Whether this request is in the selection. A plain boolean, so the memo holds. */
+  selected: boolean;
+  /**
+   * Whether the selection is being acted on right now, in which case the tick cannot be
+   * moved. Transient state, so it is disabled rather than absent — unlike the permission
+   * above it, which never reaches the markup at all (bulk-approval BR10).
+   */
+  selectionLocked: boolean;
+  /** Ticks or unticks this request; the list owns what is selected. */
+  onToggleSelection: (request: TransactionRead) => void;
   /**
    * Whether this reader is offered a decision on THIS request — decided by the list
    * from who is signed in and the request's own status. A plain boolean, so the memo
@@ -97,6 +119,10 @@ const RequestCard = memo(function RequestCard({
   request,
   presentationOf,
   possibleDuplicate,
+  selectable,
+  selected,
+  selectionLocked,
+  onToggleSelection,
   canDecide,
   handOffFocus,
   onFocusHandedOff,
@@ -106,7 +132,23 @@ const RequestCard = memo(function RequestCard({
   return (
     <Card className="gap-3 py-4">
       <CardHeader className="gap-1">
-        <p className="font-medium break-words">{request.Reference}</p>
+        {/* The tick sits with the reference it selects, so a phone-width reader ticks
+            the request they are reading rather than a control in a footer three values
+            away from it. Named for that request, as the row's is. */}
+        <div className="flex items-start gap-2">
+          {selectable && (
+            <Checkbox
+              className="mt-0.5"
+              checked={selected}
+              disabled={selectionLocked}
+              onCheckedChange={() => {
+                onToggleSelection(request);
+              }}
+              aria-label={selectRequestLabel(request.Reference)}
+            />
+          )}
+          <p className="font-medium break-words">{request.Reference}</p>
+        </div>
         <div className="flex flex-wrap items-center gap-1">
           <StatusBadge
             status={request.Status}
@@ -128,8 +170,8 @@ const RequestCard = memo(function RequestCard({
           </div>
         </dl>
       </CardContent>
-      {/* A row of its own, so the two decisions, Open and the overflow have the card's
-          whole width to sit across and wrap into at 360px. */}
+      {/* A row of its own, so the two decisions and Open have the card's whole width to
+          sit across and wrap into at 360px. */}
       <CardFooter className="justify-end">
         <RequestActions
           reference={request.Reference}
@@ -163,6 +205,25 @@ interface RequestCardsProps {
    */
   possibleDuplicateIds: ReadonlySet<number>;
   /**
+   * Whether the reader may select requests at all (an Approver — bulk-approval
+   * R7/BR10). Which requests may be selected is asked per request below, so this stays
+   * one stable boolean.
+   */
+  maySelect: boolean;
+  /**
+   * The ids currently selected. Read here and handed to each card as a plain boolean —
+   * a card must never receive the set itself, or every card would re-render on every
+   * tick and on every refresh (see `ExpenseRequestList`).
+   */
+  selectedIds: ReadonlySet<number>;
+  /**
+   * Whether a bulk action is running over the selection right now, in which case no
+   * tick can be moved underneath it (bulk-approval AC-4).
+   */
+  selectionLocked: boolean;
+  /** Ticks or unticks one request; the list owns what is selected. */
+  onToggleSelection: (request: TransactionRead) => void;
+  /**
    * Whether the reader may decide requests at all (an Approver). Which requests can
    * still be decided is asked per request below, so this stays one stable boolean.
    */
@@ -185,6 +246,10 @@ export function RequestCards({
   requests,
   presentationOf,
   possibleDuplicateIds,
+  maySelect,
+  selectedIds,
+  selectionLocked,
+  onToggleSelection,
   mayDecide,
   handOffFocusTo,
   onFocusHandedOff,
@@ -199,6 +264,10 @@ export function RequestCards({
             request={request}
             presentationOf={presentationOf}
             possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+            selectable={maySelect && awaitsDecision(request)}
+            selected={selectedIds.has(request.Id)}
+            selectionLocked={selectionLocked}
+            onToggleSelection={onToggleSelection}
             canDecide={mayDecide && awaitsDecision(request)}
             handOffFocus={handOffFocusTo === request.Id}
             onFocusHandedOff={onFocusHandedOff}

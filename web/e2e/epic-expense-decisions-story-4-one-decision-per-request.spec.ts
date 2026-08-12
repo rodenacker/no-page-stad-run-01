@@ -77,8 +77,8 @@
  * Implementation patterns this spec assumes (read these before implementing):
  * - The decide actions are DIRECT controls on the request's own row
  *   (`RequestActions.tsx`), as story 2 places them — so Approve is reached in ONE click
- *   as a button in the row, not as a `menuitem` inside the ⋯ overflow (which holds only
- *   Open). Each names the request it decides ("Approve request <reference>"), because
+ *   as a button in the row. A request carries no ⋯ overflow at all; Open is a direct
+ *   control too. Each names the request it decides ("Approve request <reference>"), because
  *   every listed request carries a pair of its own; that name is also how this spec
  *   addresses one row's control without matching another row's.
  * - The confirmation is the Shadcn `alert-dialog` (Radix renders `role="alertdialog"`,

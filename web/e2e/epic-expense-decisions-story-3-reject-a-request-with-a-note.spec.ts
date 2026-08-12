@@ -75,8 +75,9 @@
  *   is pinned is that the typed words reach the service rather than being accepted on
  *   screen and dropped.
  * - **Reject is a DIRECT control on the request's own row** (`RequestActions.tsx`,
- *   rendered on every row and card) — one activation, not a trip through the ⋯ action
- *   overflow, which holds only Open. Because every listed request carries its own
+ *   rendered on every row and card) — one activation. A request carries no ⋯ action
+ *   overflow at all; every control it offers, Open included, sits on the row (the menu
+ *   was removed at a later manual test). Because every listed request carries its own
  *   Reject, each one's accessible name names the request it decides ("Reject request
  *   <reference>", matching `rejectRequestName`), and that is what makes ONE row's
  *   control addressable — and keeps this journey's Tab walk landing on the intended
@@ -509,8 +510,8 @@ test.describe('Epic expense-decisions, Story 3: reject a request with a note', (
   });
 
   // AC-5
-  // ONE journey, start to finish, on a real keyboard: reaching the action inside the
-  // per-request overflow, sending the rejection with nothing written, being refused,
+  // ONE journey, start to finish, on a real keyboard: reaching the request's own Reject
+  // control, sending the rejection with nothing written, being refused,
   // correcting that from the keyboard, and confirming — with the confirmation's Cancel
   // holding focus on arrival (NFR2). Split into separate tests it would prove only that
   // each step is reachable in isolation, which is not what NFR1 claims.

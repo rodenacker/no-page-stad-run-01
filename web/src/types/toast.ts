@@ -24,6 +24,27 @@ export interface ToastLink {
 }
 
 /**
+ * ToastAction - something a notification asks the user to DO, on the spot.
+ *
+ * The counterpart of {@link ToastLink}: a link offers somewhere to GO, this offers
+ * something to DO where there is no address to go to (running the approvals a batch
+ * could not submit again, for instance). It renders as a real `<button>` inside the
+ * notification — in the tab order, announced as a control, operable by keyboard —
+ * never as `onClick` on the notification's body, which is a clickable non-control and
+ * unreachable without a pointer under this project's WCAG 2.2 AA bar.
+ *
+ * Taking the action dismisses the notification, exactly as following a link does: a
+ * report still offering to act on something already acted on would misreport the
+ * screen behind it.
+ */
+export interface ToastAction {
+  /** What the control reads as — wording that names what taking it does. */
+  label: string;
+  /** What it does. The notification goes away as it is taken. */
+  onAction: () => void;
+}
+
+/**
  * Toast - Individual toast notification object
  */
 export interface Toast {
@@ -35,6 +56,7 @@ export interface Toast {
   dismissible?: boolean; // Whether user can manually dismiss (default: true)
   onClick?: () => void; // Optional click handler for interactive toasts
   link?: ToastLink; // Optional destination the notification takes the user to
+  action?: ToastAction; // Optional thing to DO from inside the notification
 }
 
 /**
@@ -54,6 +76,12 @@ export interface ToastOptions {
   dismissible?: boolean;
   onClick?: () => void;
   link?: ToastLink;
+  /**
+   * Something for the user to DO from inside the notification, as a real button.
+   * Pair it with `duration: 0` — a notification carrying an action must not fade
+   * while the user is deciding whether to take it.
+   */
+  action?: ToastAction;
 }
 
 /**
