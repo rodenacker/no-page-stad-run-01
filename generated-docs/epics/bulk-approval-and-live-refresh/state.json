@@ -18,14 +18,20 @@
       "A refresh announces itself only to assistive technology (an invisible polite line naming how much has changed); there is no visible 'list updated' indicator, because a sighted reader sees the rows change. Confirm that is the wanted behaviour rather than a visible banner.",
       "The wording of the bulk-approval result is the app's own: it is headed 'Selection approved' (or 'Nothing was approved' / 'Some approvals could not be submitted') and reads 'Of the 3 requests selected: 2 approved, 1 left unchanged because it had already been decided.' The requirements fix the two figures and the reason but not the sentence — confirm it reads the way a finance approver would want."
     ],
-    "manualTestResults": []
+    "manualTestResults": [
+      {
+        "recordedAt": "2026-08-12",
+        "allPassed": true,
+        "summary": "All 28 manual tests and the 8 check-these-first assumptions confirmed by the user in chat (no per-item breakdown pasted back)."
+      }
+    ]
   },
-  "phase": "BUILD",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
-      "status": "in-progress",
+      "status": "complete",
       "commit": null,
-      "e2eStatus": "passed",
+      "e2eStatus": "passed-after-fix",
       "startedAt": "2026-08-11T13:05:00.000Z",
       "completedAt": "2026-08-11T13:19:00.000Z"
     },
@@ -59,5 +65,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-11T16:02:43.975Z"
+  "lastUpdated": "2026-08-11T16:36:58.332Z"
 }
