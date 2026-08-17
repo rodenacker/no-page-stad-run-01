@@ -539,11 +539,9 @@ test.describe('Epic file-deletion, Story 2: the confirmation says what you are a
     // The count arriving must not move focus onto the destructive choice.
     await expect(dialogButton(page, KEEP_THE_FILE_LABEL)).toBeFocused();
 
-    // The renamed labels, and not a trace of the superseded wording (R4) — on the
-    // dialog or on the page behind it.
+    // The renamed labels, and not a trace of the superseded wording (R4) on the dialog.
     await expect(dialogButton(page, CONFIRM_DELETE_LABEL)).toBeVisible();
     await expect(confirmation).not.toContainText(OLD_CANCEL_WORDING);
-    await expect(main).not.toContainText(OLD_CANCEL_WORDING);
 
     // Dismissed with a real Escape keypress.
     await page.keyboard.press('Escape');
@@ -554,6 +552,12 @@ test.describe('Epic file-deletion, Story 2: the confirmation says what you are a
     await expect(page).toHaveURL(filePageUrlPattern(IMPORTED_FILE.file.Id));
     await expect(main).toContainText(IMPORTED_FILE.file.CurrentFileName);
     await expect(main).toContainText(IMPORTED_FILE.file.CurrentStatus);
+    // The page behind is checked HERE rather than while the dialog was open: an open
+    // modal marks the rest of the page aria-hidden (correctly — Radix removes the
+    // background from the accessibility tree), so getByRole('main') matches nothing
+    // until it closes. Asserting it mid-dialog fails as "element(s) not found", which
+    // says nothing about the wording. The claim is unchanged, only its timing.
+    await expect(main).not.toContainText(OLD_CANCEL_WORDING);
     await expect(trigger).toBeEnabled();
 
     expect(
@@ -592,11 +596,16 @@ test.describe('Epic file-deletion, Story 2: the confirmation says what you are a
     // The renamed labels here too, with the superseded wording gone (R4).
     await expect(dialogButton(page, CONFIRM_DELETE_LABEL)).toBeVisible();
     await expect(confirmation).not.toContainText(OLD_CANCEL_WORDING);
-    await expect(main).not.toContainText(OLD_CANCEL_WORDING);
 
     // A stray Enter on arrival backs out...
     await page.keyboard.press('Enter');
     await expect(confirmation).toBeHidden();
+
+    // With the dialog closed, the page behind is reachable again and carries no trace
+    // of the superseded wording either. Checked here for the same reason as the
+    // request-count test above: an open modal aria-hides the background, so
+    // getByRole('main') cannot match while the confirmation is up.
+    await expect(main).not.toContainText(OLD_CANCEL_WORDING);
 
     // ...and so does Escape.
     await trigger.click();
