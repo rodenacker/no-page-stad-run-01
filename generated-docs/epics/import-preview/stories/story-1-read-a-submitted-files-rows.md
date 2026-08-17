@@ -26,6 +26,10 @@ Construction yields between chunks, the same way `buildRequestExportCsv` does, s
 
 **Unreadable is a value, not an exception.** The caller (story 3) distinguishes *unparseable body*, *wrong column shape*, and *count mismatch*; this module owns the first two and returns them as discriminated outcomes.
 
+**Tolerated eighth column (BR5a, AC-6).** The reader accepts the seven upload columns **optionally followed by a single trailing column named `Reason`** and discards it. That is what story 4's correction CSV emits, so an employee can correct it and re-upload it unmodified. The tolerance is exact — a trailing `Reason` in last position only. An unknown extra column, or a ninth alongside `Reason`, is still a wrong-shape refusal. Comment it as a deliberate round-trip affordance so it is not later "tidied away" into a lax parser.
+
+**Input is CSV text, not a `Blob`** — the caller does the reading. Note that jsdom implements neither `Blob.text()` nor `Blob.arrayBuffer()`, so callers must use `FileReader`; a `.text()` call works in the browser and throws in every Vitest test on this epic.
+
 ## Acceptance Criteria
 
 | AC | Text | Coverage |
@@ -35,6 +39,7 @@ Construction yields between chunks, the same way `buildRequestExportCsv` does, s
 | AC-3 | A file with a trailing newline and the same file without one read to the same records, with no empty final record. | vitest |
 | AC-4 | A body that cannot be read as CSV, or whose columns are not the expected seven, returns an explicit "cannot be read" outcome rather than partial records or a thrown error. | vitest |
 | AC-5 | Reading a 10,000-row file hands the main thread back between chunks rather than parsing in one blocking pass. | vitest |
+| AC-6 | A file carrying the seven upload columns followed by a single trailing `Reason` column reads successfully, with the seven values intact and the `Reason` column discarded — so a correction file from story 4 can be re-uploaded unmodified. A different extra column, or a ninth alongside `Reason`, is still "cannot be read". | vitest |
 
 ## Manual Test Checklist
 
