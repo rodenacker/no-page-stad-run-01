@@ -17,6 +17,7 @@ Every epic in this project, what it delivers, and what it builds on. Live status
 | 6 | Bulk approval and a self-updating list (`bulk-approval-and-live-refresh`) | Let an Approver select many imported requests and approve them in one action with a clear report of any it skipped, and keep every approver's list current on its own so nobody acts on a request a colleague has already decided. | Approve or reject a request (`expense-decisions`) |
 | 7 | Export requests for the payment system (`csv-export`) | Let either role export the requests currently listed as a CSV file for the external payment system, attributed to the person who produced it. | The shared expense request list (`expense-request-list`) |
 | 8 | Preview the rows of an import (`import-preview`) | Show the Importer every row of a submitted file with a clear imported/rejected verdict once validation has run, and let them download the rejected rows as a re-uploadable CSV to send back for correction. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`) |
+| 9 | Delete a submitted file (`file-deletion`) | Let the Importer delete any submitted file — including one whose rows have already imported — from the files list as well as the file's own page, after a confirmation that states exactly what is being destroyed. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`), Approve or reject a request (`expense-decisions`) |
 
 ## Coverage
 
@@ -131,6 +132,8 @@ Requested by the user on 2026-08-17, after epics 1–7 had shipped. Not in the o
 | See every row of a submitted file, marked as passing validation or rejected (N1) | Preview the rows of an import (`import-preview`) |
 | Download the rejected rows as a CSV an employee can correct and re-upload (N2) | Preview the rows of an import (`import-preview`) |
 | Import a file's valid rows even when other rows were rejected (N3) | Preview the rows of an import (`import-preview`) |
+| Delete a file straight from the files list, without opening it (N4) | Delete a submitted file (`file-deletion`) |
+| Delete a file whose rows have already imported (N5) | Delete a submitted file (`file-deletion`) |
 
 ## Decisions made at the plan approval
 
@@ -141,6 +144,9 @@ These were settled with the user during INTAKE and apply across epics:
 - **Compliance is POPIA (South Africa)**, user-confirmed. Account numbers are masked to their last four digits wherever requests are listed, with the full value revealed only by an explicit action on a single request — except in the exported CSV, which carries unmasked values because the external payment system consumes it as-is.
 
 - **A part-valid file now imports its good rows (2026-08-17, supersedes R29).** The original rule was that a file with *any* invalid row imports nothing until a retry succeeds (R29 / requirements §2.3 invariant `C-031`, assigned to `file-validation-and-retry` as its BR1). At the user's request this is reversed for epic 8: the valid rows import, and the rejected rows come back as a correctable CSV for a separate upload. **The split itself is the backend's to make** — until the transactions-api does it, a part-valid file still imports nothing. The preview works regardless (it reads the submitted file directly), but it says "will import", not "imported", for rows the service has not actually taken. See the open backend dependency below.
+
+- **A file can now be deleted after it has imported, destroying its decisions (2026-08-17, epic 9).** `file-validation-and-retry` allowed cancelling a file only while it was `Uploaded` or `Validation failed` — never once its rows had become expense payment requests. At the user's request that gate is removed: the Importer can delete any file. Because an imported file's rows are live requests, deleting one **permanently removes those requests and the record of who approved or rejected them** — which runs against the project's otherwise-firm rule that a decision is permanent and can never be revisited (R19/R24/R94). The user was shown this consequence explicitly and confirmed it. Two things follow: the confirmation must state the true scale before the fact (how many requests, how many already decided), and **whether the service can even do it is untested** — `FilesDelete` deletes "from the staging table" and imported rows have left staging. See the open backend dependency below.
+- **"Cancel file" is renamed "Delete file" (2026-08-17, epic 9).** One action, one name, on both the files list and a file's own page. It was always the same API operation (`DELETE /v1/files`, whose own description is "Deactivate and delete a file"); only the label differed. The confirmation's way-out stays worded as "Keep the file" — it must never read "Cancel", which would be ambiguous.
 
 ## Conventions that cross epic boundaries
 
@@ -162,6 +168,14 @@ that behaviour. **Epic 8 is not blocked on it:** the preview reads the originall
 file either way. What the backend gap costs is the last step — rows shown as "will import" genuinely have
 not imported yet, and the epic says so plainly rather than implying otherwise. Once the service performs
 the split, those rows can be confirmed as imported against `GET /v1/transactions` (`FileLogId`).
+
+**Deleting an imported file may not be supported (epic 9).** `DELETE /v1/files` (`FilesDelete`) is documented
+as deleting a file "from the staging table". An imported file's rows have left staging and become expense
+payment requests, so whether the service deletes them, deletes only the file record, partially succeeds, or
+refuses outright is **unknown** — it needs a signed-in session against a real imported file to find out. The
+frontend is built to report whatever the service actually does, including a refusal, in the service's own
+words; it never claims a success it did not observe. If the service turns out to refuse, the honest fix is to
+put the not-yet-imported gate back, not to work around it.
 
 **CORS on both backend services.** Neither the auth-api/BFF (`http://localhost:4424`) nor the transactions-api
 (`http://localhost:4423/transactions-api`) returns an `Access-Control-Allow-Origin` header. Both are cross-origin
