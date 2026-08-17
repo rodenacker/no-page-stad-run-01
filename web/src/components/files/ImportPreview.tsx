@@ -56,6 +56,7 @@
 import { CircleCheck, CircleX, Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
+import { CorrectionRowsDownload } from '@/components/files/CorrectionRowsDownload';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -77,6 +78,7 @@ import {
   rejectedRowsIn,
   validationErrorsFailureMessage,
 } from '@/lib/api/files';
+import { rowsToFixIn } from '@/lib/files/correctionCsv';
 import { NO_REASON_GIVEN } from '@/lib/files/defectWording';
 import { importPreviewRows } from '@/lib/files/importPreviewRows';
 import {
@@ -538,6 +540,12 @@ function ImportPreviewSection({
             <p>{willImportStatement(state.preview.counts.willImport)}</p>
             <p>{rejectedStatement(state.preview.counts.rejected)}</p>
           </div>
+
+          {/* The rejected rows as a file to correct offline and send back in (FR6).
+              It lives HERE, beside the rows it is built from, rather than in the
+              Downloads section, which keeps the service's own diagnostic error file
+              (FR7, BR6) — and it is absent entirely when nothing was rejected. */}
+          <CorrectionRowsDownload rejectedRows={rowsToFixIn(state.preview)} />
 
           <Table>
             <TableCaption className="sr-only">{TABLE_CAPTION}</TableCaption>
