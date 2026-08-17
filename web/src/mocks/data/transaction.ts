@@ -76,13 +76,13 @@
  *   - the counts are COUNTED FROM THE ROWS, never declared beside them, so a
  *     fixture cannot claim "12 approved" while carrying 11.
  *
-
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
 import {
   FILE_STATUS_CANCELLED,
   FILE_STATUS_IMPORTED,
+  FILE_STATUS_UPLOADED,
   FILE_STATUSES,
   createFileLog,
   deleteSuccessResponse,
@@ -1421,6 +1421,40 @@ export const filesNeverImportedToDelete = (): FileDeletionScenario[] =>
         ProcessDate: `2026-04-2${String(6 + index)} 07:05:00`,
       }),
   );
+
+/**
+ * The same file ONE READ EARLIER: identical identifier and name, in the status it was
+ * in before it imported.
+ *
+ * This is the row a re-read replaces while a delete confirmation is open on the file.
+ * Both surfaces re-read the active file list every 15 seconds while any file is still
+ * being processed, so a confirmation opened on an `Uploaded` file can still be on
+ * screen when that file imports — and a confirmation that goes on describing it by the
+ * status it has LEFT tells the user none of its rows will become expense payment
+ * requests when they already have, some of them possibly already decided (BR5, by a
+ * different route from the failed count read).
+ *
+ * A test opens the confirmation on this, then hands the surface `scenario.file` as the
+ * service's next answer.
+ *
+ * @example
+ *   const scenario = importedFileToDelete();
+ *   render(<SubmittedFileActions file={fileBeforeItImported(scenario)} … />);
+ *   // …open the confirmation, then:
+ *   rerender(<SubmittedFileActions file={scenario.file} … />);
+ */
+export const fileBeforeItImported = (
+  scenario: FileDeletionScenario,
+  status: string = FILE_STATUS_UPLOADED,
+): FileLog => {
+  if (status === FILE_STATUS_IMPORTED) {
+    throw new Error(
+      'fileBeforeItImported is the file BEFORE it imported — pass the status it was ' +
+        'in then (it defaults to Uploaded), never Imported itself.',
+    );
+  }
+  return { ...scenario.file, CurrentStatus: status };
+};
 
 /**
  * `GET /v1/file-logs` rows as they stand once the service has genuinely deleted the

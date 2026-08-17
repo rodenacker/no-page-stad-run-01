@@ -179,23 +179,47 @@ export const countRequests = (
   };
 };
 
-/** The rows a read answered with — none at all where the body carried no list. */
+/**
+ * The rows a read answered with, or `undefined` where the body carried NO READABLE
+ * LIST AT ALL.
+ *
+ * That distinction is the whole point, and it is the opposite of the tolerance the
+ * list surfaces use (`filesIn` in `SubmittedFilesList`, where an absent array is a
+ * legitimately empty list). Here an absent array is not an answer: the shared client
+ * resolves with `undefined` for a 204 and for a response it could not parse
+ * (`lib/api/client.ts`), so treating "no array" as "no rows" would turn a count that
+ * was never actually read into a confident zero — and a zero here reads as "this file
+ * produced no expense payment requests at all", the most reassuring sentence the
+ * confirmation can say, immediately before an irreversible delete that may destroy
+ * live requests and the record of who decided them. A count that was not read is the
+ * `unavailable` state (BR5), never a number.
+ */
 const requestsIn = (
   body: TransactionReadList | undefined,
-): TransactionRead[] =>
-  Array.isArray(body?.Transactions) ? body.Transactions : [];
+): TransactionRead[] | undefined =>
+  Array.isArray(body?.Transactions) ? body.Transactions : undefined;
 
 /**
- * How many requests one file produced, and how many are already decided.
+ * How many requests one file produced, and how many are already decided — or
+ * `undefined` where the read ANSWERED but carried no readable list, which is a failed
+ * count and not a zero (BR5).
  *
  * Rejects with whatever the read rejected with, so the caller can report the
  * service's own reason — a failure here is a STATE the user is told about (R8/BR5),
- * never a zero and never a silently swallowed count.
+ * never a zero and never a silently swallowed count. The unreadable-body case is
+ * reported as that same state by the caller rather than rejected with an invented
+ * error, because anything carrying a `message` would be shown to the user as though
+ * the SERVICE had said it (`serviceMessageOf`, project.md NFR-base-5).
  */
-export const fetchRequestCountsFor = (fileId: number): Promise<RequestCounts> =>
-  fetchTransactions().then((body) =>
-    countRequests(requestsProducedBy(fileId, requestsIn(body))),
-  );
+export const fetchRequestCountsFor = (
+  fileId: number,
+): Promise<RequestCounts | undefined> =>
+  fetchTransactions().then((body) => {
+    const requests = requestsIn(body);
+    return requests === undefined
+      ? undefined
+      : countRequests(requestsProducedBy(fileId, requests));
+  });
 
 /** Where the count for one confirmation has got to. */
 export type RequestCountState =
@@ -208,6 +232,32 @@ export type RequestCountState =
 
 export const NOT_COUNTED: RequestCountState = { phase: 'not-counted' };
 export const COUNTING: RequestCountState = { phase: 'counting' };
+
+/**
+ * The state the confirmation is REALLY in, read against what the service says about
+ * the file NOW — never the status it was in when the delete was asked for.
+ *
+ * Both surfaces re-read the file list while any file is still being processed, so a
+ * file can IMPORT while its confirmation is on screen. Deriving the state here rather
+ * than freezing it at the ask is what stops the short "none of them will become
+ * expense payment requests" wording surviving that moment for a file whose rows are
+ * now live expense payment requests, some of them possibly already decided (BR5 — the
+ * same understatement the failed-count state exists to prevent, arriving by a
+ * different route).
+ *
+ * A file that has BECOME countable and has no count yet is therefore counting: the
+ * read is owed, and the caller starts it from this same derivation, so the wording on
+ * screen and the read in flight cannot disagree. Every other state is whatever was
+ * actually read — a count already taken still names real requests, whatever the file's
+ * status does afterwards.
+ */
+export const countStateFor = (
+  file: FileLog,
+  counted: RequestCountState,
+): RequestCountState =>
+  mayHaveProducedRequests(file) && counted.phase === 'not-counted'
+    ? COUNTING
+    : counted;
 
 /** What the confirmation says, for whichever of the three states applies. */
 export const deleteConfirmationMessageFor = (

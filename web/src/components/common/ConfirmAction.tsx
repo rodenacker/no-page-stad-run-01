@@ -10,7 +10,7 @@
  * one, deleting a submitted file, and whatever a later epic adds — cannot drift into
  * four near-identical dialogs that each behave slightly differently.
  *
- * Four things here are deliberate and easy to break:
+ * Five things here are deliberate and easy to break:
  *
  * - **The way out holds initial focus, not the confirming choice.** That is what
  *   `AlertDialogCancel` gives for free, and it is why this is the Shadcn
@@ -29,6 +29,13 @@
  *   row on another, and only the caller knows which object the answer is
  *   about. So there is no trigger slot here; the caller renders whatever asks, and
  *   holds what is being confirmed while this is open.
+ * - **A description that CHANGES while the dialog is open has to say so**
+ *   (`descriptionLive`). Replacing the text of an `aria-describedby` target announces
+ *   nothing on its own, so a caller whose wording arrives late — the delete
+ *   confirmation, waiting on the count of what it would destroy — marks its
+ *   description polite from the moment it opens. That makes the description itself the
+ *   live region, moves no focus, and leaves a caller with fixed wording announced
+ *   exactly once.
  * - **Nothing here calls anything.** `onConfirm` is the caller's, and this component
  *   has no idea whether it succeeded — a refusal is reported by the caller on the
  *   screen BEHIND this dialog, which closes as the answer is given. A user is never
@@ -64,6 +71,21 @@ interface ConfirmActionProps {
   wayOutLabel: string;
   /** Whether the confirming choice is something the user cannot get back. */
   destructive?: boolean;
+  /**
+   * Whether this caller's {@link description} can CHANGE while the dialog is open —
+   * the delete confirmation's does, once the count of what would be destroyed lands.
+   *
+   * A description is only the dialog's `aria-describedby` text: replacing it announces
+   * NOTHING by itself, so a screen-reader user who opened on "Counting…" would never
+   * hear the numbers. Marking it polite makes the description itself the live region —
+   * not a second one beside it, and nothing moves focus, so the way out keeps the
+   * focus it opened with. Set from the OPEN of the dialog, not at the moment the text
+   * changes: a live region has to exist before the change to be announced.
+   *
+   * Left off for a caller whose description is fixed, so a static sentence is
+   * announced once as the dialog's description and never as an update.
+   */
+  descriptionLive?: boolean;
   /** Taken only when the confirming choice is. */
   onConfirm: () => void;
 }
@@ -76,6 +98,7 @@ export function ConfirmAction({
   confirmLabel,
   wayOutLabel,
   destructive = false,
+  descriptionLive = false,
   onConfirm,
 }: ConfirmActionProps) {
   return (
@@ -83,7 +106,11 @@ export function ConfirmAction({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
+          <AlertDialogDescription
+            aria-live={descriptionLive ? 'polite' : undefined}
+          >
+            {description}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           {/* First in the markup and focused on open: a stray Enter backs out. */}

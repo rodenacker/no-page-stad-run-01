@@ -54,7 +54,7 @@
  * link.
  *
  * DELETING A FILE FROM A ROW (`file-deletion` R1, R5, R9, R10, R11, R12, BR2, BR7)
- * adds four things to that, and each of them is easy to get subtly wrong:
+ * adds six things to that, and each of them is easy to get subtly wrong:
  *
  * - **The delete sits IN THE ROW**, beside the `Open` link — never behind a per-row
  *   menu that has to be opened first, which would put a control between a keyboard
@@ -67,15 +67,35 @@
  *   `DeleteFileConfirmation`, which owns the title, all three states of the
  *   description and the two dialog labels. A second confirmation written for this
  *   surface would read differently for the same file, however plausible its wording.
- *   One controller serves the whole table, since only one row can be being confirmed
- *   at a time.
+ *   One controller serves the whole table, since only one row can be being CONFIRMED
+ *   at a time — and it is handed the rows currently on screen, so a file that imports
+ *   while its own confirmation is open is described by what it is now rather than by
+ *   the status it was in when the delete was chosen (BR5).
+ * - **EVERY DELETE IN FLIGHT IS ITS OWN, KEYED BY FILE.** A confirmed delete is never
+ *   dropped because a DIFFERENT row's delete happens to be on its way: the calls run
+ *   alongside each other and each one's in-flight line and each refusal name their own
+ *   file. One shared "a delete is working" flag would silently swallow the second
+ *   file's confirmed delete — a user agreeing to something irreversible and getting
+ *   silence — and would label the wait with the wrong file's name. The only press that
+ *   is ignored is a second one for a file whose own delete is already on its way, and
+ *   that one is not silent: its in-flight line is on screen, naming it.
  * - **A deleted row goes because the list RE-READ ITSELF.** A success asks for the
  *   list again through the very same read the auto-refresh and a submission already
  *   use (`readsRequested`) — never a locally spliced array standing in for the
  *   service's answer, and never a second timer (R12, Feature NFR "List currency").
- *   A refusal is reported here in the SERVICE's own words with the dialog closed, the
- *   row exactly where it was and the delete still on offer; nothing on screen implies
- *   the file went anywhere it did not.
+ *   Only the LAST read asked for may answer, so a poll that set off before the delete
+ *   and lands after that re-read cannot put the deleted row back on screen. A refusal
+ *   is reported here in the SERVICE's own words with the dialog closed, the row exactly
+ *   where it was and the delete still on offer; nothing on screen implies the file went
+ *   anywhere it did not.
+ * - **A KEYBOARD USER IS NOT DROPPED WHEN THEIR ROW GOES.** The dialog hands focus back
+ *   to the control that opened it, and the re-read then takes that control off the page
+ *   with the row — leaving focus on `<body>`, so the next Tab starts again at the top of
+ *   the document (the epic's Keyboard completability NFR, WCAG 2.2 AA). So when a row
+ *   this screen deleted has actually gone AND focus was lost with it, focus is moved to
+ *   this section's own heading: the nearest thing that is still there, and the anchor a
+ *   reader carries on from. Only then — a reader who has moved on to something else
+ *   keeps their place.
  */
 
 import { PanelRightOpen, Trash2, TriangleAlert } from 'lucide-react';
@@ -236,13 +256,37 @@ const deleteRefusedTitleFor = (file: FileLog): string =>
 const STILL_LISTED_MESSAGE =
   'The file is still listed, exactly as it was. Choose its delete action again to ask once more.';
 
-/** Where a row's delete is: none asked for, one on its way, or one the service refused. */
-type DeleteState =
-  | { phase: 'idle' }
-  | { phase: 'working'; file: FileLog }
-  | { phase: 'refused'; file: FileLog; message: string };
+/** Where ONE file's delete has got to: on its way, or refused by the service. */
+type WorkingDelete = { phase: 'working'; file: FileLog };
+type RefusedDelete = { phase: 'refused'; file: FileLog; message: string };
+type DeleteProgress = WorkingDelete | RefusedDelete;
 
-const NO_DELETE: DeleteState = { phase: 'idle' };
+/**
+ * Every delete this screen has in play, by file id — never one state for the table.
+ *
+ * A table offers as many deletes as it has rows, and a user who has confirmed one does
+ * not stop reading: the state has to be able to hold a second file's delete on its way
+ * beside the first, and a refusal for one file beside another file's wait, each naming
+ * the file it belongs to.
+ */
+type DeletesInPlay = ReadonlyMap<number, DeleteProgress>;
+
+const NO_DELETES: DeletesInPlay = new Map<number, DeleteProgress>();
+
+/** The same deletes with one file's changed, or dropped where it is `undefined`. */
+const withDelete = (
+  deletes: DeletesInPlay,
+  fileId: number,
+  progress: DeleteProgress | undefined,
+): DeletesInPlay => {
+  const next = new Map(deletes);
+  if (progress === undefined) {
+    next.delete(fileId);
+  } else {
+    next.set(fileId, progress);
+  }
+  return next;
+};
 
 /** Where the list is: being read, read, or unreadable. */
 type ListState =
@@ -258,6 +302,9 @@ const LOADING: ListState = { phase: 'loading' };
  */
 const filesIn = (body: FileLogList | undefined): FileLog[] =>
   Array.isArray(body?.FileLog) ? body.FileLog : [];
+
+/** No rows yet — one array, so a screen still loading hands out a stable one. */
+const NO_FILES: readonly FileLog[] = [];
 
 /**
  * What the screen may tell this list about the person in front of it. Both answers are
@@ -294,18 +341,42 @@ export function SubmittedFilesList({
   /** Bumped by Try again, a submission, and a completed delete; asking for the list
    * again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
-  /** Where the delete asked for from a row has got to (one at a time, since one
-   * confirmation serves the whole table). */
-  const [deleteState, setDeleteState] = useState<DeleteState>(NO_DELETE);
+  /** Where each file's delete has got to — one entry per file, never one for the
+   * table, so no row's confirmed delete can be lost to another row's. */
+  const [deletes, setDeletes] = useState<DeletesInPlay>(NO_DELETES);
+  /** The rows the service last gave us, which is also what the confirmation describes
+   * its file from — a file that moves on under an open dialog moves the wording with
+   * it (BR5). */
+  const listedFiles = state.phase === 'loaded' ? state.files : NO_FILES;
   /**
    * Which file the user is being asked to confirm the deletion of, and what is known
-   * about the expense payment requests it produced. ONE controller for the table:
-   * only one row can be being confirmed at a time, and asking is the event that both
-   * opens the confirmation and starts the count.
+   * about the expense payment requests it produced. ONE controller for the table: only
+   * one row can be being CONFIRMED at a time (which is not the same as one delete at a
+   * time — see `deletes` above).
    */
-  const deleteConfirmation = useDeleteFileConfirmation();
+  const deleteConfirmation = useDeleteFileConfirmation(listedFiles);
   /** The app's one notification surface, in the root layout (brief R10). */
   const { showToast } = useToast();
+  /**
+   * Where focus is put when a row this screen deleted takes the focused control away
+   * with it. `tabIndex={-1}` makes the heading focusable programmatically without
+   * putting it in the tab order for everybody else.
+   */
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  /**
+   * The file a deleted row still owes focus to, until it has actually left the list.
+   * A record of something to DO on the next commit rather than something rendered, so
+   * it is a ref: writing it changes nothing on screen.
+   */
+  const focusOwedFor = useRef<number | undefined>(undefined);
+  /**
+   * How many list reads have been ASKED for. Each read carries the number it was given
+   * and may only answer while it is still the latest, so answers landing out of order
+   * cannot leave the screen showing the older one — which is how a poll that set off
+   * before a delete used to put the deleted row back (R11/R12). It counts asks, not
+   * answers, so the most recent question is always the one that gets to answer.
+   */
+  const readsIssued = useRef(0);
 
   /**
    * Whether the person watching this list is the one the rejected-rows notification
@@ -405,12 +476,24 @@ export function SubmittedFilesList({
    *
    * `stillWatching` is how a caller says its read no longer matters: this component
    * has gone away, or the screen has moved on.
+   *
+   * A read is ALSO over the moment a later one has been asked for. The timer's read, a
+   * submission's and a delete's are separate calls with no order to their answers, so
+   * without that the older answer could land last and win: a poll that set off before
+   * a delete would put the deleted row back on screen (R11/R12). Answering only while
+   * still the latest is one rule covering all three, rather than the delete path
+   * carrying a guard the others do not.
    */
   const readList = useCallback(
-    (stillWatching: () => boolean): Promise<void> =>
-      fetchSubmittedFiles()
+    (stillWatching: () => boolean): Promise<void> => {
+      readsIssued.current += 1;
+      const thisRead = readsIssued.current;
+      const stillTheAnswer = (): boolean =>
+        stillWatching() && readsIssued.current === thisRead;
+
+      return fetchSubmittedFiles()
         .then((body) => {
-          if (!stillWatching()) {
+          if (!stillTheAnswer()) {
             return;
           }
           const files = filesIn(body);
@@ -418,7 +501,7 @@ export function SubmittedFilesList({
           setState({ phase: 'loaded', files });
         })
         .catch((error: unknown) => {
-          if (!stillWatching()) {
+          if (!stillTheAnswer()) {
             return;
           }
           setState((current) =>
@@ -438,7 +521,8 @@ export function SubmittedFilesList({
                     FAILED_MESSAGE,
                 },
           );
-        }),
+        });
+    },
     [announceFinishedFiles],
   );
 
@@ -501,6 +585,34 @@ export function SubmittedFilesList({
     [],
   );
 
+  /**
+   * Puts focus somewhere deliberate once a row this screen deleted has actually gone.
+   *
+   * The confirmation hands focus back to the control that opened it, and the re-read
+   * then unmounts that control with its row — which drops focus onto `<body>`, so the
+   * reader's next Tab starts again at the top of the document (the epic's Keyboard
+   * completability NFR). This runs after the commit that removed the row, which is why
+   * "focus is on `<body>`" is exactly the state it has to answer for; a reader who has
+   * meanwhile focused anything else is left where they are, because moving focus out
+   * from under somebody is the same rudeness in the other direction.
+   */
+  useEffect(() => {
+    const owed = focusOwedFor.current;
+    if (owed === undefined || state.phase !== 'loaded') {
+      return;
+    }
+    // Not gone yet: the delete has been accepted but the list has not answered again.
+    if (state.files.some((file) => file.Id === owed)) {
+      return;
+    }
+    focusOwedFor.current = undefined;
+
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      headingRef.current?.focus();
+    }
+  }, [state]);
+
   const readAgain = (): void => {
     setState(LOADING);
     setReadsRequested((reads) => reads + 1);
@@ -523,62 +635,103 @@ export function SubmittedFilesList({
    * no-op, and never navigation, which is the file page's behaviour on success and has
    * no meaning here. What the service does to a file that has already IMPORTED is
    * unverified (BR6), so whatever it answers is what the user is told.
+   *
+   * EACH FILE'S DELETE IS ITS OWN. The only press ignored here is a second one for a
+   * file whose delete is already on its way — never one for another row, whose user has
+   * just agreed to something irreversible and must not be met with silence.
    */
   const confirmDelete = (file: FileLog): void => {
-    // Only a session the server named may delete, and a second press must not send a
-    // second call while one is already on its way.
-    if (actingUploader === undefined || deleteState.phase === 'working') {
+    // Only a session the server named may delete...
+    if (actingUploader === undefined) {
       return;
     }
-    setDeleteState({ phase: 'working', file });
+    // ...and a second press on the SAME file must not send a second call. That file's
+    // own in-flight line is on screen naming it, so nothing here is silent.
+    if (deletes.get(file.Id)?.phase === 'working') {
+      return;
+    }
+    setDeletes((current) =>
+      withDelete(current, file.Id, { phase: 'working', file }),
+    );
 
     void deleteSubmittedFile(file.Id, actingUploader)
       .then(() => {
-        setDeleteState(NO_DELETE);
+        setDeletes((current) => withDelete(current, file.Id, undefined));
+        // Where focus goes once the row this reader was standing on leaves the table.
+        focusOwedFor.current = file.Id;
         // The answer is the generic envelope and says nothing about the list, so the
         // list finds out by re-reading itself (R12).
         setReadsRequested((reads) => reads + 1);
       })
       .catch((error: unknown) => {
-        // One state change, not two: the refusal being reported and the wait being
-        // over are the same moment, and a reader must never meet one without the other.
-        setDeleteState({
-          phase: 'refused',
-          file,
-          // The service's own wording whenever it sent one, from EITHER place a failure
-          // can carry it; never the client's internal placeholder.
-          message: deleteFailureMessage(error),
-        });
+        // One state change, not two: the refusal being reported and this file's wait
+        // being over are the same moment, and a reader must never meet one without the
+        // other.
+        setDeletes((current) =>
+          withDelete(current, file.Id, {
+            phase: 'refused',
+            file,
+            // The service's own wording whenever it sent one, from EITHER place a
+            // failure can carry it; never the client's internal placeholder.
+            message: deleteFailureMessage(error),
+          }),
+        );
       });
   };
 
+  /** Which files are being deleted, and which the service refused — in the order their
+   * deletes were asked for, since a Map keeps what was put in it in that order. */
+  const inFlightDeletes = [...deletes.values()].filter(
+    (progress): progress is WorkingDelete => progress.phase === 'working',
+  );
+  const refusedDeletes = [...deletes.values()].filter(
+    (progress): progress is RefusedDelete => progress.phase === 'refused',
+  );
+
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
+      {/* Focusable only on purpose (`tabIndex={-1}`), so it can be where a keyboard
+          reader is put when the row they were standing on is deleted out from under
+          them — without joining the tab order for anybody else. */}
+      <h2
+        id={HEADING_ID}
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-lg font-semibold tracking-tight"
+      >
         {HEADING}
       </h2>
 
       {/* A refused delete is reported HERE, on the screen behind the confirmation,
           which has already closed — a user is never held in a dialog to read why
-          nothing happened, and the row it names is still in the table below. */}
-      {deleteState.phase === 'refused' && (
-        <Alert>
+          nothing happened, and the row it names is still in the table below. One per
+          refused file, each naming its own: two files refused is two answers, not one
+          overwriting the other. */}
+      {refusedDeletes.map((refused) => (
+        <Alert key={refused.file.Id}>
           <TriangleAlert aria-hidden="true" />
           <AlertTitle className="line-clamp-none">
-            {deleteRefusedTitleFor(deleteState.file)}
+            {deleteRefusedTitleFor(refused.file)}
           </AlertTitle>
           <AlertDescription className="text-foreground">
-            <p>{deleteState.message}</p>
+            <p>{refused.message}</p>
             <p>{STILL_LISTED_MESSAGE}</p>
           </AlertDescription>
         </Alert>
-      )}
+      ))}
 
-      {deleteState.phase === 'working' && (
-        <p role="status" className="text-muted-foreground text-sm">
-          {deletingMessage(deleteState.file)}
+      {/* One line per delete on its way, each its own live region naming its own file —
+          so two deletes in flight cannot clear each other's announcement, and no wait
+          is ever labelled with a file it does not belong to. */}
+      {inFlightDeletes.map((working) => (
+        <p
+          key={working.file.Id}
+          role="status"
+          className="text-muted-foreground text-sm"
+        >
+          {deletingMessage(working.file)}
         </p>
-      )}
+      ))}
 
       {state.phase === 'loading' && (
         <div role="status" className="grid gap-2">

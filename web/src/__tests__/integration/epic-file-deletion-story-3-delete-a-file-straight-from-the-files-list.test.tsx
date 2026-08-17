@@ -14,17 +14,29 @@
  * - AC-3 — the confirmation a row opens is the SAME one the file's own page shows,
  *   in all three of its shapes.
  * - AC-5 — a refused delete leaves the row exactly where it was, in the service's own
- *   words, with the action offered again.
+ *   words, with the action offered again. Including on a table with more than one delete
+ *   in play: a second row's confirmed delete is sent rather than dropped, and every wait
+ *   and every refusal names the file it belongs to.
  *
  * AC-4 (a confirmed delete removing the row because the list RE-READ itself, and the
  * list still refreshing afterwards) and AC-6 (keyboard completion + the real-browser
  * accessibility scan with the confirmation open) belong to this story's Playwright
  * spec — deliberately not duplicated here (testing-policy.md § "One tag, one layer").
- * Nothing below ever puts a SUCCESSFUL delete on screen, precisely so that no
- * assertion in this file can be satisfied by an implementation that splices the row
- * out of a local array instead of asking the service again (R12). That distinction is
- * made with `fileLogsAfterDeleting` / `transactionsAfterDeletingFile` in the
- * Playwright spec, which is where a real re-read is observable.
+ * No AC assertion in this file puts a SUCCESSFUL delete on screen, precisely so that
+ * none of them can be satisfied by an implementation that splices the row out of a
+ * local array instead of asking the service again (R12). That distinction is made with
+ * `fileLogsAfterDeleting` / `transactionsAfterDeletingFile` in the Playwright spec,
+ * which is where a real re-read is observable.
+ *
+ * The last two tests here are the exception, and are not AC assertions: they are
+ * regression pins for two defects the epic's code review found, both of which only
+ * exist once a delete has SUCCEEDED —
+ *   - which ANSWER wins when two list reads are in flight (an earlier read landing last
+ *     used to put the deleted row back on screen), and
+ *   - where FOCUS is left when the deleted row is taken off the page under a keyboard
+ *     user (the epic's Keyboard completability NFR).
+ * Neither restates AC-4's own claim, and neither is weakened by a spliced array,
+ * because neither is about why the row went.
  *
  * ---------------------------------------------------------------------------
  * IMPLEMENTATION CONTRACT these tests pin (read this before implementing)
@@ -195,8 +207,34 @@ const DELETE = /^delete file\b/i;
 /** The confirmation's own two choices (R4 — the way out deliberately says "Keep"). */
 const CONFIRM_DELETE = /^delete the file$/i;
 
-/** One scripted answer to a call: the body the service sends, or the failure it throws. */
-type Scripted<T> = { readonly body: T } | { readonly failure: APIError };
+/**
+ * One scripted answer to a call: the body the service sends, the failure it throws, or
+ * a call the test holds open until it decides how it ends.
+ */
+type Scripted<T> =
+  | { readonly body: T }
+  | { readonly failure: APIError }
+  | { readonly pending: Promise<T> };
+
+/** A call the test holds open — the only way to be sure one is still in flight while
+ * the user does something else. */
+interface Held<T> {
+  promise: Promise<T>;
+  answer: (value: T) => void;
+  refuse: (failure: APIError) => void;
+}
+
+const held = <T,>(): Held<T> => {
+  let answer: (value: T) => void = () => undefined;
+  let refuse: (failure: APIError) => void = () => undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    answer = resolve;
+    refuse = (failure) => {
+      reject(failure);
+    };
+  });
+  return { promise, answer, refuse };
+};
 
 /**
  * What the shared client throws when the transactions service REFUSES a call: its own
@@ -224,6 +262,13 @@ const REFUSED_COUNT_READ = refusal(
 let fileLogsScript: Scripted<FileLogList>;
 let transactionsScript: Scripted<TransactionReadList>;
 let deleteScript: Scripted<DefaultResponse>;
+/**
+ * What the delete answers for ONE named file, where a test has scripted that file
+ * specifically — otherwise `deleteScript` answers for every file alike. Keyed by the
+ * `LogId` the call carried, so two rows' deletes can be in flight at once and end
+ * differently.
+ */
+let deleteScriptsByLogId: Map<string, Scripted<DefaultResponse>>;
 
 /** What the file-logs list read answers from now on. */
 const serveFiles = (files: FileLog[]): void => {
@@ -279,6 +324,9 @@ const deliver = async <T,>(scripted: Scripted<T>): Promise<T> => {
   if ('failure' in scripted) {
     throw scripted.failure;
   }
+  if ('pending' in scripted) {
+    return scripted.pending;
+  }
   return scripted.body;
 };
 
@@ -297,11 +345,12 @@ const route = async (
   const verb = method.toUpperCase();
 
   if (verb === 'DELETE' && /\/v1\/files(\?|$)/.test(path)) {
+    const logId = logIdIn(path, config);
     deleteRequests.push({
-      logId: logIdIn(path, config),
+      logId,
       lastChangedUser: config?.lastChangedUser,
     });
-    return deliver(deleteScript);
+    return deliver(deleteScriptsByLogId.get(logId ?? '') ?? deleteScript);
   }
   if (path.includes('/v1/file-logs')) {
     return deliver(fileLogsScript);
@@ -315,6 +364,47 @@ const route = async (
       'a file that has imported — the whole expense-request list, and mutates ' +
       'through DELETE /v1/files?LogId= alone (see the implementation contract above).',
   );
+};
+
+/** What the delete call must carry for one file: the file it names, and who asked. */
+const attemptOn = (file: FileLog): RecordedDelete => ({
+  logId: String(file.Id),
+  lastChangedUser: ACTING_UPLOADER,
+});
+
+/** A file name as a literal inside a pattern — these carry dots. */
+const asLiteral = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The line a delete on its way puts on screen for ONE file, matched by the file it
+ * names — the whole point being that each wait belongs to a file and says so. Anchored
+ * at the start so it cannot be satisfied by a sentence that merely mentions the name.
+ */
+const deletingLine = (file: FileLog): RegExp =>
+  new RegExp(`^deleting\\s+${asLiteral(file.CurrentFileName)}\\b`, 'i');
+
+type UserEventInstance = ReturnType<typeof userEvent.setup>;
+
+/**
+ * How much FAKE time the one clock-driven test below is prepared to let pass while
+ * waiting for the list to ask the service again on its own. Deliberately NOT the
+ * implementation's interval: nothing here asserts a schedule, only that the list keeps
+ * itself current within a sensible time — the convention `expense-file-upload` story 3
+ * established for this same screen.
+ */
+const REFRESH_WINDOW_MS = 60_000;
+
+/**
+ * Advances the fake clock inside `act`, so timer-driven renders and the answers they
+ * bring are flushed before anything is asserted. With no argument it just flushes what
+ * is already pending. Only for the one test that installs fake timers; every other test
+ * in this file runs on the real clock and waits on the screen instead.
+ */
+const onFakeClock = async (ms = 0): Promise<void> => {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
 };
 
 const setupUser = () =>
@@ -433,6 +523,37 @@ const settledTextOf = async (element: HTMLElement): Promise<string> => {
   return settled;
 };
 
+/**
+ * The whole journey a user makes from a row: choose that row's delete, then take the
+ * confirming choice in the dialog it opens.
+ */
+const deleteFromRow = async (
+  user: UserEventInstance,
+  file: FileLog,
+): Promise<void> => {
+  await user.click(
+    within(rowFor(file.CurrentFileName)).getByRole('button', { name: DELETE }),
+  );
+  const confirmation = await screen.findByRole('alertdialog');
+  await user.click(
+    within(confirmation).getByRole('button', { name: CONFIRM_DELETE }),
+  );
+};
+
+/**
+ * The one refusal that names this file, of however many are on screen — so an assertion
+ * about one file's refusal can never be satisfied by another file's.
+ */
+const refusalNaming = (file: FileLog): HTMLElement => {
+  const naming = screen
+    .getAllByRole('alert')
+    .filter((alert) =>
+      (alert.textContent ?? '').includes(file.CurrentFileName),
+    );
+  expect(naming).toHaveLength(1);
+  return naming[0];
+};
+
 /** Opens the confirmation from a row of the list, and reads it once it has settled. */
 const confirmationTextFromRow = async (
   file: FileLog,
@@ -473,6 +594,7 @@ describe('Epic file-deletion, Story 3: deleting a file straight from the files l
     fileLogsScript = { body: fileLogListResponse([]) };
     transactionsScript = { body: transactionListResponse([]) };
     deleteScript = { body: deleteSuccessResponse() };
+    deleteScriptsByLogId = new Map();
     deleteRequests = [];
 
     mockGet.mockImplementation(
@@ -715,6 +837,102 @@ describe('Epic file-deletion, Story 3: deleting a file straight from the files l
     expect(unreadableFromRow).toContain(imported.file.CurrentFileName);
   });
 
+  // AC-5, on a table where more than one delete is in play. A user who has agreed to
+  // something irreversible must never be met with silence, and on a list of many files a
+  // message naming the wrong one is worse than no message at all — so a second row's
+  // confirmed delete is neither dropped because another row's call is still on its way,
+  // nor answered with the first file's name.
+  it("sends a second row's confirmed delete while another row's is still in flight, and never names the wrong file", async () => {
+    const scenario = importedFileToDelete();
+    // Another file, listed alongside — the one whose delete is confirmed second.
+    const [alongside] = otherFilesInTransactionsList();
+    serveFiles([scenario.file, alongside]);
+    serveTransactions(scenario.transactions);
+
+    // Both delete calls are held open, so the second is confirmed at a moment when the
+    // first is unmistakably still in flight.
+    const firstCall = held<DefaultResponse>();
+    const secondCall = held<DefaultResponse>();
+    deleteScriptsByLogId.set(String(scenario.file.Id), {
+      pending: firstCall.promise,
+    });
+    deleteScriptsByLogId.set(String(alongside.Id), {
+      pending: secondCall.promise,
+    });
+
+    const user = setupUser();
+    const close = await renderList({
+      viewerRoles: [ROLE_IMPORTER],
+      actingUploader: ACTING_UPLOADER,
+    });
+
+    await deleteFromRow(user, scenario.file);
+    await waitFor(() => {
+      expect(deleteRequests).toEqual([attemptOn(scenario.file)]);
+    });
+    // The wait on screen says which file it is about.
+    expect(
+      await screen.findByText(deletingLine(scenario.file)),
+    ).toBeInTheDocument();
+
+    // The second row's delete, confirmed while the first is still on its way.
+    await deleteFromRow(user, alongside);
+
+    // It really was sent, attributed to the same Importer: a confirmed delete is never
+    // silently dropped.
+    await waitFor(() => {
+      expect(deleteRequests).toEqual([
+        attemptOn(scenario.file),
+        attemptOn(alongside),
+      ]);
+    });
+    // ...and each file's wait is its own, naming its own file — neither has taken the
+    // other's place, and neither is labelled with the other's name.
+    expect(
+      await screen.findByText(deletingLine(alongside)),
+    ).toBeInTheDocument();
+    expect(screen.getByText(deletingLine(scenario.file))).toBeInTheDocument();
+
+    // The service refuses the second file's delete. That answer belongs to that file
+    // alone: the first is still waiting, and nothing on screen says otherwise.
+    secondCall.refuse(REFUSED_DELETE);
+    await waitFor(() => {
+      expect(refusalNaming(alongside)).toHaveTextContent(
+        DELETE_REFUSED_MESSAGE,
+      );
+    });
+    expect(refusalNaming(alongside)).not.toHaveTextContent(
+      scenario.file.CurrentFileName,
+    );
+    expect(screen.queryByText(deletingLine(alongside))).not.toBeInTheDocument();
+    expect(screen.getByText(deletingLine(scenario.file))).toBeInTheDocument();
+
+    // And when the first is refused too, both refusals stand side by side, each naming
+    // its own file: two files refused is two answers, not one overwriting the other.
+    firstCall.refuse(REFUSED_DELETE);
+    await waitFor(() => {
+      expect(refusalNaming(scenario.file)).toHaveTextContent(
+        DELETE_REFUSED_MESSAGE,
+      );
+    });
+    expect(refusalNaming(alongside)).toHaveTextContent(DELETE_REFUSED_MESSAGE);
+    expect(
+      screen.queryByText(deletingLine(scenario.file)),
+    ).not.toBeInTheDocument();
+
+    // Both rows are exactly where they were — nothing implies either file went anywhere.
+    for (const file of [scenario.file, alongside]) {
+      expect(
+        within(rowFor(file.CurrentFileName)).getByRole('link', {
+          name: /open/i,
+        }),
+      ).toHaveAttribute('href', submittedFileAddress(file));
+    }
+    expect(navigationTargets()).toEqual([]);
+
+    close();
+  });
+
   // AC-5
   it('leaves the row exactly where it was and says what the service said when a delete asked for from the list is refused', async () => {
     const scenario = importedFileToDelete();
@@ -806,6 +1024,138 @@ describe('Epic file-deletion, Story 3: deleting a file straight from the files l
         scenario.file.CurrentFileName,
       ),
     ).toBeInTheDocument();
+
+    close();
+  });
+
+  // A regression pin, not an AC (see the header): which ANSWER wins when two list reads
+  // are in flight at once. While a file is still being processed the list asks the
+  // service again on its own, and that timed read has no order to its answer relative to
+  // the one a delete asks for — so the older answer could land last and win, putting the
+  // deleted row back on screen. A deleted file reappearing reads as a delete that failed.
+  //
+  // The ONE test in this file that needs a clock, because a read the list takes on its
+  // own is the only read a delete cannot invalidate by asking again. Fake timers are set
+  // up and torn down inside the test, so nothing else here leaves real timers.
+  it('never puts a deleted row back when a read the list took before the delete answers after the re-read', async () => {
+    vi.useFakeTimers();
+    try {
+      const scenario = importedFileToDelete();
+      // A file still being processed is what keeps the list asking on its own.
+      const [working] = fileLogProgression([FILE_STATUS_VALIDATING]);
+      serveFiles([scenario.file, working]);
+      serveTransactions(scenario.transactions);
+
+      const user = userEvent.setup({
+        advanceTimers: (delay: number) => {
+          vi.advanceTimersByTime(delay);
+        },
+        pointerEventsCheck: PointerEventsCheckLevel.Never,
+      });
+      render(
+        <ToastProvider>
+          <SubmittedFilesList
+            viewerRoles={[ROLE_IMPORTER]}
+            actingUploader={ACTING_UPLOADER}
+          />
+          <ToastContainer />
+        </ToastProvider>,
+      );
+      await onFakeClock();
+      expect(screen.getByRole('table')).toBeInTheDocument();
+
+      // The list's own next read sets off while both files are still listed, and is slow
+      // to answer.
+      const earlierRead = held<FileLogList>();
+      fileLogsScript = { pending: earlierRead.promise };
+      await onFakeClock(REFRESH_WINDOW_MS);
+
+      // Meanwhile the user deletes a file. The service accepts it, and the read the list
+      // then takes — asked for LATER — answers first, without the file.
+      serveFiles([working]);
+      await user.click(
+        within(rowFor(scenario.file.CurrentFileName)).getByRole('button', {
+          name: DELETE,
+        }),
+      );
+      await onFakeClock();
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', {
+          name: CONFIRM_DELETE,
+        }),
+      );
+      await onFakeClock();
+
+      expect(
+        within(screen.getByRole('table')).queryByText(
+          scenario.file.CurrentFileName,
+        ),
+      ).not.toBeInTheDocument();
+
+      // Only now does the earlier read answer, still describing the deleted file as
+      // listed. It is the answer to a question that has since been asked again, so it
+      // changes nothing at all: the file does not come back, and the row that is
+      // genuinely still there is untouched.
+      earlierRead.answer(fileLogListResponse([scenario.file, working]));
+      await onFakeClock();
+
+      expect(
+        within(screen.getByRole('table')).queryByText(
+          scenario.file.CurrentFileName,
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole('table')).getByText(working.CurrentFileName),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A regression pin, not an AC (see the header): where FOCUS is left when the row a
+  // keyboard user just acted on is taken off the page. The confirmation hands focus back
+  // to the control that opened it, and the re-read then unmounts that control with its
+  // row — dropping focus onto the document body, so the next Tab starts again at the top
+  // of the page (the epic's Keyboard completability NFR, WCAG 2.2 AA).
+  it('leaves a keyboard user somewhere deliberate when the row they deleted goes', async () => {
+    const scenario = importedFileToDelete();
+    const [alongside] = otherFilesInTransactionsList();
+    serveFiles([scenario.file, alongside]);
+    serveTransactions(scenario.transactions);
+
+    const user = setupUser();
+    const close = await renderList({
+      viewerRoles: [ROLE_IMPORTER],
+      actingUploader: ACTING_UPLOADER,
+    });
+
+    await user.click(
+      within(rowFor(scenario.file.CurrentFileName)).getByRole('button', {
+        name: DELETE,
+      }),
+    );
+    const confirmation = await screen.findByRole('alertdialog');
+    // What the service answers once it has accepted the delete.
+    serveFiles([alongside]);
+    await user.click(
+      within(confirmation).getByRole('button', { name: CONFIRM_DELETE }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('table')).queryByText(
+          scenario.file.CurrentFileName,
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    // The reader is left on the section's own heading — something still on the page,
+    // and where the list carries on from — rather than on the document body.
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /^submitted files$/i }),
+      ).toHaveFocus();
+    });
 
     close();
   });

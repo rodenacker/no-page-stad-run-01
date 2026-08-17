@@ -13,7 +13,10 @@
  * - AC-2 — a file in any other status gets the short confirmation, and its requests are
  *   never read at all.
  * - AC-3 — BR5, the dangerous case: a failed count read is its OWN state, never the
- *   short wording and never a zero.
+ *   short wording and never a zero. And its second route into the same understatement:
+ *   the file IMPORTING while its confirmation is open (the page re-reads every 15
+ *   seconds while a file is being processed), which must move the wording on with it
+ *   rather than leave the dialog describing the file by a status it has left.
  * - AC-4 — a file that genuinely produced nothing says so, and is never confused with
  *   AC-3's state.
  * - AC-5 — the count is announced while it is being read, and nothing is deleted until
@@ -95,7 +98,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SubmittedFileActions } from '@/components/files/SubmittedFileActions';
 import { apiClient, del, get, post } from '@/lib/api/client';
 import { CLIENT_FALLBACK_MESSAGES } from '@/lib/api/errors';
-import { TRANSACTIONS_ENDPOINT } from '@/lib/api/transactions';
+import {
+  // The app's OWN plain sentence for a read that failed with nothing readable from the
+  // service — not to be confused with `TRANSACTION_LIST_FAILURE_MESSAGE` below, which is
+  // the wording the SERVICE sends when it refuses.
+  TRANSACTION_LIST_FAILED_MESSAGE as COUNT_READ_FAILED_PLAINLY,
+  TRANSACTIONS_ENDPOINT,
+} from '@/lib/api/transactions';
 import { displayNameOf } from '@/lib/auth/identity';
 // The shared wording + counting module this story creates (contract note 2). The import
 // fails until it exists — the expected TDD-red signal.
@@ -113,6 +122,7 @@ import { userInfoFor } from '@/mocks/data/identity';
 import {
   TRANSACTION_LIST_FAILURE_MESSAGE,
   countRequests,
+  fileBeforeItImported,
   filesNeverImportedToDelete,
   importedFileToDelete,
   importedFileWithNoRequests,
@@ -185,11 +195,13 @@ const COUNT_READ_REFUSED: APIError = {
   endpoint: TRANSACTIONS_ENDPOINT,
 };
 
-/** One scripted answer: the body the service sends, a failure, or a read still in flight. */
+/** One scripted answer: the body the service sends, a failure, a read still in flight,
+ * or an answer carrying nothing readable at all. */
 type Scripted<T> =
   | { readonly body: T }
   | { readonly failure: APIError }
-  | { readonly pending: Promise<T> };
+  | { readonly pending: Promise<T> }
+  | { readonly nothing: true };
 
 /** A read the test holds open until it chooses to answer it (AC-5). */
 interface Deferred<T> {
@@ -215,6 +227,14 @@ const deliver = async <T,>(scripted: Scripted<T>): Promise<T> => {
   if ('pending' in scripted) {
     return scripted.pending;
   }
+  if ('nothing' in scripted) {
+    // The shared client's signature says a body always arrives; in reality it resolves
+    // with NONE for a 204 and for any response it could not parse
+    // (`lib/api/client.ts`). That is a real production answer, so the harness has to be
+    // able to give it — and it is precisely the answer that must not be counted as a
+    // zero (BR5).
+    return undefined as unknown as T;
+  }
   return scripted.body;
 };
 
@@ -229,6 +249,15 @@ const serveTransactions = (scenario: FileDeletionScenario): void => {
 /** The count read is refused from now on — the same failure a real 500 produces. */
 const refuseTransactions = (): void => {
   transactionsScript = { failure: COUNT_READ_REFUSED };
+};
+
+/**
+ * The count read ANSWERS from now on, but with nothing readable in it — a 204, or a body
+ * the client could not parse. Nothing was counted either way, so it is the same state as
+ * a refusal and emphatically not an empty list.
+ */
+const answerCountReadWithNothing = (): void => {
+  transactionsScript = { nothing: true };
 };
 
 /** One recorded delete: which file it named, and who it was attributed to. */
@@ -311,15 +340,39 @@ const setupUser = (): UserEventInstance =>
   });
 
 /** The actions section as the file's page mounts it, for a session that may act. */
+const actionsFor = (file: FileLog) => (
+  <SubmittedFileActions
+    file={file}
+    actingUploader={ACTING_UPLOADER}
+    onRetried={() => undefined}
+  />
+);
+
 const openActionsFor = (file: FileLog): (() => void) => {
-  const { unmount } = render(
-    <SubmittedFileActions
-      file={file}
-      actingUploader={ACTING_UPLOADER}
-      onRetried={() => undefined}
-    />,
-  );
+  const { unmount } = render(actionsFor(file));
   return unmount;
+};
+
+/**
+ * The same section, mounted for a file the SERVICE may re-describe while it is on
+ * screen: `/upload/file` re-reads the active file list every 15 seconds while the file
+ * is still being processed and hands this component whatever came back, so a file can
+ * IMPORT with its own delete confirmation open on it.
+ */
+const openActionsForFileThatMoves = (
+  file: FileLog,
+): {
+  /** The page's next re-read landed, and the file now reads like this. */
+  serviceNowReports: (next: FileLog) => void;
+  close: () => void;
+} => {
+  const { rerender, unmount } = render(actionsFor(file));
+  return {
+    serviceNowReports: (next: FileLog): void => {
+      rerender(actionsFor(next));
+    },
+    close: unmount,
+  };
 };
 
 /**
@@ -579,6 +632,33 @@ describe('Epic file-deletion, Story 2: the confirmation says what you are about 
     );
 
     close();
+
+    // THE OTHER WAY A COUNT GOES UNREAD, and the one that reads as reassurance rather
+    // than as a failure: the service ANSWERS, but with nothing readable in it. The
+    // shared client resolves a 204 — and any response it could not parse — with no body
+    // at all, and "no rows in the body" is not "this file produced no rows". Nothing was
+    // counted, so this is the failed-count state too, in the app's own plain words since
+    // the service said nothing.
+    answerCountReadWithNothing();
+    const closeUnreadable = openActionsFor(scenario.file);
+
+    const unreadable = await confirmationAfterCounting(setupUser());
+
+    expect(unreadable).toHaveTextContent(scenario.file.CurrentFileName);
+    expect(unreadable).toHaveTextContent(COUNT_UNAVAILABLE_MESSAGE);
+    expect(unreadable).toHaveTextContent(COUNT_READ_FAILED_PLAINLY);
+    // Never the sentence a file that genuinely produced nothing gets — the most
+    // reassuring thing this dialog can say, immediately before an irreversible delete.
+    expect(unreadable).not.toHaveTextContent(
+      importedConfirmationMessage(countRequests([])),
+    );
+    expect(withoutFileName(textOf(unreadable), scenario.file)).not.toMatch(
+      /\b0\b/,
+    );
+    // Nor the short wording, which would describe an imported file as harmless.
+    expect(unreadable).not.toHaveTextContent(NEVER_IMPORTED_MESSAGE);
+
+    closeUnreadable();
   });
 
   // AC-4
@@ -617,6 +697,72 @@ describe('Epic file-deletion, Story 2: the confirmation says what you are about 
     );
     expect(textOf(refusedConfirmation)).not.toEqual(noneText);
     closeRefused();
+  });
+
+  // AC-3 / BR5 again, by the other route a confirmation can come to understate what it
+  // destroys: not a failed count, but a file that MOVES ON while the dialog is open.
+  // The page re-reads the active file list every 15 seconds while the file is still
+  // being processed, so a confirmation opened on a file that had produced nothing can
+  // still be on screen once that file has imported — and by then its rows are live
+  // expense payment requests, some already carrying an Approver's decision.
+  it('re-derives what deleting destroys when the file imports while the confirmation is open, and never goes on describing it by the status it has left', async () => {
+    const scenario = importedFileToDelete();
+    // The count read answers whenever one is made — and one is only made once this file
+    // reads as having imported.
+    serveTransactions(scenario);
+    const beforeImporting = fileBeforeItImported(scenario);
+
+    const user = setupUser();
+    const showing = openActionsForFileThatMoves(beforeImporting);
+
+    await user.click(screen.getByRole('button', { name: DELETE_FILE }));
+
+    // What the file is at this moment: it never imported, so nothing is counted and the
+    // short warning is the honest thing to say (R7/AC-2).
+    const opened = await screen.findByRole('alertdialog');
+    expect(opened).toHaveTextContent(beforeImporting.CurrentFileName);
+    expect(opened).toHaveTextContent(NEVER_IMPORTED_MESSAGE);
+
+    // The page's own re-read lands, and the service now reports the file as imported:
+    // 40 requests, 12 of them already approved and 3 rejected.
+    showing.serviceNowReports(scenario.file);
+
+    // The dialog stops describing the file by the status it has left...
+    await waitFor(() => {
+      expect(screen.getByRole('alertdialog')).not.toHaveTextContent(
+        NEVER_IMPORTED_MESSAGE,
+      );
+    });
+    // ...and states what deleting it NOW destroys, counted from this file's own rows —
+    // so the count really was started by the change rather than skipped.
+    await waitFor(() => {
+      expect(screen.getByRole('alertdialog')).toHaveTextContent(
+        importedConfirmationMessage(scenario.expected),
+      );
+    });
+    const settled = screen.getByRole('alertdialog');
+    expectNoUnfilteredNumbers(settled, scenario);
+    // Nor is it the failed-count state: a count that was read is never told as one that
+    // could not be.
+    expect(settled).not.toHaveTextContent(COUNT_UNAVAILABLE_MESSAGE);
+
+    // None of that is consent: the wording changing under the user deletes nothing.
+    expect(deleteRequests).toEqual([]);
+
+    // And the confirming choice, once taken, deletes the file the dialog names.
+    await user.click(
+      within(settled).getByRole('button', { name: CONFIRM_DELETE }),
+    );
+    await waitFor(() => {
+      expect(deleteRequests).toEqual([
+        {
+          logId: String(scenario.file.Id),
+          lastChangedUser: ACTING_UPLOADER,
+        },
+      ]);
+    });
+
+    showing.close();
   });
 
   // AC-5

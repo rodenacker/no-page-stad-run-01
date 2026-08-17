@@ -129,10 +129,15 @@ function OfferedActions({
   const [state, setState] = useState<ActionState>(IDLE);
   /**
    * Whether the user is being asked to confirm the delete, and what the confirmation
-   * knows about the file's expense payment requests. Nothing is sent while it is open;
-   * asking is what starts the count, so the dialog opens already saying so.
+   * knows about the file's expense payment requests. Nothing is sent while it is open.
+   *
+   * The file this page is about is handed in as the confirmation's current data, so the
+   * dialog describes the file as the page's own 15-second re-read now reports it: a
+   * file that IMPORTS while its confirmation is open stops being described as one that
+   * never will (BR5). That is the whole reason this page re-renders this component with
+   * a fresh `file` at all.
    */
-  const deleteConfirmation = useDeleteFileConfirmation();
+  const deleteConfirmation = useDeleteFileConfirmation([file]);
   const router = useRouter();
 
   /** Whether a call is already on its way — a second press must not send a second. */
