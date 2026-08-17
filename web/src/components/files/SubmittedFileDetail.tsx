@@ -81,16 +81,21 @@ const LOADING_MESSAGE = 'Loading this file…';
 const BACK_LABEL = 'Back to Expense files';
 
 /**
- * The one answer for a file that is not in the active list: cancelled, unknown, or an
- * identifier that was never usable.
+ * The one answer for a file that is not in the active list: deleted, cancelled,
+ * unknown, or an identifier that was never usable.
  *
  * The title carries the phrase a user scans for; the sentence below it explains why
  * without repeating that phrase, and without dressing it up as a system failure —
  * nothing went wrong.
+ *
+ * DELETED is named FIRST because it is now the likeliest way a reader gets here since
+ * `file-deletion` shipped: a bookmark, a second tab, or a colleague's delete leaves a
+ * perfectly good address pointing at a file that has gone. `Cancelled` stays beside it
+ * because it is still a status the service reports for a file this app never deleted.
  */
 const UNAVAILABLE_TITLE = 'This file is not available';
 const UNAVAILABLE_MESSAGE =
-  'It may have been cancelled, or the address may point to a file that no longer exists. Open one of the files still in play from the Expense files list.';
+  'It may have been deleted or cancelled, or the address may point to a file that no longer exists. Open one of the files still in play from the Expense files list.';
 
 /** Names what did not happen, so the alert is not just an apology. */
 const FAILED_TITLE = 'Could not open this file';
@@ -198,7 +203,7 @@ export function SubmittedFileDetail({
    *
    * One value doing two jobs: it gates the uploader-only actions — so an Approver's
    * browser never receives their markup at all (source UI-24) — and it is the audit
-   * identity the cancel call must carry, which is what keeps the name the service
+   * identity the delete call must carry, which is what keeps the name the service
    * records from ever being something a user typed.
    */
   actingUploader?: string;
@@ -431,11 +436,12 @@ export function SubmittedFileDetail({
         </dl>
       </section>
 
-      {/* Retry and cancel — nothing at all unless the session may act on this file AND
-          the file's status leaves something to do, which that component decides for
-          itself. A retry asks every call on this page again, and keeps asking for a
-          while, since the service's answer to it says nothing about the file's new
-          state. */}
+      {/* Retry and delete — nothing at all unless the session may act on this file,
+          which is now the ONLY reason that component renders nothing: the delete is
+          offered whatever the file's status (`file-deletion` R3/BR1), and the retry's
+          own status rule is that component's to keep. A retry asks every call on this
+          page again, and keeps asking for a while, since the service's answer to it
+          says nothing about the file's new state. */}
       <SubmittedFileActions
         file={file}
         actingUploader={actingUploader}

@@ -94,20 +94,23 @@ export const FILE_BULK_ERRORS_DOWNLOAD_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}
  * `POST /v1/files/retry-validation?LogId={id}` — sends a file whose validation failed
  * back for another attempt (`FilesRetryValidation`, brief FR4).
  *
- * The spec declares NO `LastChangedUser` header on this operation, unlike the cancel
+ * The spec declares NO `LastChangedUser` header on this operation, unlike the delete
  * below. That asymmetry is as-documented (brief §Notes & Caveats) — do not add one
  * speculatively to make the two calls look alike.
  */
 export const FILE_RETRY_VALIDATION_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files/retry-validation`;
 
 /**
- * `DELETE /v1/files?LogId={id}` — cancels a submitted file (`FilesDelete`, brief FR5).
+ * `DELETE /v1/files?LogId={id}` — deletes a submitted file (`FilesDelete`,
+ * `file-deletion` R9).
  *
  * This is the BARE `/v1/files` path — the parent of the upload, download and
  * retry-validation operations above. Nothing else in this app addresses it, and only
- * `DELETE` is defined on it, so a call here is always a cancel.
+ * `DELETE` is defined on it, so a call here is always a delete. It is also the app's
+ * ONLY delete address: there is exactly one delete operation in this app, and a second
+ * endpoint constant beside this one is a bug, not an extension.
  */
-export const FILE_CANCEL_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files`;
+export const FILE_DELETE_ENDPOINT = `${TRANSACTIONS_API_BASE_PATH}/v1/files`;
 
 /**
  * `IsActive` is a required query parameter on the list call, and `Yes` is the value
@@ -373,8 +376,9 @@ export const retryFileValidation = (logId: number): Promise<DefaultResponse> =>
   });
 
 /**
- * Cancels one submitted file, deactivating it and clearing its rows from staging
- * (brief FR5, BR2).
+ * Deletes one submitted file, deactivating it and clearing its rows from staging
+ * (`file-deletion` R9). THE app's one delete call — every surface that offers a delete
+ * comes through here; do not wrap it again.
  *
  * `actingUploader` is the AUTHENTICATED person's own name, decided on the server from
  * the session — never anything the user typed, and never a value read from the page.
@@ -384,13 +388,16 @@ export const retryFileValidation = (logId: number): Promise<DefaultResponse> =>
  * The answer is the generic `DefaultResponse` envelope. Once this succeeds the file is
  * inactive, so it leaves `GET /v1/file-logs?IsActive=Yes` and its own page stops
  * resolving — which is why a caller sends the user back to the Expense files list
- * rather than re-reading the file.
+ * rather than re-reading the file. What the service does when the file has already
+ * IMPORTED (its rows having left the staging table this endpoint's own description
+ * names) is unverified against the real backend — a caller reports whatever comes back
+ * and assumes no happy path.
  */
-export const cancelSubmittedFile = (
+export const deleteSubmittedFile = (
   logId: number,
   actingUploader: string,
 ): Promise<DefaultResponse> =>
-  apiClient<DefaultResponse>(FILE_CANCEL_ENDPOINT, {
+  apiClient<DefaultResponse>(FILE_DELETE_ENDPOINT, {
     method: 'DELETE',
     params: { LogId: logId },
     lastChangedUser: actingUploader,
@@ -409,12 +416,12 @@ export const retryFailureMessage = (error: unknown): string =>
   serviceWordingOf(error) ?? RETRY_FAILED_MESSAGE;
 
 /**
- * Shown when a cancel was refused and the service said nothing readable about why —
+ * Shown when a delete was refused and the service said nothing readable about why —
  * the client's internal placeholders never reach a user (project.md NFR-base-5).
  */
-export const CANCEL_FAILED_MESSAGE =
-  'This file could not be cancelled. Please ask for it again.';
+export const DELETE_FAILED_MESSAGE =
+  'This file could not be deleted. Please ask for it again.';
 
-/** What to tell the user when a cancel was refused. */
-export const cancelFailureMessage = (error: unknown): string =>
-  serviceWordingOf(error) ?? CANCEL_FAILED_MESSAGE;
+/** What to tell the user when a delete was refused. */
+export const deleteFailureMessage = (error: unknown): string =>
+  serviceWordingOf(error) ?? DELETE_FAILED_MESSAGE;

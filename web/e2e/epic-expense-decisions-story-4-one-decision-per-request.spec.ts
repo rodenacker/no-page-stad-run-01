@@ -84,8 +84,8 @@
  * - The confirmation is the Shadcn `alert-dialog` (Radix renders `role="alertdialog"`,
  *   portalled to the body, so it is NOT inside `main`), with the confirming control
  *   naming the action it takes — the convention `SubmittedFileActions.tsx` already ships
- *   ("Cancel the file"), so an Approve confirmation reads "Approve…"/"Confirm…" rather
- *   than a bare "OK". Cancel/the way out is never named for the action itself.
+ *   ("Delete the file"), so an Approve confirmation reads "Approve…"/"Confirm…" rather
+ *   than a bare "OK". The way out is never named for the action itself.
  * - BR1's re-read is issued FROM THE BROWSER through `fetchTransactions()` at the app's
  *   own `/transactions-api/...` address, and the decide call FROM THE BROWSER through
  *   story 1's `lib/api/decisions.ts` at the app's own `/api/decisions` address.

@@ -2,7 +2,7 @@
 
 /**
  * What the Finance Uploader may DO to a submitted file: send it back for validation, or
- * cancel it altogether (brief FR4, FR5, BR3).
+ * delete it altogether (`file-deletion` R2, R3, R4, R5, R9, R10, R11, BR1, BR2, BR7).
  *
  * Six things here are deliberate and easy to break:
  *
@@ -12,50 +12,60 @@
  *   and then NOTHING is rendered — not a disabled control, not a greyed-out one (source
  *   UI-24). So an Approver's browser never receives this markup at all, which is what
  *   makes the exclusion structural rather than cosmetic.
- * - **That same value is the audit identity the cancel call must carry.** The service
- *   requires `LastChangedUser` on the cancel, and it is the authenticated person's own
+ * - **That same value is the audit identity the delete call must carry.** The service
+ *   requires `LastChangedUser` on the delete, and it is the authenticated person's own
  *   name — one value doing both jobs, so the name the service records can never be
  *   anything the user typed or anything the browser chose for itself.
- * - **WHICH action applies is decided from the file's own status.** Retry while
- *   validation has failed; cancel while the file has not been imported (`Uploaded` or
- *   `Validation failed` — the two the brief names). Once the file has imported neither
- *   applies and this section is absent: the file's own status, already on the page, is
- *   the answer instead of a control that cannot be used.
- * - **A CANCELLED file is not a case here at all.** Cancelling sets `IsActive: false`,
- *   so the file leaves `GET /v1/file-logs?IsActive=Yes` and its page stops resolving —
+ * - **THE DELETE HAS NO STATUS RULE, and that absence is deliberate.** There used to be
+ *   one (`cancelApplies`: `Uploaded` or `Validation failed` only, with an imported file
+ *   excluded outright), and `file-deletion` BR1 reverses it on the user's explicit
+ *   instruction: a file may be deleted whatever its status, INCLUDING once its rows have
+ *   become live expense payment requests. Do not reinstate a gate here, and do not add a
+ *   second, wider action beside this one. RETRY's own rule is a different rule that
+ *   survives untouched: validation is only worth starting again while it has failed.
+ * - **A DELETED file is not a case here at all.** The delete sets `IsActive: false`, so
+ *   the file leaves `GET /v1/file-logs?IsActive=Yes` and its page stops resolving —
  *   that is `SubmittedFileDetail`'s "not available" answer, not a variant of this
- *   section. Which is also why a confirmed cancel sends the user back to the Expense
+ *   section. Which is also why a confirmed delete sends the user back to the Expense
  *   files list rather than leaving them on a page whose file no longer exists.
- * - **The cancel is gated by the project's shared confirmation (source UI-09).**
- *   `ConfirmAction` is the one implementation of that convention — it NAMES the file
- *   here, says the file and its rows go and that it cannot be undone, opens with the way
- *   OUT holding focus (a stray Enter keeps the file), and sends nothing until the
- *   confirming choice is taken. The way out reads "keep", never "cancel": the
- *   destructive action is itself called Cancel file, so "Cancel" would mean both things
- *   at once.
+ * - **The delete is gated by the project's shared confirmation (source UI-09).**
+ *   `DeleteFileConfirmation` — the epic's ONE confirmation, shared with the Expense
+ *   files list — wraps `ConfirmAction`: it NAMES the file, states what deleting
+ *   actually destroys (the real request numbers for a file that has imported, the
+ *   short warning otherwise, and its own state when the count could not be read),
+ *   opens with the way OUT holding focus (a stray Enter keeps the file), and sends
+ *   nothing until the confirming choice is taken. None of that wording belongs here:
+ *   two surfaces must say the same thing, so it lives in
+ *   `lib/files/deleteConfirmation.ts`. The way out reads "keep", and must never be
+ *   reworded to "Cancel": the destructive choice is called Delete the file, so a way
+ *   out reading "Cancel" would be the one ambiguous wording left on the surface.
  * - **A refusal is reported HERE, in the service's own words**, with the confirmation
- *   closed and both actions still on offer — a user is never trapped in a dialog to
- *   read why something did not happen, and the file is left exactly as it was.
+ *   closed and the delete still on offer — a user is never trapped in a dialog to read
+ *   why something did not happen, and the file is left exactly as it was. Whether the
+ *   service accepts a delete on a file that has already IMPORTED is unverified against
+ *   the real backend (`file-deletion` BR6), so whatever it answers is what the user is
+ *   told: never a claimed success, never a silent no-op.
  */
 
-import { Ban, RotateCcw, TriangleAlert } from 'lucide-react';
+import { RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { ConfirmAction } from '@/components/common/ConfirmAction';
+import {
+  DeleteFileConfirmation,
+  useDeleteFileConfirmation,
+} from '@/components/files/DeleteFileConfirmation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
-  cancelFailureMessage,
-  cancelSubmittedFile,
+  deleteFailureMessage,
+  deleteSubmittedFile,
   retryFailureMessage,
   retryFileValidation,
 } from '@/lib/api/files';
 import { UPLOAD_PATH } from '@/lib/auth/access-map';
-import {
-  FILE_STATUS_UPLOADED,
-  FILE_STATUS_VALIDATION_FAILED,
-} from '@/types/files';
+import { DELETE_FILE_LABEL } from '@/lib/files/deleteConfirmation';
+import { FILE_STATUS_VALIDATION_FAILED } from '@/types/files';
 
 import type { FileLog } from '@/types/files';
 
@@ -64,55 +74,34 @@ const HEADING_ID = 'submitted-file-actions-heading';
 const HEADING = 'Actions';
 
 /**
- * The four controls' own wording, reserved across this epic's stories.
+ * This surface's own control wording. The delete's three labels are NOT here: they
+ * are shared with the Expense files list, so they live in
+ * `lib/files/deleteConfirmation.ts` with everything else the two surfaces must say
+ * identically.
  *
  * `RETRY_LABEL` is deliberately NOT the bare "Try again": that belongs to the
- * processing history's own failed read on this same screen. And the three cancel
- * labels are deliberately all different, so no query — and no user — can mistake the
- * control that ASKS for the one that DOES it or the one that backs out.
+ * processing history's own failed read on this same screen.
  */
 const RETRY_LABEL = 'Retry validation';
-const CANCEL_LABEL = 'Cancel file';
-const CONFIRM_CANCEL_LABEL = 'Cancel the file';
-const KEEP_FILE_LABEL = 'Keep the file';
-
-/** The confirmation names the file it is about — nothing vague like "this file". */
-const confirmationTitleFor = (file: FileLog): string =>
-  `Cancel ${file.CurrentFileName}?`;
-
-/**
- * What cancelling actually does, and that there is no way back from it (source UI-09).
- * The rows are named because they, not just the file, are what the user loses.
- */
-const CONFIRMATION_MESSAGE =
-  'The file and all of its rows are removed, and none of them will become expense payment requests. This cannot be undone — you would have to submit the file again.';
 
 /** Announced while a call is on its way, since nothing on the page has changed yet. */
 const RETRY_IN_FLIGHT = 'Asking for this file to be validated again…';
-const CANCEL_IN_FLIGHT = 'Cancelling this file…';
+const DELETE_IN_FLIGHT = 'Deleting this file…';
 
 /** Names what did not happen, so the alert is not just an apology. */
 const RETRY_REFUSED_TITLE = 'Could not start validation again';
-const CANCEL_REFUSED_TITLE = 'Could not cancel this file';
+const DELETE_REFUSED_TITLE = 'Could not delete this file';
 
 /** Says what to do about it — the control itself, which is still right there. */
 const ASK_AGAIN_MESSAGE =
   'The file is exactly as it was. Choose the action again to ask once more.';
 
-/** Retry applies only while this file's validation has failed (brief FR4). */
-const retryApplies = (file: FileLog): boolean =>
-  file.CurrentStatus === FILE_STATUS_VALIDATION_FAILED;
-
 /**
- * Cancel applies while the file has NOT been imported — the two statuses the brief
- * names (FR5, BR2): awaiting processing, or failed validation.
- *
- * `Validating` is deliberately absent: the brief lists exactly `Uploaded` and
- * `Validation failed`, and a file whose validation is under way is not something this
- * app offers to pull out from under the service.
+ * Retry applies only while this file's validation has failed
+ * (`file-validation-and-retry` FR4) — the ONE status rule left on this surface, and
+ * not the one `file-deletion` BR1 removed. Deleting a file has no status rule at all.
  */
-const cancelApplies = (file: FileLog): boolean =>
-  file.CurrentStatus === FILE_STATUS_UPLOADED ||
+const retryApplies = (file: FileLog): boolean =>
   file.CurrentStatus === FILE_STATUS_VALIDATION_FAILED;
 
 /** Where an action is: none asked for, one on its way, or one the service refused. */
@@ -138,8 +127,17 @@ function OfferedActions({
   onRetried: () => void;
 }) {
   const [state, setState] = useState<ActionState>(IDLE);
-  /** Whether the user is being asked to confirm the cancel. Nothing is sent while it is. */
-  const [cancelAsked, setCancelAsked] = useState(false);
+  /**
+   * Whether the user is being asked to confirm the delete, and what the confirmation
+   * knows about the file's expense payment requests. Nothing is sent while it is open.
+   *
+   * The file this page is about is handed in as the confirmation's current data, so the
+   * dialog describes the file as the page's own 15-second re-read now reports it: a
+   * file that IMPORTS while its confirmation is open stops being described as one that
+   * never will (BR5). That is the whole reason this page re-renders this component with
+   * a fresh `file` at all.
+   */
+  const deleteConfirmation = useDeleteFileConfirmation([file]);
   const router = useRouter();
 
   /** Whether a call is already on its way — a second press must not send a second. */
@@ -171,13 +169,13 @@ function OfferedActions({
       });
   };
 
-  const confirmCancel = (): void => {
+  const confirmDelete = (confirmed: FileLog): void => {
     if (working) {
       return;
     }
-    setState({ phase: 'working', message: CANCEL_IN_FLIGHT });
+    setState({ phase: 'working', message: DELETE_IN_FLIGHT });
 
-    void cancelSubmittedFile(file.Id, actingUploader)
+    void deleteSubmittedFile(confirmed.Id, actingUploader)
       .then(() => {
         // The file is inactive now, so this page would only be able to say it is no
         // longer available. The list is where there is something to do instead — and
@@ -185,10 +183,13 @@ function OfferedActions({
         router.replace(UPLOAD_PATH);
       })
       .catch((error: unknown) => {
+        // Only the service's own answer decides what is said here — including for a
+        // file that had already imported, where what the service does is unverified
+        // (`file-deletion` BR6). Nothing above reports a success this never had.
         setState({
           phase: 'refused',
-          title: CANCEL_REFUSED_TITLE,
-          message: cancelFailureMessage(error),
+          title: DELETE_REFUSED_TITLE,
+          message: deleteFailureMessage(error),
         });
       });
   };
@@ -218,32 +219,27 @@ function OfferedActions({
           </Button>
         )}
 
-        {cancelApplies(file) && (
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setCancelAsked(true);
-              }}
-            >
-              <Ban aria-hidden="true" />
-              {CANCEL_LABEL}
-            </Button>
-            {/* The project's one confirmation: it names the file, holds focus on the
-                way out, and sends nothing until the confirming choice is taken. */}
-            <ConfirmAction
-              open={cancelAsked}
-              onOpenChange={setCancelAsked}
-              title={confirmationTitleFor(file)}
-              description={CONFIRMATION_MESSAGE}
-              confirmLabel={CONFIRM_CANCEL_LABEL}
-              wayOutLabel={KEEP_FILE_LABEL}
-              destructive
-              onConfirm={confirmCancel}
-            />
-          </>
-        )}
+        {/* No status condition: the delete is offered on every file this session may
+            act on, imported ones included (`file-deletion` R3/BR1). */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            // Asking is the event that both opens the confirmation and starts reading
+            // what this file would destroy — never a render reacting to the dialog.
+            deleteConfirmation.ask(file);
+          }}
+        >
+          <Trash2 aria-hidden="true" />
+          {DELETE_FILE_LABEL}
+        </Button>
+        {/* The epic's one confirmation, shared with the Expense files list: it names
+            the file, says what deleting actually destroys, holds focus on the way out,
+            and sends nothing until the confirming choice is taken. */}
+        <DeleteFileConfirmation
+          confirmation={deleteConfirmation}
+          onConfirm={confirmDelete}
+        />
       </div>
 
       {state.phase === 'working' && (
@@ -269,12 +265,10 @@ export function SubmittedFileActions({
   /** Called once a retry has been accepted, so the page can re-read what it shows. */
   onRetried: () => void;
 }) {
-  // Nothing at all reaches the browser for a session that may not act on the file, and
-  // nothing at all for a file neither action applies to — absent, never disabled.
+  // Nothing at all reaches the browser for a session that may not act on the file —
+  // absent, never disabled (source UI-24). There is no second reason to render nothing:
+  // a session that MAY act is always offered the delete, whatever the file's status.
   if (actingUploader === undefined) {
-    return null;
-  }
-  if (!retryApplies(file) && !cancelApplies(file)) {
     return null;
   }
 

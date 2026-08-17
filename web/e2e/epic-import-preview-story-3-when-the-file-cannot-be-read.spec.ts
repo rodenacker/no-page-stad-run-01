@@ -74,7 +74,7 @@
  *     `role="alert"` inside the preview, NO table of any kind (BR8), and one control
  *     named exactly "Load the preview again" (story 3 §Retry label — chosen to avoid
  *     the labels this page already owns: `Try again`, `Try again to load the rejected
- *     rows`, `Load this file again`, `Retry validation`, `Cancel file`, `Download
+ *     rows`, `Load this file again`, `Retry validation`, `Delete file`, `Download
  *     original file`, `Download error file`).
  *   - The preview is its own labelled section — `<section aria-labelledby>` with a
  *     heading naming it, as `RejectedRows` and `FileProcessingHistory` already are —

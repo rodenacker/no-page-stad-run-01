@@ -5,23 +5,33 @@
  * - Target File: web/src/app/(authenticated)/upload/file/page.tsx
  * - Page Action: modify_existing
  *
+ * SUPERSEDED IN PART BY EPIC `file-deletion` (story 1). That story renamed this
+ * story's destructive action — trigger "Cancel file" → "Delete file", confirm
+ * "Cancel the file" → "Delete the file", way out "Keep the file" unchanged — and
+ * REMOVED its status gate, so the action is now offered whatever the file's status,
+ * including once it has imported (`file-deletion` R3/R4/BR1, a user-confirmed
+ * reversal). This file is updated to the rule as it now stands: the criteria below
+ * are unchanged in intent, but the imported-file case asserts the action is OFFERED
+ * where it once asserted it was absent. Retry's own status rule is untouched by that
+ * epic and is still pinned here exactly as it was.
+ *
  * Covers the criteria tagged `vitest`:
  * - AC-2 — which action is offered follows the file's STATUS: retry only while
- *   validation has failed, cancel while the file is awaiting processing or has
- *   failed, neither once it has imported (the page states the file's state instead).
+ *   validation has failed; the delete whatever the status, including once the file
+ *   has imported.
  * - AC-3 — retrying puts the file back into an in-progress status, records a new
  *   processing activity, and the page shows the outcome once it resolves.
- * - AC-4 — the cancel confirmation names the file, says it cannot be undone, opens
- *   with the keep-the-file choice holding focus, and cancels nothing until confirmed.
- * - AC-6 — a refused retry or cancel is reported in the SERVICE's own words and
+ * - AC-4 — the delete confirmation names the file, says it cannot be undone, opens
+ *   with the keep-the-file choice holding focus, and deletes nothing until confirmed.
+ * - AC-6 — a refused retry or delete is reported in the SERVICE's own words and
  *   leaves the file exactly as it was.
  *
  * AC-1 (the server deciding from the session role that an Approver is offered
- * neither action) and AC-5 (a confirmed cancel deactivating the file so its row
+ * neither action) and AC-5 (a confirmed delete deactivating the file so its row
  * leaves the Expense files list) are this story's Playwright spec's — deliberately
  * not duplicated here (testing-policy.md § "One tag, one layer"). What IS pinned
  * below is the component half of that gating: told the session may not act on the
- * file, the page renders no retry or cancel control at all — absent, not disabled.
+ * file, the page renders no retry or delete control at all — absent, not disabled.
  *
  * ---------------------------------------------------------------------------
  * IMPLEMENTATION CONTRACT these tests pin (read this before implementing)
@@ -43,22 +53,23 @@
  *    `page.tsx` passes `actingUploader={hasRole(session, ROLE_IMPORTER) ?
  *    displayNameOf(session) : undefined}` — matching on `ROLE_IMPORTER` from
  *    `@/types/auth` (the auth service's own wire name; "Finance Uploader" recognises
- *    nobody, project.md §Roles). With the prop ABSENT no retry/cancel control is
+ *    nobody, project.md §Roles). With the prop ABSENT no retry/delete control is
  *    rendered at all — not disabled, not `aria-disabled`, not greyed-out markup
  *    (source UI-24, the shape `app/(authenticated)/upload/page.tsx` already shows).
- *    That one value doubles as the audit identity the cancel call must send, so the
+ *    That one value doubles as the audit identity the delete call must send, so the
  *    name the service records can never be anything the user typed.
- * 3. WHICH ACTION APPLIES is decided from the file's own `CurrentStatus`:
- *    retry while `Validation failed`; cancel while `Uploaded` OR `Validation failed`;
- *    neither once `Imported`. (A `Cancelled` file is inactive, so it is absent from
- *    `GET /v1/file-logs?IsActive=Yes` and never resolves at all — that is story 1's
- *    AC-5 "no longer available" page, not an action-gating case, which is why the
- *    imported file is the representative "neither is offered" state below.)
+ * 3. WHICH ACTION APPLIES. Retry is decided from the file's own `CurrentStatus` —
+ *    offered while `Validation failed`, and only then. The DELETE has no status rule
+ *    at all any more (`file-deletion` R3/BR1 removed the `Uploaded`-or-`Validation
+ *    failed` gate this story shipped): it is offered on every file the session may act
+ *    on, an `Imported` one included. (A `Cancelled` file is inactive, so it is absent
+ *    from `GET /v1/file-logs?IsActive=Yes` and never resolves at all — that is story
+ *    1's AC-5 "no longer available" page, not an action-gating case.)
  * 4. THE TWO CALLS, and their documented header asymmetry (epic brief §Notes):
  *    - retry  → `POST   {TRANSACTIONS_API_BASE_PATH}/v1/files/retry-validation?LogId=<id>`
  *               with NO `LastChangedUser` header; the spec declares none, so none is
  *               sent speculatively.
- *    - cancel → `DELETE {TRANSACTIONS_API_BASE_PATH}/v1/files?LogId=<id>` WITH
+ *    - delete → `DELETE {TRANSACTIONS_API_BASE_PATH}/v1/files?LogId=<id>` WITH
  *               `LastChangedUser` (the shared client's `lastChangedUser` config /
  *               `del` argument), carrying `actingUploader`.
  *    Both belong in `lib/api/files.ts` alongside `fetchSubmittedFiles`, through the
@@ -89,13 +100,15 @@
  *    watched for — any sensible values satisfy them. What IS pinned is that ONE timer
  *    drives every section of the page: each section that has to catch up takes a signal
  *    from whoever owns that timer rather than growing one of its own.
- * 6. THE CANCEL CONFIRMATION is the Shadcn `alert-dialog` (already installed;
+ * 6. THE DELETE CONFIRMATION is the Shadcn `alert-dialog` (already installed;
  *    do NOT regenerate it from the CLI, which reinstates a raw colour keyword over
  *    its `bg-overlay/60` token). Radix renders it with `role="alertdialog"`. Per the
  *    `UI-09` convention it names the file, says the file and its rows are removed and
  *    cannot be undone, and opens with the way OUT holding focus — which is what
- *    `AlertDialogCancel` gives for free. Labels these tests query by:
- *      trigger  "Cancel file"  ·  confirm  "Cancel the file"  ·  way out  "Keep the file"
+ *    `AlertDialogCancel` gives for free. Labels these tests query by (renamed by
+ *    `file-deletion` R4; the way out keeps its wording precisely because a way out
+ *    reading "Cancel" would be ambiguous beside a destructive choice called Delete):
+ *      trigger  "Delete file"  ·  confirm  "Delete the file"  ·  way out  "Keep the file"
  *    Nothing is sent until the confirm choice is taken.
  * 7. A REFUSAL IS THE SERVICE'S OWN WORDING, reported ON THE PAGE:
  *    `serviceMessageOf(e) ?? serviceDetailOf(e) ?? <own wording>`
@@ -103,7 +116,7 @@
  *    service reports a refusal as a 500 carrying `Messages[]`, which the shared client
  *    keeps on `details` while putting its OWN placeholder on `message` — so
  *    `serviceMessageOf` alone finds nothing and "Internal Server Error: …" would reach
- *    the user (project.md NFR-base-5). A refused cancel CLOSES the confirmation and
+ *    the user (project.md NFR-base-5). A refused delete CLOSES the confirmation and
  *    reports the refusal on the page beside the actions, rather than trapping the user
  *    in a dialog, and leaves the file with both actions still offered.
  *
@@ -130,7 +143,7 @@ import userEvent, {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Production code under test — the submitted-file page's own client view, which this
-// story teaches to retry and cancel. The import fails until it exists (TDD red).
+// story teaches to retry and delete. The import fails until it exists (TDD red).
 import { SubmittedFileDetail } from '@/components/files/SubmittedFileDetail';
 // Real production toast composition (not mocked) — the surface the root layout wraps
 // every signed-in screen in, so a refusal reported through it reads as text either way.
@@ -143,14 +156,14 @@ import { displayNameOf } from '@/lib/auth/identity';
 // gives the SAME file (one id, one name) at successive statuses, which is exactly what a
 // retry needs. Never hand-write a response body in a test.
 import {
-  CANCEL_REFUSED_MESSAGE,
+  DELETE_REFUSED_MESSAGE,
   FILE_STATUS_IMPORTED,
   FILE_STATUS_UPLOADED,
   FILE_STATUS_VALIDATING,
   FILE_STATUS_VALIDATION_FAILED,
   RETRY_REFUSED_MESSAGE,
-  cancelFailureResponse,
-  cancelSuccessResponse,
+  deleteFailureResponse,
+  deleteSuccessResponse,
   fileLogListResponse,
   fileLogProgression,
   fileLogWithStatus,
@@ -222,7 +235,7 @@ const mockGet = get as unknown as ReturnType<typeof vi.fn>;
 const mockPost = post as unknown as ReturnType<typeof vi.fn>;
 const mockDel = del as unknown as ReturnType<typeof vi.fn>;
 
-/** The signed-in Finance Uploader, and the audit name the cancel call must carry. */
+/** The signed-in Finance Uploader, and the audit name the delete call must carry. */
 const IMPORTER = userInfoFor(ROLE_IMPORTER);
 const ACTING_UPLOADER = displayNameOf(IMPORTER);
 
@@ -243,13 +256,13 @@ const LOG_ID_IN_ADDRESS = String(LOG_ID);
 const REFRESH_WINDOW_MS = 60_000;
 
 /**
- * The accessible names of the four controls this story adds. Anchored, so the
- * "Cancel file" trigger and the confirmation's "Cancel the file" choice can never be
- * mistaken for one another.
+ * The accessible names of the four controls this story adds, under the wording
+ * `file-deletion` R4 gave them. Anchored, so the "Delete file" trigger and the
+ * confirmation's "Delete the file" choice can never be mistaken for one another.
  */
 const RETRY = /^retry validation$/i;
-const CANCEL = /^cancel file$/i;
-const CONFIRM_CANCEL = /^cancel the file$/i;
+const DELETE_FILE = /^delete file$/i;
+const CONFIRM_DELETE = /^delete the file$/i;
 const KEEP_FILE = /^keep the file$/i;
 
 /**
@@ -270,8 +283,8 @@ const REFUSED_RETRY = refusal(
   '/transactions-api/v1/files/retry-validation',
 );
 
-const REFUSED_CANCEL = refusal(
-  cancelFailureResponse().Messages,
+const REFUSED_DELETE = refusal(
+  deleteFailureResponse().Messages,
   '/transactions-api/v1/files',
 );
 
@@ -308,7 +321,7 @@ let rejectedRowsScript: Scripted<ValidationErrors> = {
   body: validationErrorsResponse([]),
 };
 let retryScript: Scripted<DefaultResponse> = { body: retrySuccessResponse() };
-let cancelScript: Scripted<DefaultResponse> = { body: cancelSuccessResponse() };
+let deleteScript: Scripted<DefaultResponse> = { body: deleteSuccessResponse() };
 
 /**
  * Answers whatever is currently scripted — so a test changes what the SERVICE says
@@ -378,7 +391,7 @@ interface RecordedCall {
 }
 
 let retryRequests: RecordedCall[] = [];
-let cancelRequests: RecordedCall[] = [];
+let deleteRequests: RecordedCall[] = [];
 
 /** A query-parameter value the request actually carried, as text. */
 const scalarOf = (value: unknown): string | null =>
@@ -421,11 +434,11 @@ const route = async (
   const verb = method.toUpperCase();
 
   if (verb === 'DELETE' && /\/v1\/files(\?|$)/.test(path)) {
-    cancelRequests.push({
+    deleteRequests.push({
       logId: logIdIn(path, config),
       lastChangedUser: config?.lastChangedUser,
     });
-    return deliver(cancelScript);
+    return deliver(deleteScript);
   }
   if (path.includes('/v1/files/retry-validation')) {
     retryRequests.push({
@@ -543,9 +556,9 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
     rejectedRowsScript = { body: validationErrorsResponse([]) };
     readFailuresOwed = { files: 0, history: 0, rejectedRows: 0 };
     retryScript = { body: retrySuccessResponse() };
-    cancelScript = { body: cancelSuccessResponse() };
+    deleteScript = { body: deleteSuccessResponse() };
     retryRequests = [];
-    cancelRequests = [];
+    deleteRequests = [];
 
     mockGet.mockImplementation(
       (endpoint: string, params?: APIRequestConfig['params']) =>
@@ -571,39 +584,46 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
     vi.useRealTimers();
   });
 
-  // AC-2
-  it('offers retry only while validation has failed, cancel while the file is still unimported, and neither once it has imported', async () => {
+  // AC-2 — as `file-deletion` R3/BR1 now has it: retry keeps its status rule, the
+  // delete has none.
+  it("offers retry only while validation has failed, and the delete whatever the file's status — including once it has imported", async () => {
     // A file whose validation failed: both actions apply.
     const closeFailed = await openFile(
       fileLogWithStatus(FILE_STATUS_VALIDATION_FAILED),
       ACTING_UPLOADER,
     );
     expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
     closeFailed();
 
     // A file still awaiting processing: there is no failed validation to retry, but it
-    // has not imported either, so it can still be cancelled.
+    // can still be deleted.
     const closeUploaded = await openFile(
       fileLogWithStatus(FILE_STATUS_UPLOADED),
       ACTING_UPLOADER,
     );
-    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
     expect(offeredControl(RETRY)).not.toBeInTheDocument();
     expect(screen.queryAllByText(/retry validation/i)).toEqual([]);
     closeUploaded();
 
-    // A file that has imported: neither action applies any more, and the page says
-    // where the file stands instead of offering something that cannot be done.
+    // A file that has imported. There is still nothing to retry — that rule did not
+    // change — but the delete IS offered here, where the shipped status gate used to
+    // hide it: a file may be deleted whatever its status (`file-deletion` R3/BR1).
     const closeImported = await openFile(
       fileLogWithStatus(FILE_STATUS_IMPORTED),
       ACTING_UPLOADER,
     );
     expect(screen.getByText(FILE_STATUS_IMPORTED)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
     expect(offeredControl(RETRY)).not.toBeInTheDocument();
-    expect(offeredControl(CANCEL)).not.toBeInTheDocument();
     expect(screen.queryAllByText(/retry validation/i)).toEqual([]);
-    expect(screen.queryAllByText(/cancel file/i)).toEqual([]);
     closeImported();
 
     // And a session that may not act on the file — no acting uploader was decided for
@@ -614,9 +634,9 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
       fileLogWithStatus(FILE_STATUS_VALIDATION_FAILED),
     );
     expect(offeredControl(RETRY)).not.toBeInTheDocument();
-    expect(offeredControl(CANCEL)).not.toBeInTheDocument();
+    expect(offeredControl(DELETE_FILE)).not.toBeInTheDocument();
     expect(screen.queryAllByText(/retry validation/i)).toEqual([]);
-    expect(screen.queryAllByText(/cancel file/i)).toEqual([]);
+    expect(screen.queryAllByText(/delete file/i)).toEqual([]);
     closeReadOnly();
   });
 
@@ -814,9 +834,11 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
       ),
     ).toBeInTheDocument();
     // And the file is still a failed one, so the uploader can correct it and retry
-    // again, or cancel it (Key Workflows step 5).
+    // again, or delete it (Key Workflows step 5).
     expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
     // Every refusal was actually handed out, so the reads above really were a second
     // round of asking rather than one lucky sample.
     expect(readFailuresOwed).toEqual({
@@ -829,13 +851,13 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
   });
 
   // AC-4
-  it('asks for confirmation before cancelling, naming the file and warning it cannot be undone, and cancels nothing unless it is confirmed', async () => {
+  it('asks for confirmation before deleting, naming the file and warning it cannot be undone, and deletes nothing unless it is confirmed', async () => {
     const failed = fileLogWithStatus(FILE_STATUS_VALIDATION_FAILED);
     const user = setupUser();
     serveHistory(fileProcessHistory());
     const close = await openFile(failed, ACTING_UPLOADER);
 
-    await user.click(screen.getByRole('button', { name: CANCEL }));
+    await user.click(screen.getByRole('button', { name: DELETE_FILE }));
 
     const confirmation = await screen.findByRole('alertdialog');
     // It names the file being acted on, says what happens to it and its rows, and says
@@ -853,26 +875,28 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
       expect(keepTheFile).toHaveFocus();
     });
 
-    // Backing out cancels nothing at all...
+    // Backing out deletes nothing at all...
     await user.click(keepTheFile);
     await waitFor(() => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
-    expect(cancelRequests).toEqual([]);
+    expect(deleteRequests).toEqual([]);
     // ...and leaves the file exactly where it was, both actions still on offer.
     expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
 
-    // Only confirming cancels it — and the call names this file and is attributed to
+    // Only confirming deletes it — and the call names this file and is attributed to
     // the signed-in uploader, which the service requires on this call alone.
-    await user.click(screen.getByRole('button', { name: CANCEL }));
+    await user.click(screen.getByRole('button', { name: DELETE_FILE }));
     const reopened = await screen.findByRole('alertdialog');
     await user.click(
-      within(reopened).getByRole('button', { name: CONFIRM_CANCEL }),
+      within(reopened).getByRole('button', { name: CONFIRM_DELETE }),
     );
 
     await waitFor(() => {
-      expect(cancelRequests).toEqual([
+      expect(deleteRequests).toEqual([
         { logId: String(LOG_ID), lastChangedUser: ACTING_UPLOADER },
       ]);
     });
@@ -881,13 +905,13 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
   });
 
   // AC-6
-  it("reports a refused retry or cancel in the service's own words and leaves the file exactly as it was", async () => {
+  it("reports a refused retry or delete in the service's own words and leaves the file exactly as it was", async () => {
     const failed = fileLogWithStatus(FILE_STATUS_VALIDATION_FAILED);
     const newAttempt = runningFileProcessLog();
     const user = setupUser();
     serveHistory(fileProcessHistory());
     retryScript = { failure: REFUSED_RETRY };
-    cancelScript = { failure: REFUSED_CANCEL };
+    deleteScript = { failure: REFUSED_DELETE };
     const close = await openFile(failed, ACTING_UPLOADER);
 
     await user.click(screen.getByRole('button', { name: RETRY }));
@@ -911,30 +935,34 @@ describe('Epic file-validation-and-retry, Story 4: retrying validation or cancel
     // legitimately says "Validation failed" in two places.)
     expect(screen.queryByText(newAttempt.StartDate)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
 
-    // A refused cancel reads the same way, and does not strand the user in the
+    // A refused delete reads the same way, and does not strand the user in the
     // confirmation either.
-    await user.click(screen.getByRole('button', { name: CANCEL }));
+    await user.click(screen.getByRole('button', { name: DELETE_FILE }));
     const confirmation = await screen.findByRole('alertdialog');
     await user.click(
-      within(confirmation).getByRole('button', { name: CONFIRM_CANCEL }),
+      within(confirmation).getByRole('button', { name: CONFIRM_DELETE }),
     );
 
     await waitFor(() => {
-      expect(cancelRequests).toEqual([
+      expect(deleteRequests).toEqual([
         { logId: String(LOG_ID), lastChangedUser: ACTING_UPLOADER },
       ]);
     });
-    expect(await screen.findByText(CANCEL_REFUSED_MESSAGE)).toBeInTheDocument();
+    expect(await screen.findByText(DELETE_REFUSED_MESSAGE)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
     // The file was not deactivated, so it is still here with both actions — and the
-    // user was not returned to the Expense files list as a successful cancel returns
+    // user was not returned to the Expense files list as a successful delete returns
     // them.
     expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CANCEL })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: DELETE_FILE }),
+    ).toBeInTheDocument();
     expect(navigationTargets()).toEqual([]);
 
     close();

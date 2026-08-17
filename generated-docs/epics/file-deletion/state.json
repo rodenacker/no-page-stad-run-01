@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "file-deletion",
+    "name": "Delete a submitted file",
+    "createdAt": "2026-08-17T09:24:07.761Z",
+    "dependsOn": [
+      "expense-file-upload",
+      "file-validation-and-retry",
+      "expense-decisions"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [
+      "Verify that deleting a file that has already imported actually works: the app now offers the action on those files, but the service's own description of this delete says it removes a file from the staging area, and an imported file's rows have already left it. If the service refuses, you will see its refusal every time — the app will not pretend otherwise, but you would be offered an action that can never finish.",
+      "Verify nothing is left behind afterwards: open the expense requests list after deleting an imported file. The app tells the user that deleting the file removes the requests it produced. If the service only deactivates the file and leaves those requests in place, you will still see them — including ones an Approver already decided — with no file behind them, and the confirmation you agreed to will have overstated what happened.",
+      "Verify the numbers in the confirmation are right: the app works out how many requests a file produced by reading every request in the system and keeping the ones marked as coming from that file. Compare the number in the confirmation against what you can see in the requests list for that file. If the service marks them differently, or leaves the file reference off older ones, the confirmation could tell you that far less is being destroyed than really is.",
+      "A refused delete that the service gives no readable reason for falls back to the app's own sentence: \"This file could not be deleted. Please ask for it again.\" Confirm that reads right to you.",
+      "The confirming choice stays usable while the request count is still being read — someone certain of what they are doing can delete before the numbers land. The alternative (disabling it until the count arrives) takes the control out from under a keyboard user mid-journey. Confirm this is the behaviour you want on a destructive action.",
+      "The confirmation's exact sentences are an interpretation of what the requirement described: \"This file produced 40 expense payment requests. 12 of them have already been approved and 3 rejected. Deleting the file removes all 40 of them and the record of who decided the 15 already decided. This cannot be undone.\" Read it as a user would."
+    ],
+    "manualTestResults": [
+      {
+        "allPassed": true,
+        "at": "2026-08-17T13:32:54.448Z",
+        "note": "User confirmed all manual tests passed, including the three unverified backend assumptions. Deleting an imported file works; no orphaned requests; confirmation counts match the requests list. BR6 resolved — see journal.md."
+      }
+    ]
+  },
+  "phase": "COMPLETE-ON-BRANCH",
+  "stories": {
+    "1": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-17T10:16:52.997Z",
+      "completedAt": "2026-08-17T10:34:25.181Z"
+    },
+    "2": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed-after-fix",
+      "startedAt": "2026-08-17T10:34:25.181Z",
+      "completedAt": "2026-08-17T10:54:37.374Z"
+    },
+    "3": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-17T10:54:37.374Z",
+      "completedAt": "2026-08-17T11:06:08.135Z"
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-17T13:32:54.448Z"
+}

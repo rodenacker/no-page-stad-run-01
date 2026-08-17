@@ -114,8 +114,8 @@
  *     A trailing full stop is optional. They are expected to reconcile against the
  *     file's own `RecordCount`.
  * 14. RESERVED CONTROL LABELS on this page — do not collide: `Try again`, `Try again to
- *     load the rejected rows`, `Load this file again`, `Retry validation`, `Cancel
- *     file` / `Cancel the file` / `Keep the file`, `Download original file`, `Download
+ *     load the rejected rows`, `Load this file again`, `Retry validation`, `Delete
+ *     file` / `Delete the file` / `Keep the file`, `Download original file`, `Download
  *     error file`.
  *
  * Mocked here, and why: only `@/lib/api/client`, the fixed HTTP boundary

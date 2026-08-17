@@ -1,7 +1,40 @@
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom/vitest';
 
+import { configure } from '@testing-library/react';
 import { vi } from 'vitest';
+
+// How long `findBy*` / `waitFor` / `waitForElementToBeRemoved` may wait for the
+// screen to settle — the other half of the ceiling `vitest.config.ts` already
+// raises for `testTimeout` (5s → 15s), and raised here for exactly the same
+// reason.
+//
+// Testing Library's own default is 1000 ms, which is a wall-clock window in a
+// run where 43 test files share 12 cores: a worker gets time-sliced, and the
+// macrotask that commits a React render can sit behind other threads' work for
+// longer than the window even though nothing is wrong. Measured on this project's
+// heaviest chain — `/upload/file` resolving the file from the active list,
+// downloading the submitted file, reading its bytes with a `FileReader`, parsing
+// the CSV (which yields to the macrotask queue between chunks) and only then
+// rendering the preview — the wait was 65 ms in isolation and 338–1201 ms in the
+// full parallel run. At 1000 ms that failed roughly one run in four while passing
+// 4/4 on its own: a flake that says nothing about the code, and the same trap sat
+// under every other whole-screen test.
+//
+// THIS RAISES A CEILING AND CHANGES NO EXPECTATION. Every one of these utilities
+// resolves the moment its condition holds, so a passing test is no slower; only a
+// test that was going to fail spends the extra time, and nothing in this suite
+// asserts by letting one of them time out. Kept comfortably BELOW `testTimeout`
+// on purpose: a genuinely missing element must still fail as Testing Library's
+// "Unable to find role=… " with the DOM printed, which is diagnostic, rather than
+// as a bare "Test timed out", which is not.
+//
+// This is a budget, not a fix for a race. A wait that needs longer because the
+// code is genuinely racing (a missing `await`, an unhandled rejection) must be
+// fixed in the code — and a test should still wait on an observable signal that
+// the screen has settled rather than betting a single query against a whole
+// asynchronous chain.
+configure({ asyncUtilTimeout: 5000 });
 
 // Accessibility is asserted in Playwright (real browser) via @axe-core/playwright,
 // not in jsdom — see testing-policy.md § Where each scenario belongs. So there is
