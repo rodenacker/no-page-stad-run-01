@@ -12,7 +12,8 @@
  * credential store grants nothing here (`roles.ts`), so showing it would tell the
  * user they have standing they do not have.
  */
-import { rolesOf } from './roles';
+import { hasRole, rolesOf } from './roles';
+import { ROLE_IMPORTER } from '@/types/auth';
 
 import type { UserInfoRead } from '@/types/auth';
 
@@ -33,3 +34,26 @@ export const displayNameOf = (user: DisplayableIdentity): string =>
  */
 export const roleLabelOf = (user: DisplayableIdentity): string =>
   rolesOf(user).join(', ');
+
+/**
+ * WHO MAY ACT ON A SUBMITTED FILE, and under whose name — the one expression the
+ * SERVER decision rests on, so the two screens that make it (`/upload` and
+ * `/upload/file`) cannot drift apart.
+ *
+ * `undefined` for anybody but the Finance Uploader, and that absence is what leaves
+ * the uploader-only actions out of the markup altogether rather than rendering them
+ * disabled (source UI-24). The same value is the audit identity those calls send as
+ * `LastChangedUser`, so the name the service records comes from
+ * `GET /v1/auth/userinfo` and never from anything the user typed or the browser chose.
+ *
+ * The match is on `ROLE_IMPORTER` — the auth service's own wire name for the role the
+ * requirements call the "Finance Uploader"; matching on the requirements' wording
+ * would recognise nobody.
+ *
+ * Call it on the SERVER only. A component that receives its answer as a prop reads no
+ * session in the browser, which is what makes the exclusion structural.
+ */
+export const actingUploaderIn = (
+  user: DisplayableIdentity,
+): string | undefined =>
+  hasRole(user, ROLE_IMPORTER) ? displayNameOf(user) : undefined;

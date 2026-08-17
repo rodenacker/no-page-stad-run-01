@@ -23,6 +23,7 @@ import { PermissionDeniedMessage } from '@/components/auth/PermissionDeniedMessa
 import { SubmittedFilesList } from '@/components/files/SubmittedFilesList';
 import { SubmitExpenseFileForm } from '@/components/upload/SubmitExpenseFileForm';
 import { UPLOAD_PATH, canAccess } from '@/lib/auth/access-map';
+import { actingUploaderIn } from '@/lib/auth/identity';
 import { requireSession } from '@/lib/auth/requireSession';
 import { hasRole, rolesOf } from '@/lib/auth/roles';
 import { ROLE_IMPORTER } from '@/types/auth';
@@ -46,12 +47,23 @@ export default async function UploadPage() {
     <div className="grid gap-8">
       <h1 className="text-2xl font-semibold tracking-tight">Expense files</h1>
       {hasRole(session, ROLE_IMPORTER) && <SubmitExpenseFileForm />}
-      {/* Who is watching is decided here, on the server, from the session — the list
-          never reads an identity in the browser. It is what narrows the
-          rejected-rows notification to the Finance Uploader
-          (`file-validation-and-retry` FR9): an Approver's rows still keep themselves
-          current, they are simply not told about another person's bad rows. */}
-      <SubmittedFilesList viewerRoles={rolesOf(session)} />
+      {/* Both of these are decided here, on the server, from the session — the list
+          never reads an identity in the browser. They are two DIFFERENT decisions with
+          opposite polarities, which is why they are two props:
+
+          - `viewerRoles` is who is WATCHING, and it narrows the rejected-rows
+            notification to the Finance Uploader (`file-validation-and-retry` FR9): an
+            Approver's rows still keep themselves current, they are simply not told
+            about another person's bad rows.
+          - `actingUploader` is who may DELETE a file from a row, and under whose name
+            (`file-deletion` R1/R5/BR2/BR7). It is `actingUploaderIn`, the same
+            expression the file's own page uses for the same decision — `undefined`
+            for anybody but the Finance Uploader, which leaves the delete out of the
+            markup entirely rather than rendering it disabled (source UI-24). */}
+      <SubmittedFilesList
+        viewerRoles={rolesOf(session)}
+        actingUploader={actingUploaderIn(session)}
+      />
     </div>
   );
 }

@@ -52,12 +52,40 @@
  * carrying the file's identifier (`file-validation-and-retry` FR8): a link, not a
  * button that pushes a route, so it can be opened in a new tab and is announced as a
  * link.
+ *
+ * DELETING A FILE FROM A ROW (`file-deletion` R1, R5, R9, R10, R11, R12, BR2, BR7)
+ * adds four things to that, and each of them is easy to get subtly wrong:
+ *
+ * - **The delete sits IN THE ROW**, beside the `Open` link — never behind a per-row
+ *   menu that has to be opened first, which would put a control between a keyboard
+ *   user and the action (story 3 AC-6).
+ * - **Who may delete is decided on the SERVER** and arrives as `actingUploader`. Its
+ *   absence means NO delete control at all — the opposite polarity to `viewerRoles`
+ *   below, deliberately, and the reason the two are separate props. See
+ *   {@link SubmittedFilesListProps}.
+ * - **ONE confirmation, shared with the file's own page.** The dialog a row opens is
+ *   `DeleteFileConfirmation`, which owns the title, all three states of the
+ *   description and the two dialog labels. A second confirmation written for this
+ *   surface would read differently for the same file, however plausible its wording.
+ *   One controller serves the whole table, since only one row can be being confirmed
+ *   at a time.
+ * - **A deleted row goes because the list RE-READ ITSELF.** A success asks for the
+ *   list again through the very same read the auto-refresh and a submission already
+ *   use (`readsRequested`) — never a locally spliced array standing in for the
+ *   service's answer, and never a second timer (R12, Feature NFR "List currency").
+ *   A refusal is reported here in the SERVICE's own words with the dialog closed, the
+ *   row exactly where it was and the delete still on offer; nothing on screen implies
+ *   the file went anywhere it did not.
  */
 
-import { PanelRightOpen, TriangleAlert } from 'lucide-react';
+import { PanelRightOpen, Trash2, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  DeleteFileConfirmation,
+  useDeleteFileConfirmation,
+} from '@/components/files/DeleteFileConfirmation';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -73,7 +101,12 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/contexts/ToastContext';
 import { serviceDetailOf, serviceMessageOf } from '@/lib/api/errors';
-import { fetchSubmittedFiles } from '@/lib/api/files';
+import {
+  deleteFailureMessage,
+  deleteSubmittedFile,
+  fetchSubmittedFiles,
+} from '@/lib/api/files';
+import { DELETE_FILE_LABEL } from '@/lib/files/deleteConfirmation';
 import { submittedFileAddress } from '@/lib/files/fileAddress';
 import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
 import { ROLE_IMPORTER } from '@/types/auth';
@@ -168,6 +201,49 @@ const OPEN_LABEL = 'Open';
 const openLabelFor = (file: FileLog): string =>
   `the file ${file.CurrentFileName}`;
 
+/**
+ * How a row's delete action names the file it is about, for a screen reader.
+ *
+ * The visible wording is the shared `DELETE_FILE_LABEL` — the SAME phrase the file's
+ * own page uses, because the two surfaces must not develop separate vocabulary — and
+ * the file's name follows it, so a row's delete is told apart from another row's by
+ * more than its position. As with the `Open` link above, that extra wording is
+ * deliberately not the BARE file name: the name already has its own cell, and a
+ * second element carrying exactly the same text would make the row's own file
+ * ambiguous to anything reading the table by text.
+ */
+const deleteLabelFor = (file: FileLog): string =>
+  `named ${file.CurrentFileName}`;
+
+/** The last column holds what can be DONE with a row, not one named action. */
+const ACTIONS_COLUMN_LABEL = 'Actions';
+
+/** Announced while the delete is on its way, since the row has not changed yet. */
+const deletingMessage = (file: FileLog): string =>
+  `Deleting ${file.CurrentFileName}…`;
+
+/**
+ * Names what did not happen, AND which file it did not happen to — on a list of many
+ * files, "this file" would leave the user guessing which row the message is about.
+ */
+const deleteRefusedTitleFor = (file: FileLog): string =>
+  `Could not delete ${file.CurrentFileName}`;
+
+/**
+ * Says what the screen still shows and what to do about it — the row is untouched and
+ * its own action is still right there (`file-deletion` R10/R11).
+ */
+const STILL_LISTED_MESSAGE =
+  'The file is still listed, exactly as it was. Choose its delete action again to ask once more.';
+
+/** Where a row's delete is: none asked for, one on its way, or one the service refused. */
+type DeleteState =
+  | { phase: 'idle' }
+  | { phase: 'working'; file: FileLog }
+  | { phase: 'refused'; file: FileLog; message: string };
+
+const NO_DELETE: DeleteState = { phase: 'idle' };
+
 /** Where the list is: being read, read, or unreadable. */
 type ListState =
   | { phase: 'loading' }
@@ -184,25 +260,50 @@ const filesIn = (body: FileLogList | undefined): FileLog[] =>
   Array.isArray(body?.FileLog) ? body.FileLog : [];
 
 /**
- * What the screen may tell this list about who is watching it.
+ * What the screen may tell this list about the person in front of it. Both answers are
+ * decided on the SERVER by `/upload`; nothing here reads a session in the browser.
  *
- * `viewerRoles` is the signed-in person's role names, which the `/upload` page fills
- * from the session (`rolesOf(session)`) — nothing here reads a session in the
- * browser. It is OPTIONAL, and a list rendered without it still speaks up: this
- * component's original contract carries no session prop at all
- * (`expense-file-upload` story 3), so withholding a notification from a caller that
- * has not said who is watching would silently change that behaviour.
+ * THE TWO PROPS HAVE OPPOSITE DEFAULTS, AND THAT IS THE POINT — they answer two
+ * different questions, so copying one's convention into the other is a real defect
+ * rather than an inconsistency:
+ *
+ * - `viewerRoles` is the signed-in person's role names (`rolesOf(session)`). It is
+ *   OPTIONAL, and a list rendered WITHOUT it still speaks up: this component's
+ *   original contract carries no session prop at all (`expense-file-upload` story 3),
+ *   so withholding a notification from a caller that has not said who is watching
+ *   would silently change shipped behaviour.
+ * - `actingUploader` is the Finance Uploader's own name where the session may DELETE a
+ *   file, and `undefined` otherwise (`actingUploaderIn(session)` — the same value the
+ *   file's own page hands `SubmittedFileActions`). Its ABSENCE means NO DELETE CONTROL
+ *   AT ALL: the safe default, so a caller that has said nothing about who is acting
+ *   cannot be handed a destructive action the server never authorised. Absent, never
+ *   disabled (source UI-24). The same value is the `LastChangedUser` audit identity
+ *   the delete call carries (`file-deletion` BR7), so the name the service records can
+ *   never be something the browser chose for itself.
  */
 interface SubmittedFilesListProps {
   viewerRoles?: string[];
+  actingUploader?: string;
 }
 
 export function SubmittedFilesList({
   viewerRoles,
+  actingUploader,
 }: SubmittedFilesListProps = {}) {
   const [state, setState] = useState<ListState>(LOADING);
-  /** Bumped by Try again; asking for the list again is what re-runs the read. */
+  /** Bumped by Try again, a submission, and a completed delete; asking for the list
+   * again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
+  /** Where the delete asked for from a row has got to (one at a time, since one
+   * confirmation serves the whole table). */
+  const [deleteState, setDeleteState] = useState<DeleteState>(NO_DELETE);
+  /**
+   * Which file the user is being asked to confirm the deletion of, and what is known
+   * about the expense payment requests it produced. ONE controller for the table:
+   * only one row can be being confirmed at a time, and asking is the event that both
+   * opens the confirmation and starts the count.
+   */
+  const deleteConfirmation = useDeleteFileConfirmation();
   /** The app's one notification surface, in the root layout (brief R10). */
   const { showToast } = useToast();
 
@@ -405,11 +506,79 @@ export function SubmittedFilesList({
     setReadsRequested((reads) => reads + 1);
   };
 
+  /**
+   * Deletes the file the user has just confirmed, and lets the SERVICE decide what the
+   * screen then shows (`file-deletion` R9/R10/R11/R12).
+   *
+   * On success nothing is removed from anything here: the list is simply asked again,
+   * through the same read `Try again` and a submission already use. That is what makes
+   * the row's disappearance the service's answer rather than this component's opinion
+   * of it — and it is also how everything ELSE that has moved on since the last read
+   * arrives at the same time. The rows on screen deliberately stay put while that read
+   * is in flight; blanking them would be a worse answer than showing them a moment out
+   * of date, and no second timer is involved anywhere.
+   *
+   * On refusal the file and every row stay exactly as they were and the service's own
+   * wording is reported above the table — never a claimed success, never a silent
+   * no-op, and never navigation, which is the file page's behaviour on success and has
+   * no meaning here. What the service does to a file that has already IMPORTED is
+   * unverified (BR6), so whatever it answers is what the user is told.
+   */
+  const confirmDelete = (file: FileLog): void => {
+    // Only a session the server named may delete, and a second press must not send a
+    // second call while one is already on its way.
+    if (actingUploader === undefined || deleteState.phase === 'working') {
+      return;
+    }
+    setDeleteState({ phase: 'working', file });
+
+    void deleteSubmittedFile(file.Id, actingUploader)
+      .then(() => {
+        setDeleteState(NO_DELETE);
+        // The answer is the generic envelope and says nothing about the list, so the
+        // list finds out by re-reading itself (R12).
+        setReadsRequested((reads) => reads + 1);
+      })
+      .catch((error: unknown) => {
+        // One state change, not two: the refusal being reported and the wait being
+        // over are the same moment, and a reader must never meet one without the other.
+        setDeleteState({
+          phase: 'refused',
+          file,
+          // The service's own wording whenever it sent one, from EITHER place a failure
+          // can carry it; never the client's internal placeholder.
+          message: deleteFailureMessage(error),
+        });
+      });
+  };
+
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
       <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
         {HEADING}
       </h2>
+
+      {/* A refused delete is reported HERE, on the screen behind the confirmation,
+          which has already closed — a user is never held in a dialog to read why
+          nothing happened, and the row it names is still in the table below. */}
+      {deleteState.phase === 'refused' && (
+        <Alert>
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle className="line-clamp-none">
+            {deleteRefusedTitleFor(deleteState.file)}
+          </AlertTitle>
+          <AlertDescription className="text-foreground">
+            <p>{deleteState.message}</p>
+            <p>{STILL_LISTED_MESSAGE}</p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {deleteState.phase === 'working' && (
+        <p role="status" className="text-muted-foreground text-sm">
+          {deletingMessage(deleteState.file)}
+        </p>
+      )}
 
       {state.phase === 'loading' && (
         <div role="status" className="grid gap-2">
@@ -448,7 +617,7 @@ export function SubmittedFilesList({
             <TableCaption className="sr-only">
               Submitted expense files, with the setting each was sent against,
               when it was processed, its status, its most recent processing
-              activity, how many records it holds and the way to open it.
+              activity, how many records it holds and what can be done with it.
             </TableCaption>
             <TableHeader>
               <TableRow>
@@ -461,7 +630,7 @@ export function SubmittedFilesList({
                   Records
                 </TableHead>
                 <TableHead scope="col" className="text-right">
-                  <span className="sr-only">Open the file</span>
+                  <span className="sr-only">{ACTIONS_COLUMN_LABEL}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -481,22 +650,63 @@ export function SubmittedFilesList({
                     {file.RecordCount}
                   </TableCell>
                   <TableCell className="text-right">
-                    {/* A real link, so the file's page can be opened in a new tab
-                        and is announced as somewhere to go — never a button that
-                        pushes a route. */}
-                    <Button asChild variant="ghost" size="sm">
-                      <Link href={submittedFileAddress(file)}>
-                        <PanelRightOpen aria-hidden="true" />
-                        {OPEN_LABEL}{' '}
-                        <span className="sr-only">{openLabelFor(file)}</span>
-                      </Link>
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      {/* A real link, so the file's page can be opened in a new tab
+                          and is announced as somewhere to go — never a button that
+                          pushes a route. */}
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={submittedFileAddress(file)}>
+                          <PanelRightOpen aria-hidden="true" />
+                          {OPEN_LABEL}{' '}
+                          <span className="sr-only">{openLabelFor(file)}</span>
+                        </Link>
+                      </Button>
+
+                      {/* The delete, IN the row beside the link and reachable by Tab
+                          alone — never behind a menu. There is no status condition on
+                          it: a file may be deleted whatever its status, an `Imported`
+                          one included (R3/BR1). A session the server did not name gets
+                          no markup for it at all. */}
+                      {actingUploader !== undefined && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            // Asking is the event that both opens the confirmation and
+                            // starts reading what this file would destroy — never a
+                            // render reacting to the dialog.
+                            deleteConfirmation.ask(file);
+                          }}
+                        >
+                          <Trash2 aria-hidden="true" />
+                          {DELETE_FILE_LABEL}{' '}
+                          <span className="sr-only">
+                            {deleteLabelFor(file)}
+                          </span>
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         ))}
+
+      {/* The epic's ONE confirmation, shared with the file's own page — it names the
+          file, says what deleting actually destroys (the real request numbers for a
+          file that has imported, the short warning otherwise, and its own state when
+          the count could not be read), holds focus on the way out, and sends nothing
+          until the confirming choice is taken. One for the whole table, since only one
+          row can be being confirmed at a time. */}
+      {actingUploader !== undefined && (
+        <DeleteFileConfirmation
+          confirmation={deleteConfirmation}
+          onConfirm={confirmDelete}
+        />
+      )}
     </section>
   );
 }
