@@ -19,16 +19,12 @@
  *   contains so they can correct it outside the app. The account number is the single
  *   exception, and it is a compliance one (below).
  * - **WHERE THE DEFECT WORDING COMES FROM is the heart of this section, and the two
- *   sources are never mixed.** For the four rules this app owns — a missing
- *   `Reference`, a non-numeric `Amount`, an unreadable `TransactionDate`, an
- *   unsupported `Currency` — the app's own fixed wording is what the user reads and
- *   the service's machine-phrased text never reaches them. For anything else,
- *   including a `TransactionType` defect, the SERVICE's own reason is shown word for
- *   word. The app holds no accepted-value list for transaction type and never judges
- *   one itself — the service is the sole authority (brief §Notes & Caveats, a user
- *   decision at INTAKE; do not add an app-side enum or rule for that field). A row the
- *   service described without attributing it to a column shows what it was given; a
- *   row with no defect signal at all is still listed, and no reason is invented for it.
+ *   sources are never mixed.** That rule — the four sentences this app owns and the
+ *   service's own words for everything else — now lives in `lib/files/defectWording.ts`,
+ *   because the import preview's rejected rows and its correction CSV must read exactly
+ *   the same way; this section composes it rather than restating it. A row the service
+ *   described without attributing it to a column shows what it was given; a row with no
+ *   defect signal at all is still listed, and no reason is invented for it.
  * - **The rows arrive as a JSON STRING** inside `ValidationErrors.JsonArray`
  *   (`@/types/files`). Reading them is `rejectedRowsIn` in `lib/api/files.ts`, which
  *   answers `undefined` for every body that cannot be read as rows — a string that
@@ -77,6 +73,7 @@ import {
   rejectedRowsIn,
   validationErrorsFailureMessage,
 } from '@/lib/api/files';
+import { NO_REASON_GIVEN, defectWordingFor } from '@/lib/files/defectWording';
 import { FILE_STATUS_VALIDATION_FAILED } from '@/types/files';
 
 import type { FileLog, ValidationErrorRow } from '@/types/files';
@@ -135,34 +132,6 @@ const rowLabelOf = (row: ValidationErrorRow): string | undefined =>
 /** Said in a cell whose value the source file did not hold at all. */
 const NOT_RECORDED = 'Not recorded';
 
-/**
- * Said in the defect cell of a row the service gave no reason for. It states what is
- * missing; it does not guess at a reason, which is the one thing this section must
- * never do (brief FR3, and the epic's recorded assumption about this response).
- */
-const NO_REASON_GIVEN = 'No reason was given for this row.';
-
-/**
- * The FOUR rules this app owns, and its fixed wording for each — quoted from the
- * brief's FR2 (`R38`, `R39`, `R40`, `R42`). This map is the app's entire vocabulary
- * about a defect: a column that is not in it is explained by the SERVICE, in the
- * service's own words.
- *
- * `TransactionType` is absent on purpose and must stay absent (FR3).
- *
- * A `Map`, not an object literal, because `ErrorColumn` is a string that came out of
- * parsing an UNTRUSTED payload: looking an arbitrary name up on an object literal can
- * answer with something inherited rather than nothing (`toString`, `constructor`), and
- * this section's whole contract is that a body it cannot make sense of is a handled
- * state and never a crash. A `Map` answers `undefined` for every key but the four.
- */
-const APP_OWNED_DEFECT_WORDING = new Map<string, string>([
-  ['Reference', 'This request has no reference and cannot be imported.'],
-  ['Amount', 'Amount must be a number, for example 1245.67.'],
-  ['TransactionDate', 'Transaction date must be a valid date and time.'],
-  ['Currency', 'Currency must be a supported currency code.'],
-]);
-
 /** What each recorded value is called in the heading row. */
 const COLUMN = {
   reference: 'Reference',
@@ -174,24 +143,6 @@ const COLUMN = {
   currency: 'Currency',
   defect: 'What is wrong',
 } as const;
-
-/**
- * What the user reads about one row's defect.
- *
- * The app speaks only where it owns the rule; everywhere else the service's own
- * sentence travels to the user untouched. `undefined` means the row carries no defect
- * signal at all, which is not a licence to invent one.
- */
-const defectWordingFor = (row: ValidationErrorRow): string | undefined => {
-  const { ErrorColumn, ErrorMessage } = row;
-
-  const appOwned =
-    ErrorColumn === undefined
-      ? undefined
-      : APP_OWNED_DEFECT_WORDING.get(ErrorColumn);
-
-  return appOwned ?? ErrorMessage;
-};
 
 /** Where the rejected rows are: being read, read, unreadable, or unreachable. */
 type RejectedRowsState =

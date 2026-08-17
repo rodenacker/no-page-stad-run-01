@@ -57,6 +57,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FileDownloadActions } from '@/components/files/FileDownloadActions';
 import { FileProcessingHistory } from '@/components/files/FileProcessingHistory';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
+import { ImportPreview } from '@/components/files/ImportPreview';
 import { RejectedRows } from '@/components/files/RejectedRows';
 import { SubmittedFileActions } from '@/components/files/SubmittedFileActions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -447,6 +448,12 @@ export function SubmittedFileDetail({
           the file's OWN values, so a re-read is all it takes for the error file of a
           new attempt to be the one on offer. */}
       <FileDownloadActions file={file} />
+
+      {/* Every row of the file the user submitted, with what will happen to it —
+          nothing at all until this file's validation has run, which that component
+          decides for itself. It takes the same signal as the sections below, and grows
+          no timer of its own: this page owns the only interval. */}
+      <ImportPreview file={file} refreshSignal={refreshes} />
 
       {/* Which rows were rejected, and why — nothing at all unless this file's
           validation failed, which that component decides for itself. It takes the same
