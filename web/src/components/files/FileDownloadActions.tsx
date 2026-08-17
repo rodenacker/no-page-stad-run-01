@@ -31,6 +31,14 @@
  *   again needs nothing but pressing the same control (which is this section's retry
  *   affordance; the exact words "Try again" belong to the processing history's own
  *   failed read on this same screen and must not be reused).
+ * - **EACH DOWNLOAD SAYS WHICH FILE IT IS, IN ITS OWN DESCRIPTION** (`import-preview`
+ *   FR7/BR6). This page carries a third download — the import preview's correction file,
+ *   the rejected rows to fix and upload again — and the two must be impossible to
+ *   confuse: these two are the service's own files (the file as submitted, and the
+ *   diagnostic the transactions service generated for it), and each says so in text tied
+ *   to its control with `aria-describedby`. One paragraph sitting near two buttons
+ *   describes neither of them to anybody listening, which is the whole of what the
+ *   requirement asks for.
  * - **Neither control is disabled while its file is on its way.** Disabling the control
  *   a keyboard user has just activated takes the focus out from under them; the wait is
  *   announced in its own right instead. Which is exactly why **EACH DOWNLOAD KEEPS ITS
@@ -71,9 +79,20 @@ const ERROR_FILE_LABEL = 'Download error file';
 const ORIGINAL_FILE_SUBJECT = 'the original file';
 const ERROR_FILE_SUBJECT = 'the error file';
 
-/** What the reader is told about the two downloads before taking either. */
-const DESCRIPTION =
-  'Each file is saved under the name the transactions service holds for it. Correct your data outside this application, then submit or retry the file.';
+/**
+ * WHICH FILE EACH CONTROL HANDS OVER (`import-preview` FR7/BR6). Both of these are the
+ * transactions service's own files, saved under the name the service holds for them —
+ * said here so neither can be mistaken for the import preview's correction file, which
+ * this application builds from the rejected rows for the user to fix and upload again.
+ */
+const ORIGINAL_FILE_DESCRIPTION =
+  'The file exactly as it was submitted, under the name the transactions service holds for it. It is a copy of what was sent, not a file to correct and send back.';
+const ERROR_FILE_DESCRIPTION =
+  'The error file the transactions service generated for this file. It is the service’s own report of what it found, for reference — to fix the rejected rows and submit them again, use the import preview’s download instead.';
+
+/** Ties each description to the control it is about. */
+const ORIGINAL_FILE_DESCRIPTION_ID = 'download-original-file-description';
+const ERROR_FILE_DESCRIPTION_ID = 'download-error-file-description';
 
 /** The wire value of `HasBulkErrorFile` that means the service generated one. */
 const HAS_ERROR_FILE = 'Yes';
@@ -99,6 +118,10 @@ interface OfferedDownload {
   label: string;
   /** How this download reads inside a sentence. */
   subject: string;
+  /** Which file this is, in the user's terms — read out with the control it describes. */
+  description: string;
+  /** What ties that description to this download's control. */
+  descriptionId: string;
   /** The name the delivered file must arrive under — the service's own. */
   fileName: string;
   /** The endpoint that answers with this file's bytes. */
@@ -123,6 +146,8 @@ const downloadsFor = (file: FileLog): OfferedDownload[] => {
     {
       label: ORIGINAL_FILE_LABEL,
       subject: ORIGINAL_FILE_SUBJECT,
+      description: ORIGINAL_FILE_DESCRIPTION,
+      descriptionId: ORIGINAL_FILE_DESCRIPTION_ID,
       fileName: file.CurrentFileName,
       read: () => downloadSubmittedFile(file.Id),
     },
@@ -132,6 +157,8 @@ const downloadsFor = (file: FileLog): OfferedDownload[] => {
     offered.push({
       label: ERROR_FILE_LABEL,
       subject: ERROR_FILE_SUBJECT,
+      description: ERROR_FILE_DESCRIPTION,
+      descriptionId: ERROR_FILE_DESCRIPTION_ID,
       // The generated error file's own name, as the service reported it on the file
       // log. Nothing is invented where it named none: an empty name leaves the naming
       // to the browser instead.
@@ -196,8 +223,6 @@ export function FileDownloadActions({ file }: { file: FileLog }) {
         {HEADING}
       </h2>
 
-      <p className="text-muted-foreground max-w-prose text-sm">{DESCRIPTION}</p>
-
       {/* One refusal per download that was refused, each naming its own file — so a
           refusal on one download can never be overwritten, or explained away, by what
           happened to the other. */}
@@ -220,19 +245,33 @@ export function FileDownloadActions({ file }: { file: FileLog }) {
         );
       })}
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Each control with the words that say which file it hands over, tied to it by
+          `aria-describedby` so the two downloads are told apart by ear as well as by
+          eye (`import-preview` FR7/BR6). */}
+      <div className="flex flex-wrap items-start gap-6">
         {offered.map((download) => (
-          <Button
+          <div
             key={download.label}
-            type="button"
-            variant="outline"
-            onClick={() => {
-              startDownload(download);
-            }}
+            className="grid max-w-prose justify-items-start gap-2"
           >
-            <Download aria-hidden="true" />
-            {download.label}
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              aria-describedby={download.descriptionId}
+              onClick={() => {
+                startDownload(download);
+              }}
+            >
+              <Download aria-hidden="true" />
+              {download.label}
+            </Button>
+            <p
+              id={download.descriptionId}
+              className="text-muted-foreground text-sm"
+            >
+              {download.description}
+            </p>
+          </div>
         ))}
       </div>
 
