@@ -49,6 +49,10 @@ Rebuilds `RequestNarrowingControls` as a single ruled field strip — underline-
 
 **Shadcn primitives still apply (CLAUDE.md §1).** Compose the existing `input`, `select`, `label` primitives and restyle via tokens/classes — do not hand-roll raw HTML inputs to get the underline look.
 
-**R7 / R27 — hidden, never disabled.** An Importer must not see decision controls, bulk approval, or the possible-duplicate notification *at all*. Not greyed, not `aria-disabled`, not present-and-hidden-by-CSS. AC-6's assertion is about absence from the accessibility tree.
+**R7 / R27 — hidden, never disabled.** An Importer must not see decision controls, bulk approval, or the possible-duplicate **notification** *at all*. Not greyed, not `aria-disabled`, not present-and-hidden-by-CSS. AC-6's negative sweeps all pass `{ hidden: true }`, so present-but-`aria-hidden`, present-but-`display:none` and present-but-disabled each fail exactly as a working control would.
+
+**⚠ AC-6 means the notification, NOT the duplicate mark.** Read literally, "no possible-duplicate notification anywhere" would have an Importer see nothing duplicate-related — but `expense-request-list` story 6 AC-3/AC-4 already require the Importer to **see the row mark** while being **notified** of nothing. The distinction is load-bearing: the *mark* is shared, the *notification* is Approver-only. Story 3's Vitest spec encodes notification-only and asserts the mark is still present for the Importer, so **AC-6 cannot be satisfied by deleting the mark.**
+
+**New contract the spec introduces — implement it deliberately.** Neither the brief nor the design brief states an accessibility-tree shape for "one ruled field strip". The spec pins the only non-CSS half: the eight controls of the six narrowings live inside **exactly one** grouping element (a `<fieldset>` / `role="group"`) whose accessible name contains **"narrow"** (e.g. `<fieldset><legend>Narrow the batch</legend>`). This is the single new assertion in the file and the one all five tests currently fail on — so build it on cycle 1 rather than discovering it as a failure.
 
 **Export is untouched behaviourally (R6, `csv-export` R1–R4):** narrowing-respecting scope, whole account numbers in the file, exporter attribution. Only its presentation moves into the strip's notation.

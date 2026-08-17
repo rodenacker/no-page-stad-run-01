@@ -55,4 +55,18 @@ Adds the epic's one orchestrated motion grammar. Before an irreversible decision
 
 **Non-obvious coupling — do not break it.** The bulk-approve confirmation is gated on `bulkApprovalAsked` **alone and deliberately not also on the selection being non-empty**; an inline comment explains that a dialog which unmounts itself never reports itself closed, which would leave self-refresh **paused for the rest of the session**. This story rewires exactly that area. That gate must survive.
 
+### What "does not balance" means, mechanically (pinned by this story's Vitest spec)
+
+Neither brief states this, so the spec fixes it: while a decision is awaiting confirmation, **`AWAITING DECISION` states the projected figure** while **`RECORDS` and `DECIDED` still state what the batch actually is** — so the three visibly do not add up. **`DECIDED` must not move with it.** Moving both re-balances the block and there is nothing left for the reader to see, which defeats R17 entirely. Confirm this reads right by eye at MANUAL-TEST.
+
+**The pre-commit wording is `NOT YET CONFIRMED`.** New surface owned by this story, pinned in the spec, used two ways:
+- As a control-block label-over-figure pair — **absent** while nothing is pending (this project's convention: an indicator reading `0` is a fixture, not an answer).
+- As the row mark, in the `StatusBadge` grammar — **words on the row**, because per BR3 a gutter shape alone would not satisfy R3.
+
+**The figures must carry their labels as accessible names** (`aria-labelledby` pointing at the visible tracked label is the natural markup). This story's spec requires it; story 2 builds the block. Programmatic labelling is additive, so one implementation satisfies both — but **story 2 must not render the figures as bare numerals beside unassociated text**, or this story's tests fail on work story 2 owns.
+
+**The `bulkApprovalAsked` gate is load-bearing for AC-6, not incidental.** It is what pauses self-refresh so a colleague's decision lands in the pre-submit read. AC-6 *uses* it. No test forces it to change — and none should.
+
+**The count you decrement must use story 2's definition.** `AWAITING DECISION` is `Status === Imported` and `DECIDED` is `Status !== Imported` — **not** the existing `countRequests()` helper's `approved + rejected` (see story 2's notes). If this story recomputes the figure a different way from story 2, the roll will land on a number that disagrees with the band it lives in.
+
 **Self-refresh is part of AC-6.** A request another approver decides arrives via refresh: its row desaturates and inks its mark, and the control totals correct themselves with no user action. The refresh cadence and its pausing rules are unchanged.

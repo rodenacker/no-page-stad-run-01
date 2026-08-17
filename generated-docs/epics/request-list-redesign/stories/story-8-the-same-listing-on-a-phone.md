@@ -52,3 +52,26 @@ Replaces `RequestCards`' Shadcn `Card`-per-request treatment — an explicit ant
 **AC-4 spans two stories.** The control block belongs to story 2, but it must still hold its composition and BR4's scale dominance at 360px — where a six-figure control block is hardest to lay out. Expect the block to reflow (stacking or dropping to two columns) while `AWAITING DECISION` stays the largest element.
 
 **Touch targets.** A gutter mark that is also the selection control must still meet the minimum touch target at phone width (WCAG 2.2 AA, target size) — the two-character *visual* gutter can carry a larger *hit* area.
+
+### AC-1's "action overflow" — SETTLED: there is no overflow, and that is correct
+
+AC-1 and UI-23 both say "an action overflow". **There is none, by user decision, and it must not be restored.** `generated-docs/architecture.md` records it explicitly:
+
+> *"Every per-request action … is a DIRECT control … there is no ⋯ action overflow menu anywhere on a request … Do not restore the menu as a missing feature."*
+
+Approved by the user at a manual test as superseding UI-23's **mechanism** while still meeting its **purpose** — every action reachable, no horizontal scroll. `web/src/components/requests/RequestActions.tsx` carries the same decision.
+
+**Nothing here needs a ruling and nothing needs reinstating.** Both test layers were written to the *outcome* rather than the mechanism, so they hold either way:
+
+- The **Vitest** file's reach-helper finds each action whether it sits directly on the line-group or inside an overflow.
+- The **Playwright** spec's AC-1 and AC-5 assert "every action reachable in one gesture from the group", and its header documents how to re-point AC-3's keyboard walk if an overflow ever returns.
+
+Read the manual checklist's *"a menu for its actions"* the same way: direct controls satisfy it.
+
+### ⚠ AC-4 rests on a composition assumption story 2 owns
+
+The Playwright spec's AC-4 adjacency checks assume **each label reads immediately before its own figure** (R11's "labels over figures"). A layout that puts a header row of labels above a separate row of figures would fail them even with a correct control block. Story 2 builds that block — build it as label/figure pairs, not as two parallel rows. The spec's "Implementation patterns this spec assumes" block states this where the developer reads it in Step 1.
+
+### This story's Playwright spec is its entire automated coverage
+
+Story 8 has **no `vitest`-tagged acceptance criterion** — all five are `playwright`. The Vitest file exists only as a set of supplementary component-layer guards. If E2E is skipped or deferred for this story, story 8 has effectively no automated verification at all.

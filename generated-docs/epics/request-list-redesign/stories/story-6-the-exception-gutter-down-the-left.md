@@ -58,3 +58,18 @@ Adds a permanently reserved two-character gutter as the listing's first column �
 **Story 4 must land first** — the four structurally distinct shapes live in the shared `StatusBadge`, and this gutter consumes them at two-character width. Do not define a second set of shapes here.
 
 **Non-obvious coupling — do not break it.** The bulk-approve confirmation in `ExpenseRequestList` is gated on `bulkApprovalAsked` **alone**, deliberately *not* also on the selection being non-empty. An inline comment explains why: a dialog that unmounts itself never reports itself closed, which would leave self-refresh paused for the rest of the session. This story rewires the selection area; that gate must survive intact.
+
+**⚠ Name the gutter's column header carefully — it can break story 5's spec.** The gutter adds a new first `columnheader`. Story 5's Playwright spec addresses the existing headings by single distinctive words (`/status/i`, `/amount/i`, `/reference/i`, `/file/i`, `/date/i`, `/account/i`, `/description/i`, `/type/i`) so the restyle is free to shorten or uppercase them. If the gutter's header carries an accessible name containing any of those words — "Status mark" being the obvious trap — `getByRole('columnheader', { name: /status/i })` matches two elements and Playwright's **strict mode fails story 5's spec**. The failure would present as a story 5 regression while actually originating here.
+
+**The gutter header's accessible name is pinned by two constraints at once. Both are real:**
+
+1. **It must contain the word "exception"** — story 6's own Vitest spec asserts this. A leftmost column of marks is otherwise unnamed for a screen-reader user, and AC-1's "runs down the left" needs an identifiable column to assert against.
+2. **It must NOT contain any of story 5's eight matched words** — `status`, `amount`, `reference`, `file`, `date`, `account`, `description`, `type` — or story 5's spec breaks on strict-mode ambiguity.
+
+**Use `Exceptions and selection`** (as an `sr-only` heading). It satisfies both. "Status mark" fails constraint 2; a bare `Select` or `Mark` fails constraint 1.
+
+**Also settled: an ordinary row's gutter is EMPTY.** R18 reads as though an undecided row should carry a distinct glyph, which would contradict R15/BR5's "empty on an ordinary row". The brief's §Data Model resolves it — *"empty (ordinary, undecided, no exception)"* — and story 6's Vitest spec pins that reading (an ordinary gutter holds no text and no control). **Do not "fix" this by printing a placeholder glyph or dash.**
+
+**⚠ Fixture trap if you combine duplicates with bulk selection.** `duplicatePair()` uses references `TXN-20260415-0006` / `TXN-20260430-0006` (ids 7201/7202), which **collide on reference** with `manyTransactions(n)` for `n >= 6` — and `transactionsForBulkSelection` composes `manyTransactions`. If you need a possible-duplicate row inside a bulk-selection fixture (tempting, since the gutter carries both marks), pass a reference override or the set will contain duplicate references and any reference-keyed assertion will behave unpredictably. Duplicate marking itself is AC-2 (by eye) and `expense-request-list` story 6 already owns its own spec for it.
+
+**Keep `disabled={selectionLocked}` on the relocated checkbox.** BR2's in-flight selection lock is not re-asserted in this story's own file; it stays pinned by `epic-bulk-approval-and-live-refresh-story-2`'s AC-4 test, which finds the tick via `within(row).getByRole('checkbox')` and so survives the move into the gutter **only if** that prop moves with it.

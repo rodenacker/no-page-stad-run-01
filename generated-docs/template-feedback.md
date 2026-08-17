@@ -136,3 +136,39 @@ const list = sel => [...card.querySelectorAll(sel + " .txt")].map(n => n.innerTe
 **Suggested fix.** Ship `configure({ asyncUtilTimeout: … })` in the template’s `web/vitest.setup.ts` alongside the raised `testTimeout`, as one decision rather than two — the two ceilings only make sense set together, and a project that raises one and not the other has moved the flake rather than removed it. Worth a line in `testing-policy.md` too: a budget is a ceiling and changes no expectation, but a test should still hang its wait off an observable "the screen has settled" signal rather than betting one query against a whole asynchronous chain.
 
 **Affected.** `web/vitest.setup.ts`, `web/vitest.config.ts`, `.claude/policies/testing-policy.md`. Observed on epic `import-preview` story 4, found at the `file-deletion` epic-end gate, 2026-08-17.
+
+---
+
+## The `rtk` output wrapper reports a FALSE PASS on a failing gate
+
+**Severity.** High — it silently inverts a gate verdict, which is precisely what CLAUDE.md §5 ("Quality Gates Are Binary — report actual exit codes truthfully") exists to prevent.
+
+**What happened.** During epic `request-list-redesign` B0.2, `npx prettier --check "src/**/*.tsx"` exited **1** with 6 genuinely unformatted files, while the wrapped output printed:
+
+```
+Prettier: All files formatted correctly
+```
+
+Re-running the identical command through `rtk proxy` showed the truth (`Code style issues found in 6 files`). The **exit code was correct in both cases** — only the human-readable summary lied. `npx playwright test --list` is affected too: it renders as `PASS (0) FAIL (0) skipped (110)`, which reads like a broken suite rather than a successful collection of 110 tests.
+
+**Why it matters here.** An agent or orchestrator that reads the summary line instead of the exit code will report a passing gate over a failing one. Two of this epic's own test-generation agents were misled and had to re-run everything through `rtk proxy` to obtain true output; one initially reported "prettier clean" on a tree that was not.
+
+**Suggested fix.** Either (a) make the wrapper's summary line derive from the child's exit code so it can never contradict it, or (b) add a line to the workflow's gate guidance: **judge every gate by its exit code or its JSON, never by wrapped prose**, and re-run through `rtk proxy` when the two disagree. `quality-gates.js` is unaffected because it returns structured JSON with `overallStatus` — that is the pattern to prefer.
+
+**Affected.** The `rtk` hook's output filter; `.claude/shared/orchestrator-rules.md` gate guidance; the `test-generator` and `developer` agent verification steps. Observed on epic `request-list-redesign` during B0.2 batch test generation, 2026-08-17.
+
+---
+
+## Parallel B0.2 test-generation agents collide when probing production files
+
+**Severity.** Low — self-correcting, but it produces alarming false signals.
+
+**What happened.** B0.2 launches one `test-generator` per story per mode as a single parallel batch (18 agents for a 9-story epic). Several independently used a sound technique: temporarily modify a production file to prove their assertions would pass *after* implementation, then revert with `git checkout --`. Story 3's agent added a `<fieldset>` to `RequestNarrowingControls.tsx`; story 5's agent ran four separate mutations of `ExpenseRequestList.tsx`; story 9's Vitest agent wrote a scratch test file.
+
+Because these overlap in time, siblings observed the intermediate states: story 2's agent reported `RequestNarrowingControls.tsx` as **syntactically broken (unclosed `<fieldset>`, TS17002)**, and two agents reported a stray `zz-scratch-story-9.test.tsx` as an uncommitted file that should not be committed. Every agent behaved correctly and every file was reverted or deleted; the tree ended clean. But a `tsc` run that happens to land inside another agent's probe window fails for a reason unrelated to the file under test.
+
+**Why it's worth fixing.** The probe technique is genuinely valuable — story 5's mutation testing is what proved its green regression net had teeth (4 mutations, 4 caught), and it is far stronger evidence than a red run. The problem is only that B0.2's parallelism doesn't anticipate it.
+
+**Suggested fix.** Give the probe technique an explicit, collision-free home in `test-generator`: require probes to run in a **git worktree or a scratch copy** rather than the shared tree, and require scratch test files to be written to a gitignored path. Alternatively, note in B0.2 that a `tsc`/lint failure naming a file outside the agent's own story is likely a sibling's probe and should be re-run before being believed.
+
+**Affected.** `.claude/agents/test-generator.md`, `.claude/commands/continue.md` § Step B0.2. Observed on epic `request-list-redesign`, 2026-08-17.

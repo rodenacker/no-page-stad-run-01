@@ -50,4 +50,29 @@ Retires Cabin and loads **Public Sans** (all text) plus **Azeret Mono** (figures
 
 **Do not touch the reduced-motion block.** `globals.css` already ends with a global `@media (prefers-reduced-motion: reduce)` rule forcing durations to `0.01ms` app-wide. Story 9's digit roll must work *with* it; do not weaken it here.
 
-**`--primary-foreground` is deliberately the dark ink (5.9:1), not white** — white on `#00AEEF` is 2.5:1 and fails. Keep it.
+**`--primary-foreground` is deliberately the dark ink (5.9:1), not white** — white on `#00AEEF` is 2.5:1 and fails. Keep it. Story 1's Vitest spec *computes* this from the palette via WCAG relative luminance rather than pinning a hex, so changing it to white fails the test rather than silently passing.
+
+### ⚠ BR10 has no automated coverage — it needs an explicit build-grep step
+
+**Neither test layer can verify BR10.** Playwright can see the direction-contract comment in the served DOM, but it cannot prove the comment survived a **production build** — and BR10's requirement is precisely that. Without a deliberate step, BR10 ships unverified.
+
+The check, to be run by the developer on this story and again at EPIC-END after the quality-check's `build` gate produces `web/.next`:
+
+```bash
+(cd web && npm run build) && grep -rl "29469d17" web/.next | head
+```
+
+**A non-empty result is the pass.** An empty result means the build erased the contract — most likely because it was written as a JSX comment (`{/* … */}`), which the compiler strips. It must be **emitted markup**: a real HTML comment placed as the first child of `<body>` in the root layout, not inside a slotted or child component.
+
+**⚠ React cannot render a comment node at all.** This is harder than "don't use a JSX comment", and it is where a first attempt will fail:
+
+- `{/* … */}` is stripped by the compiler — nothing reaches the output.
+- `{'<!-- … -->'}` as a text child is **HTML-escaped** into `&lt;!-- … --&gt;`, which is visible text, not a comment.
+
+So the comment has to be injected as raw markup (e.g. via `dangerouslySetInnerHTML` on a wrapper, or another technique that writes directly into the streamed markup). Story 1's Playwright spec asserts AC-2 against **the navigation response's own bytes**, not the live DOM — precisely because a comment node cannot be observed the usual way — and its failure message reports exactly what it found instead, so the constraint is unambiguous at implementation time.
+
+**Why the spec does not probe `var(--font-mono)` at runtime.** Under `@theme inline`, that token dereferences a `next/font` variable declared on `<body>`, so reading it at `:root` is invalid-at-computed-value-time and would fail a *correct* implementation. AC-1's figure-face clause is therefore asserted as "the mono face is declared, self-hosted, and really downloads app-wide" — not "element X renders in it". Which elements take the mono face is decided by stories 2, 5 and 7, not here.
+
+**AC-4 will likely pass before this story is implemented.** It is a pure guard on the root layout and was deliberately not contorted to manufacture a red. AC-3 *is* red, because it additionally requires all six unredesigned screens to be set in the new text face.
+
+Record the grep result in the story's commit body so the evidence is auditable rather than asserted.

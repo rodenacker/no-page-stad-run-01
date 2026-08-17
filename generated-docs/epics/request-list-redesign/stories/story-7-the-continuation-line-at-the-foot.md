@@ -50,3 +50,9 @@ Restyles `RequestListPagination` as a continuation line in the listing's notatio
 **AC-5's volume range is a real test, not a formality.** Two ends break most often: a single request (the line and the listing must still look deliberate, not like an unfinished empty state) and the final page of a 22-page batch (the `RECORDS 421–428 OF 428` case, where a naive range calculation overshoots).
 
 **Figures in mono.** The continuation line is notation — its numerals belong in Azeret Mono so the line doesn't reflow width as you page through.
+
+**The single-record wording is `RECORDS 1 OF 1 · PAGE 1 OF 1` — not `RECORDS 1–1 OF 1`.** R14 fixes the notation for a multi-record page but says nothing about the one-record case. This story's **Playwright** spec pins it to the collapsed form (`RECORDS 1 OF 1`); the Vitest file deliberately leaves it open. Implement the collapsed form, or the E2E spec fails on a wording nobody documented.
+
+**The line must be one element whose *entire* text is the continuation line.** Story 7's Vitest spec asserts against a single element's full text content, while the Playwright spec parses it from the screen's rendered text and requires **exactly one** records-range and **exactly one** page-counter on screen. Two consequences: do not scatter the line across sibling elements such that no single element holds it whole, and do not render a second copy of the range or page counter anywhere on the screen (a mobile duplicate would break the E2E parse).
+
+**Locate page controls inside the labelled pagination `<nav>`.** Story 7's Vitest spec scopes to that `<nav>` and queries real `<button>`s inside it — deliberately avoiding any `ul`/`li`/`listitem` assertion, so the implementation is never pushed toward semantic list markup that would break the phone-width one-`listitem`-per-request assertion. Keep the labelled `<nav>` and keep the controls as real buttons.

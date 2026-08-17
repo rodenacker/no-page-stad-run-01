@@ -50,3 +50,9 @@ Rewrites the shared `StatusBadge` as a ruled status mark (glyph plus tracked tex
 **BR11 — `cancelled` is a file-level state.** A cancelled file's transactions never reach this list, so the cancelled shape will not appear in live test data. It must still exist and render correctly if exercised. Its absence from the request list at manual test is expected, not a bug — do not "fix" it by inventing a way to show it.
 
 **No pill surface at all.** No `rounded-full`, no chip background. If the Shadcn `badge` primitive can't carry this without a pill, compose the mark from `badge`-free primitives rather than fighting it — but keep it one shared component.
+
+**How this squares with CLAUDE.md §1 (use Shadcn primitives).** §1 requires composing Shadcn primitives rather than hand-rolling equivalents from raw HTML + Tailwind; it does **not** mandate using `badge` specifically. The `badge` primitive applies an unconditional `rounded-full` capsule, which *is* the pill this story removes. So: drop `badge` from the shared mark, and build the mark by composing other primitives and the token layer. Do not read this as licence to hand-roll elsewhere.
+
+**This is the story's only jsdom-observable delta.** Story 4's Vitest spec pins `data-slot="badge"` as absent from the shared mark — everything else in AC-1/3/4/6 already holds against today's `StatusBadge`. That single assertion is what makes the story red, so if the pill genuinely has to stay for some reason, say so before implementing: the story would then have no automated signal at all and would rest entirely on the by-eye criteria.
+
+**Three real consumers are covered by the spec** (the request list, the file-status vocabulary, and the possible-duplicate mark), so a change that fixes only the request list fails at test time rather than at manual test. Good — that is R28 being enforced early.
