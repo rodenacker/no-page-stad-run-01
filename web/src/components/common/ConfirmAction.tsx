@@ -7,7 +7,7 @@
  * nothing at all until the confirming choice is taken).
  *
  * It exists so the confirmations this app asks for — approving a request, rejecting
- * one, cancelling a submitted file, and whatever a later epic adds — cannot drift into
+ * one, deleting a submitted file, and whatever a later epic adds — cannot drift into
  * four near-identical dialogs that each behave slightly differently.
  *
  * Four things here are deliberate and easy to break:
@@ -17,10 +17,13 @@
  *   `alert-dialog` primitive rather than the plain `dialog`: arriving here and pressing
  *   Enter must back out, never act. (`expense-decisions` NFR2 makes this override the
  *   project's usual "first editable field takes focus" rule for confirmations.)
- * - **The two labels are the CALLER's, and they must not read alike.** "Cancel file" /
- *   "Cancel the file" / "Keep the file" is the discipline the file actions already
+ * - **The two labels are the CALLER's, and they must not read alike.** "Delete file" /
+ *   "Delete the file" / "Keep the file" is the discipline the file actions already
  *   follow: the control that ASKS, the one that DOES it and the one that BACKS OUT are
- *   three different phrases, so neither a user nor a query can confuse them.
+ *   three different phrases, so neither a user nor a query can confuse them. The way
+ *   out is worded with "keep", never "Cancel" — beside a destructive choice called
+ *   Delete, "Cancel" would read as a second name for the action rather than the way
+ *   out of it.
  * - **It is CONTROLLED — the caller owns whether it is open.** A confirmation is
  *   reached from a plain button on one screen and from a per-request control in a list
  *   row on another, and only the caller knows which object the answer is

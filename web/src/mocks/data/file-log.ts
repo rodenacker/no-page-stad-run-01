@@ -258,23 +258,43 @@ export const retryFailureResponse = (
   message: string = RETRY_REFUSED_MESSAGE,
 ): DefaultResponse => ({ Id: 0, MessageType: 'ERROR', Messages: [message] });
 
+/* -------------------------------------------------------------------------- */
+/* Deleting a file — DELETE /v1/files (the app's ONE delete call)              */
+/* -------------------------------------------------------------------------- */
+
 /**
- * `DELETE /v1/files?LogId={id}` (cancel) success body. That call requires a
+ * `DELETE /v1/files?LogId={id}` success body. That call requires a
  * `LastChangedUser` header taken from the authenticated identity — never from user
  * input (epic brief §Notes & Caveats); the retry call declares no such header, and
  * that asymmetry is as-documented.
+ *
+ * NAMED FORWARD (epic `file-deletion`): this is the same single operation that
+ * `file-validation-and-retry` surfaced as "Cancel file" — the API operation was
+ * always `FilesDelete`, only the frontend's vocabulary said "cancel". There is
+ * exactly one delete call in this app, so there is exactly one success body and
+ * one refusal sentence here; do not add a second pair beside them.
  */
-export const cancelSuccessResponse = (): DefaultResponse => ({
+export const deleteSuccessResponse = (): DefaultResponse => ({
   Id: 5001,
   MessageType: 'SUCCESS',
-  Messages: ['File cancelled'],
+  Messages: ['File deleted'],
 });
 
-/** The wording the SERVICE itself gives for a refused cancel (see {@link RETRY_REFUSED_MESSAGE}). */
-export const CANCEL_REFUSED_MESSAGE =
+/**
+ * The wording the SERVICE itself gives for a refused delete (see
+ * {@link RETRY_REFUSED_MESSAGE}) — deliberately phrased as only a backend would
+ * phrase it, so a test can tell it apart from wording the screen wrote for itself.
+ *
+ * This one sentence covers BOTH refusal cases the `file-deletion` epic cares about:
+ * an ordinary refusal, and the genuinely untested one (brief BR6) where the file
+ * has already imported and its rows have left the staging table this endpoint's own
+ * description names. The frontend must show whatever the service said either way
+ * (R10), so the fixture does not pretend to know two different sentences.
+ */
+export const DELETE_REFUSED_MESSAGE =
   'The file could not be deactivated (staging rows are locked by another process).';
 
 /** `DELETE /v1/files` failure body — same envelope as {@link retryFailureResponse}. */
-export const cancelFailureResponse = (
-  message: string = CANCEL_REFUSED_MESSAGE,
+export const deleteFailureResponse = (
+  message: string = DELETE_REFUSED_MESSAGE,
 ): DefaultResponse => ({ Id: 0, MessageType: 'ERROR', Messages: [message] });

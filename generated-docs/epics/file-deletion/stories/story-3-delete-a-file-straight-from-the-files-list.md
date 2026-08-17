@@ -37,6 +37,10 @@ On refusal the list surfaces the service's own wording, leaves every row untouch
 
 Still exactly one delete API call in the app.
 
+### Control shape — pinned at test generation
+
+The delete control sits **directly in the row**, alongside the existing `Open` link — **not** behind a per-row menu or overflow button. Story 3's Playwright spec tabs straight to it from the page, so a menu would fail AC-6. If a menu is ever wanted, the acceptance criterion has to change first.
+
 ## Acceptance Criteria
 
 | AC | Text | Coverage |

@@ -57,7 +57,7 @@ import type { ImportPreviewRow } from '@/lib/files/importPreviewRows';
  * The control's own visible wording (BR6) — which is also its accessible name, so it
  * owes no tooltip. Reserved on this page: it must never contain the word "error", and it
  * is none of `Download original file`, `Download error file`, `Try again`, `Load this
- * file again`, `Load the preview again`, `Retry validation` or `Cancel file`.
+ * file again`, `Load the preview again`, `Retry validation` or `Delete file`.
  */
 export const CORRECTION_DOWNLOAD_LABEL = 'Download rows to fix and re-upload';
 

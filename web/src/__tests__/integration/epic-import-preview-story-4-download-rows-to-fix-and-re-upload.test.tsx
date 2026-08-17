@@ -75,7 +75,7 @@
  *     use on this screen, none of which this control may collide with:
  *     `Download original file`, `Download error file`, `Try again`, `Try again to
  *     load the rejected rows`, `Load this file again`, `Retry validation`,
- *     `Cancel file`, `Reveal account number` / `Hide account number`.
+ *     `Delete file`, `Reveal account number` / `Hide account number`.
  *  9. NO REJECTED ROWS, NO CONTROL. It is LEFT OUT of the markup, never rendered
  *     disabled (source UI-24, the rule every other conditional action on this page
  *     follows).

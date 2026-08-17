@@ -8,15 +8,23 @@
  * - Requirements: FR4, FR5, BR1, BR2, BR3 (+ source UI-09 confirmation convention,
  *   UI-24 role-conditional markup)
  *
+ * SUPERSEDED IN PART BY EPIC `file-deletion` (story 1): this story's destructive
+ * action was renamed — trigger "Cancel file" → "Delete file", confirm "Cancel the
+ * file" → "Delete the file", way out "Keep the file" unchanged — and its status gate
+ * removed, so it is now offered whatever the file's status (`file-deletion`
+ * R3/R4/BR1). The criteria below are unchanged in intent; only the wording they
+ * locate the action by has moved. Which statuses offer it is the Vitest layer's, and
+ * is pinned there under the new rule.
+ *
  * Coverage split (feature-planner tags — one tag, one layer):
- * - AC-1 (a Finance Uploader is offered retry and cancel; an Approver is offered
+ * - AC-1 (a Finance Uploader is offered retry and delete; an Approver is offered
  *   NEITHER, absent from the page rather than greyed out) and AC-5 (confirming the
- *   cancel deactivates the file, which then leaves the Expense files list) → this
+ *   delete deactivates the file, which then leaves the Expense files list) → this
  *   file. AC-1 needs two signed-in identities, so it renders as two tests; AC-5's
  *   confirmation is only reachable through the dialog, so its dismiss path and its
  *   confirm path are one test each.
  * - AC-2 (which actions apply at which status), AC-4 (the confirmation's own wording
- *   and focus rules) and AC-6 (a refused retry/cancel reported in the service's own
+ *   and focus rules) and AC-6 (a refused retry/delete reported in the service's own
  *   wording) are the Vitest layer's:
  *   `web/src/__tests__/integration/epic-file-validation-and-retry-story-4-retry-validation-or-cancel-the-file.test.tsx`.
  * - AC-3 (retry puts the file back in progress, records a new activity, and shows the
@@ -25,11 +33,14 @@
  *   fake timers, while `page.clock` proves it against the app's real refresh interval
  *   in a real browser. The dialog's focus and keyboard behaviour is complemented for
  *   the same reason: jsdom has no real focus management and no real Escape handling.
- * - One accessibility scan is here and nowhere else in this story: the OPEN cancel
- *   confirmation. This epic's page-level scan belongs to story 1 (its AC-6), but that
- *   scan cannot reach this state — the dialog exists only in this story, only for a
- *   Finance Uploader, and only after a click. testing-policy.md requires each
- *   distinct state a story introduces to be scanned.
+ * - One accessibility scan is here and nowhere else in this story: the OPEN delete
+ *   confirmation over a `Validation failed` file. This epic's page-level scan belongs
+ *   to story 1 (its AC-6), but that scan cannot reach this state — the dialog exists
+ *   only in this story, only for a Finance Uploader, and only after a click.
+ *   testing-policy.md requires each distinct state a story introduces to be scanned.
+ *   (`file-deletion` story 1 scans the same dialog over an IMPORTED file, a state
+ *   that only exists because that story removed the status gate — a different state,
+ *   not a repeat of this one.)
  *
  * ---------------------------------------------------------------------------
  * Mocking strategy
@@ -58,7 +69,7 @@
  *    is the app's OWN same-origin mount point, so an unmocked call is forwarded to the
  *    live transactions service by the route handler INSIDE the Next.js process, where
  *    `blockLiveBackends` cannot see it. `mockFileActions` is likewise registered in
- *    every test, so no retry or cancel can ever leave this machine.
+ *    every test, so no retry or delete can ever leave this machine.
  *    Finally the real services' own origins are blocked outright, registered LAST so
  *    they win over the origin-agnostic globs above them.
  *
@@ -76,18 +87,18 @@
  *   `page.route()` cannot intercept a fetch made by the Next.js server or by a Server
  *   Action, so moving either call server-side both bypasses these mocks and sends the
  *   request to the live transactions service.
- * - The cancel call carries `LastChangedUser` taken from the authenticated identity
+ * - The delete call carries `LastChangedUser` taken from the authenticated identity
  *   (`GET /v1/auth/userinfo`) and never from user input; this spec asserts the value
  *   the browser sent is one of that identity's own — its display name or its email.
  *   The retry call declares no such header, and that asymmetry is as-documented.
  * - Labels this spec locates the controls by (kept deliberately narrow, because the
  *   destructive action and its dismissal must not be confusable):
  *     retry            → /retry validation/i
- *     cancel (trigger, and the confirming choice in the dialog) → /cancel (the )?file/i
+ *     delete (trigger, and the confirming choice in the dialog) → /delete (the )?file/i
  *     the dismiss choice in the dialog → must be worded with "keep" (the story's own
- *       "keep the file"). Labelling it "Cancel" is what UI-09 rules out here: the
- *       destructive action is itself called Cancel file, so "Cancel" would mean both
- *       things at once.
+ *       "keep the file"). Labelling it "Cancel" is what UI-09 rules out here: it would
+ *       read as a second way of describing the destructive action rather than as the
+ *       way out of it.
  * - The confirmation is the Shadcn `alert-dialog` the epic pins (already installed;
  *   its overlay uses the `bg-overlay/60` token — do not regenerate it from the CLI).
  *   Radix renders it as `role="alertdialog"`, PORTALLED to the body — so dialog
@@ -96,7 +107,7 @@
  *   (`hasRole(session, ROLE_IMPORTER)`, the shape `app/(authenticated)/upload/page.tsx`
  *   already uses), so an Approver's browser never receives the markup. A disabled
  *   control fails AC-1 here, which asserts absence.
- * - After a confirmed cancel the file is inactive and no longer resolves on its own
+ * - After a confirmed delete the file is inactive and no longer resolves on its own
  *   page, so the user is returned to the Expense files list (`/upload`).
  * - After an accepted retry the page re-reads the file and its history — either at
  *   once or by starting the same refresh-while-in-progress pattern
@@ -141,7 +152,7 @@ import {
   FILE_STATUS_IMPORTED,
   FILE_STATUS_VALIDATING,
   FILE_STATUS_VALIDATION_FAILED,
-  cancelSuccessResponse,
+  deleteSuccessResponse,
   fileLogListResponse,
   fileLogProgression,
   fileLogWithStatus,
@@ -169,7 +180,7 @@ import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { FileLog } from '../src/mocks/data/file-log';
 import type { FileProcessLog } from '../src/mocks/data/file-process-log';
 
-/** This story's screen, and the Expense files list a confirmed cancel returns to. */
+/** This story's screen, and the Expense files list a confirmed delete returns to. */
 const FILE_PAGE_PATH = '/upload/file';
 const EXPENSE_FILES_PATH = '/upload';
 
@@ -205,11 +216,11 @@ const VALIDATION_ERRORS_URL_GLOB =
   '**/transactions-api/v1/files/validation-errors**';
 
 /**
- * The cancel call is `DELETE /transactions-api/v1/files?LogId=<id>` — a path that a
+ * The delete call is `DELETE /transactions-api/v1/files?LogId=<id>` — a path that a
  * glob cannot separate from its own children (`/files/download`,
  * `/files/retry-validation`), so it is matched exactly on the pathname instead.
  */
-const isCancelFileCall = (url: URL): boolean =>
+const isDeleteFileCall = (url: URL): boolean =>
   url.pathname.endsWith('/transactions-api/v1/files');
 
 /**
@@ -240,17 +251,17 @@ const WCAG_22_AA_TAGS = [
 
 /**
  * The two actions this story adds, and the confirmation's dismiss choice. See the
- * header's label contract: the dismissal must be worded with "keep", because the
- * destructive action is itself called Cancel file.
+ * header's label contract: the dismissal is worded with "keep", never "cancel", so it
+ * cannot be mistaken for the destructive choice beside it.
  */
 const RETRY_VALIDATION_LABEL = /retry validation/i;
-const CANCEL_FILE_LABEL = /cancel (the )?file/i;
+const DELETE_FILE_LABEL = /delete (the )?file/i;
 const KEEP_THE_FILE_LABEL = /keep/i;
 
 /**
- * UI-09's irreversibility clause, as this story states it: "the file and its rows are
- * removed and it cannot be undone". Both accepted phrasings of the same promise are
- * allowed; anything softer (a bare "Are you sure?") fails.
+ * UI-09's irreversibility clause, as the confirmation states it: "the file and its
+ * rows are removed and it cannot be undone". Both accepted phrasings of the same
+ * promise are allowed; anything softer (a bare "Are you sure?") fails.
  */
 const IRREVERSIBLE_WORDING = /cannot be undone|cannot be recovered/i;
 
@@ -262,7 +273,7 @@ const IRREVERSIBLE_WORDING = /cannot be undone|cannot be recovered/i;
 const POLL_TICK_MS = 60_000;
 
 /**
- * Real-time window in which a cancel call would arrive, if the dismissed confirmation
+ * Real-time window in which a delete call would arrive, if the dismissed confirmation
  * had wrongly sent one.
  */
 const STRAY_CALL_WINDOW_MS = 3_000;
@@ -320,7 +331,7 @@ const requiredValue = (value: string | undefined, what: string): string => {
   return value;
 };
 
-/** One of the two files the mocked active list holds — the one that is NOT cancelled below. */
+/** One of the two files the mocked active list holds — the one that is NOT deleted below. */
 const fileInStatus = (files: FileLog[], status: string): FileLog => {
   const match = files.find((file) => file.CurrentStatus === status);
   if (!match) {
@@ -333,7 +344,7 @@ const fileInStatus = (files: FileLog[], status: string): FileLog => {
 };
 
 /**
- * A second active file, with its own id and name, so "the cancelled file is gone from
+ * A second active file, with its own id and name, so "the deleted file is gone from
  * the list" is distinguishable from "the list is empty or failed to load". Its status
  * is a settled one, so its presence never starts the list's own refresh.
  */
@@ -414,7 +425,7 @@ const serveFilePage = async (
       jsonResponse(validationErrorsResponse(invalidRowsForEveryDefect())),
     ),
   );
-  // The Expense files list a confirmed cancel returns to carries story 2's submit
+  // The Expense files list a confirmed delete returns to carries story 2's submit
   // form, which reads the named settings for itself.
   await page.route(FILE_SETTINGS_URL_GLOB, (route) =>
     route.fulfill(jsonResponse(fileSettingListResponse())),
@@ -430,15 +441,15 @@ const serveFilePage = async (
   };
 };
 
-/** What the browser actually sent when it asked for a cancel. */
+/** What the browser actually sent when it asked for a delete. */
 interface FileActionCalls {
-  /** The `LastChangedUser` header the cancel call carried, if it carried one. */
+  /** The `LastChangedUser` header the delete call carried, if it carried one. */
   auditUserSent: () => string | undefined;
 }
 
 /**
  * Answers this story's two mutating calls, and lets a test say what the service does
- * as a consequence (`onRetried` / `onCancelled` change what the reads then return).
+ * as a consequence (`onRetried` / `onDeleted` change what the reads then return).
  *
  * Registered in EVERY test, including the ones that never click either action: these
  * are the only calls in this epic that change data, and an unmocked one would be
@@ -446,7 +457,7 @@ interface FileActionCalls {
  */
 const mockFileActions = async (
   page: Page,
-  effects: { onRetried?: () => void; onCancelled?: () => void } = {},
+  effects: { onRetried?: () => void; onDeleted?: () => void } = {},
 ): Promise<FileActionCalls> => {
   let auditUser: string | undefined;
 
@@ -455,7 +466,7 @@ const mockFileActions = async (
     return route.fulfill(jsonResponse(retrySuccessResponse()));
   });
 
-  await page.route(isCancelFileCall, (route) => {
+  await page.route(isDeleteFileCall, (route) => {
     const request = route.request();
     if (request.method() !== 'DELETE') {
       // Nothing in this story addresses this path with another method; letting one
@@ -463,24 +474,24 @@ const mockFileActions = async (
       return route.abort();
     }
     auditUser = request.headers()['lastchangeduser'];
-    effects.onCancelled?.();
-    return route.fulfill(jsonResponse(cancelSuccessResponse()));
+    effects.onDeleted?.();
+    return route.fulfill(jsonResponse(deleteSuccessResponse()));
   });
 
   return { auditUserSent: () => auditUser };
 };
 
 /**
- * Resolves to the URL of a cancel call if one arrives within the window, or to `null`
- * if none does — the observable form of "nothing is cancelled unless it is confirmed".
+ * Resolves to the URL of a delete call if one arrives within the window, or to `null`
+ * if none does — the observable form of "nothing is deleted unless it is confirmed".
  * Start it BEFORE the interaction it is watching.
  */
-const watchForCancelCall = (page: Page): Promise<string | null> =>
+const watchForDeleteCall = (page: Page): Promise<string | null> =>
   page
     .waitForRequest(
       (request) =>
         request.method() === 'DELETE' &&
-        isCancelFileCall(new URL(request.url())),
+        isDeleteFileCall(new URL(request.url())),
       { timeout: STRAY_CALL_WINDOW_MS },
     )
     .then((request) => request.url())
@@ -536,7 +547,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
   });
 
   // AC-1
-  test('a Finance Uploader on a file whose validation failed is offered both retry and cancel', async ({
+  test('a Finance Uploader on a file whose validation failed is offered both retry and delete', async ({
     page,
     context,
   }) => {
@@ -554,12 +565,12 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     await expect(main).toContainText(FILE_STATUS_VALIDATION_FAILED);
 
     const retry = main.getByRole('button', { name: RETRY_VALIDATION_LABEL });
-    const cancel = main.getByRole('button', { name: CANCEL_FILE_LABEL });
+    const deleteFile = main.getByRole('button', { name: DELETE_FILE_LABEL });
 
     await expect(retry).toBeVisible();
     await expect(retry).toBeEnabled();
-    await expect(cancel).toBeVisible();
-    await expect(cancel).toBeEnabled();
+    await expect(deleteFile).toBeVisible();
+    await expect(deleteFile).toBeEnabled();
   });
 
   // AC-1
@@ -587,22 +598,22 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
       main.getByRole('button', { name: RETRY_VALIDATION_LABEL }),
     ).toHaveCount(0);
     await expect(
-      main.getByRole('button', { name: CANCEL_FILE_LABEL }),
+      main.getByRole('button', { name: DELETE_FILE_LABEL }),
     ).toHaveCount(0);
 
     // ...nor anywhere in the page's words: decided server-side and left out of the
     // markup, never rendered disabled (source UI-24). A greyed-out control would
     // still carry its role and its label, so both checks above and below would fail.
     await expect(main).not.toContainText(RETRY_VALIDATION_LABEL);
-    await expect(main).not.toContainText(CANCEL_FILE_LABEL);
+    await expect(main).not.toContainText(DELETE_FILE_LABEL);
   });
 
   // AC-5
   // The confirmation itself, in a real browser: real focus management and real
   // keyboard. Dismissing it — by Escape or by the keep-the-file choice — must leave
-  // the file exactly as it was and send no cancel, which is the precondition for the
+  // the file exactly as it was and send no delete, which is the precondition for the
   // confirm path below meaning anything at all (UI-09).
-  test('the cancel confirmation names the file, warns it cannot be undone, opens with keep-the-file focused, and cancels nothing when dismissed', async ({
+  test('the delete confirmation names the file, warns it cannot be undone, opens with keep-the-file focused, and deletes nothing when dismissed', async ({
     page,
     context,
   }) => {
@@ -615,13 +626,13 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     await page.goto(filePageFor(FAILED_FILE.Id));
 
     const main = page.getByRole('main');
-    const cancelTrigger = main.getByRole('button', { name: CANCEL_FILE_LABEL });
-    await expect(cancelTrigger).toBeVisible();
+    const deleteTrigger = main.getByRole('button', { name: DELETE_FILE_LABEL });
+    await expect(deleteTrigger).toBeVisible();
 
     // Watching from before the first click, for the whole interaction.
-    const strayCancelCall = watchForCancelCall(page);
+    const strayDeleteCall = watchForDeleteCall(page);
 
-    await cancelTrigger.click();
+    await deleteTrigger.click();
 
     // The dialog is portalled to the body, so it is addressed on its own — not via
     // `main` (and it is `alertdialog`, not `alert`, so Next's route announcer is not
@@ -629,7 +640,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     const confirmation = page.getByRole('alertdialog');
     await expect(confirmation).toBeVisible();
 
-    // It names the file being acted on, and says what cancelling does and that it
+    // It names the file being acted on, and says what deleting does and that it
     // cannot be taken back.
     await expect(confirmation).toContainText(FAILED_FILE.CurrentFileName);
     await expect(confirmation).toContainText(/rows/i);
@@ -645,7 +656,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     await expect(confirmation).toBeHidden();
 
     // ...and dismissed again with the keep-the-file choice.
-    await cancelTrigger.click();
+    await deleteTrigger.click();
     await expect(confirmation).toBeVisible();
     await confirmation
       .getByRole('button', { name: KEEP_THE_FILE_LABEL })
@@ -657,16 +668,16 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     await expect(page).toHaveURL(filePageUrlPattern(FAILED_FILE.Id));
     await expect(main).toContainText(FAILED_FILE.CurrentFileName);
     await expect(main).toContainText(FILE_STATUS_VALIDATION_FAILED);
-    await expect(cancelTrigger).toBeEnabled();
+    await expect(deleteTrigger).toBeEnabled();
 
     expect(
-      await strayCancelCall,
-      'a dismissed confirmation must not cancel the file — the service was asked to deactivate it anyway',
+      await strayDeleteCall,
+      'a dismissed confirmation must not delete the file — the service was asked to deactivate it anyway',
     ).toBeNull();
   });
 
   // AC-5
-  test('confirming the cancel deactivates the file, which is then gone from the Expense files list', async ({
+  test('confirming the delete deactivates the file, which is then gone from the Expense files list', async ({
     page,
     context,
   }) => {
@@ -676,7 +687,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
       fileProcessHistory(),
     );
     const actions = await mockFileActions(page, {
-      onCancelled: () => {
+      onDeleted: () => {
         // The service deactivates the file (brief BR2), so it is no longer in the
         // active list the Expense files screen reads.
         feed.showFiles([OTHER_ACTIVE_FILE]);
@@ -691,17 +702,17 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     const main = page.getByRole('main');
     await expect(main).toContainText(FAILED_FILE.CurrentFileName);
 
-    await main.getByRole('button', { name: CANCEL_FILE_LABEL }).click();
+    await main.getByRole('button', { name: DELETE_FILE_LABEL }).click();
 
     const confirmation = page.getByRole('alertdialog');
     await expect(confirmation).toBeVisible();
-    await confirmation.getByRole('button', { name: CANCEL_FILE_LABEL }).click();
+    await confirmation.getByRole('button', { name: DELETE_FILE_LABEL }).click();
 
     // The file no longer resolves on a page of its own, so the user lands back on the
     // Expense files list...
     await expect(page).toHaveURL(EXPENSE_FILES_URL_PATTERN);
 
-    // ...where the list is plainly there, and the cancelled file is not in it.
+    // ...where the list is plainly there, and the deleted file is not in it.
     await expect(
       fileRow(page, OTHER_ACTIVE_FILE.CurrentFileName),
     ).toBeVisible();
@@ -711,7 +722,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     // auth service reported — never to anything typed into the page.
     expect(
       [SIGNED_IN_IMPORTER.Email, fullNameOf(SIGNED_IN_IMPORTER)],
-      'the cancel call must carry LastChangedUser taken from GET /v1/auth/userinfo (epic brief §Notes & Caveats)',
+      'the delete call must carry LastChangedUser taken from GET /v1/auth/userinfo (epic brief §Notes & Caveats)',
     ).toContain(actions.auditUserSent());
   });
 
@@ -794,11 +805,11 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
     await expect(main).not.toContainText(FILE_STATUS_VALIDATING);
   });
 
-  // Accessibility — the one state story 1's page-level scan cannot reach: the cancel
+  // Accessibility — the one state story 1's page-level scan cannot reach: the delete
   // confirmation open over the file's page, as the only role that is offered it. Real
   // browser, so the overlay's contrast, the dialog's name and its focus placement are
   // all seen. No fake clock here — axe is never run under faked timers.
-  test('the open cancel confirmation has no accessibility violations', async ({
+  test('the open delete confirmation has no accessibility violations', async ({
     page,
     context,
   }) => {
@@ -818,7 +829,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
       main.getByRole('button', { name: RETRY_VALIDATION_LABEL }),
     ).toBeVisible();
 
-    await main.getByRole('button', { name: CANCEL_FILE_LABEL }).click();
+    await main.getByRole('button', { name: DELETE_FILE_LABEL }).click();
 
     // Scan only once the dialog has arrived and taken focus, so the state under the
     // scan is the settled one.
@@ -830,7 +841,7 @@ test.describe('Epic file-validation-and-retry, Story 4: retry validation or canc
 
     await expectNoAccessibilityViolations(
       page,
-      'the cancel confirmation open over the file',
+      'the delete confirmation open over the file',
     );
   });
 });

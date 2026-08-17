@@ -46,7 +46,9 @@ Grep the whole of `web/` for `Cancel file` / `Cancel the file` before finishing.
 | AC-3 | A session that is not the Importer receives no delete control at all in the page's markup — absent, never disabled or greyed out. | vitest |
 | AC-4 | Confirming the delete on a file the service accepts removes the file and returns the user to the Expense files list, where the file is no longer listed. | playwright |
 | AC-5 | When the service refuses the delete — including on an imported file — the page shows the service's own message, the user stays on the file's page with the file unchanged and the delete still offered, and nothing reports the delete as having succeeded. | vitest |
-| AC-6 | The delete action and both confirmation shapes are completable by keyboard alone, with the way out ("Keep the file") holding focus when the confirmation opens, and the page passes an accessibility scan with the confirmation open. | playwright |
+| AC-6 | The file's page passes an accessibility scan with the confirmation open. | playwright |
+
+> **Coverage split, settled at test generation.** AC-6 originally also claimed the keyboard/focus proof, which duplicated story 2's AC-6 — both stories render the same confirmation. **Story 2's Playwright spec owns keyboard operability and "Keep the file" holding focus** (for both confirmation shapes); **story 1's owns the `/upload/file` accessibility scan** and AC-4's confirm-then-return-to-list flow. Story 3's owns the `/upload` scan. No surface is scanned twice.
 
 ## Manual Test Checklist
 

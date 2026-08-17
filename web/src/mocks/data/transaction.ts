@@ -65,12 +65,28 @@
  * from a list you already have, in the same order, so a test never hand-builds a
  * second list and accidentally changes something else too.
  *
+ * DELETING A FILE (epic `file-deletion`): the final section pairs a `FileLog` with
+ * the requests it produced, because the delete confirmation names both at once
+ * ("this file produced 40 requests, 12 already approved and 3 rejected"). Two
+ * things there are load-bearing:
+ *   - the list it hands `GET /v1/transactions` deliberately contains OTHER files'
+ *     rows, several of them already decided, because the filter is client-side
+ *     (BR4) — a fixture whose rows all belong to one file would pass against an
+ *     implementation with no filter at all;
+ *   - the counts are COUNTED FROM THE ROWS, never declared beside them, so a
+ *     fixture cannot claim "12 approved" while carrying 11.
+ *
+
  * Import discipline (so the Playwright layer can import this without alias
  * plumbing): type-only imports, and sibling factories by relative path.
  */
 import {
   FILE_STATUS_CANCELLED,
+  FILE_STATUS_IMPORTED,
+  FILE_STATUSES,
   createFileLog,
+  deleteSuccessResponse,
+  fileLogListResponse,
   fileLogWithStatus,
 } from './file-log';
 import { userInfoFor } from './identity';
@@ -85,6 +101,7 @@ import {
 } from '../../types/transactions';
 
 import type { DefaultResponse } from '../../types/api';
+import type { FileLog, FileLogList } from '../../types/files';
 import type {
   TransactionRead,
   TransactionReadList,
@@ -985,3 +1002,472 @@ export const transactionsAfterApproving = (
     status: TRANSACTION_STATUS_APPROVED,
     by: DECIDING_APPROVER,
   });
+
+/* -------------------------------------------------------------------------- */
+/* Deleting a file — the file PAIRED with the requests it produced             */
+/* (epic `file-deletion`)                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * WHY THIS SECTION EXISTS. The delete confirmation is the only place in the app
+ * that describes a `FileLog` and its `TransactionRead` rows in one sentence: "this
+ * file produced 40 requests, 12 already approved and 3 rejected". Every layer —
+ * the confirmation opened from the file's own page (story 1), the shared wording
+ * module (story 2) and the same confirmation opened from a list row (story 3) —
+ * must agree byte for byte about those numbers, so no layer may author a
+ * transaction list of its own. {@link importedFileWithRequests} is the one source.
+ *
+ * THE DECOY ROWS ARE THE POINT, not padding. `GET /v1/transactions` takes no query
+ * parameters, so the app fetches EVERY request in the system and narrows to one
+ * file client-side (BR4). A fixture whose rows all belonged to the file under test
+ * would pass just as happily against an implementation that never filters at all.
+ * Every scenario below therefore carries a substantial block of rows belonging to
+ * two OTHER files, several of them already `Approved` or `Rejected`, so a missing
+ * or broken filter produces visibly wrong counts
+ * ({@link FileDeletionScenario.expectedIfUnfiltered}) rather than accidentally
+ * right ones.
+ *
+ * THE OTHER TWO RESPONSES THIS EPIC NEEDS ALREADY EXIST — do not write new ones:
+ *   - a REFUSED DELETE is `deleteFailureResponse()` / `DELETE_REFUSED_MESSAGE` in
+ *     `./file-log` (the sentence `file-validation-and-retry` already used for this
+ *     same single `DELETE /v1/files` call, carried forward under delete
+ *     vocabulary). Stories 1 and 3 must assert that ONE shared service sentence.
+ *   - a REFUSED COUNT READ (story 2 AC-3, the dangerous branch) is the ordinary
+ *     failed transactions read: {@link transactionListFailureResponse} /
+ *     {@link TRANSACTION_LIST_FAILURE_MESSAGE}. It is the same endpoint failing,
+ *     so it is the same fixture — a second "count failed" sentence would let the
+ *     two layers drift apart.
+ */
+
+/** How many requests a scenario's file may produce before its ids would collide
+ * with the decoy files' ids. Far above anything a confirmation test needs. */
+const DELETION_REQUEST_CEILING = 250;
+
+/** Id blocks: the file under test's rows, then one block per decoy file. */
+const OWN_REQUEST_ID_BASE = 7500;
+
+/**
+ * The two OTHER files whose rows share the `GET /v1/transactions` response with the
+ * file under test. Both are `Imported` (only an imported file has rows at all) and
+ * both carry decided requests, so an unfiltered count is wrong in all three numbers
+ * — total, approved AND rejected — not just the total.
+ */
+const DECOY_FILE_SPECS = [
+  {
+    Id: 5201,
+    CurrentFileName: 'expenses_2026-04-22.csv',
+    ProcessDate: '2026-04-22 08:30:00',
+    idBase: 7800,
+    total: 15,
+    approved: 5,
+    rejected: 4,
+  },
+  {
+    Id: 5202,
+    CurrentFileName: 'expenses_2026-04-23.csv',
+    ProcessDate: '2026-04-23 08:30:00',
+    idBase: 7900,
+    total: 10,
+    approved: 4,
+    rejected: 3,
+  },
+] as const;
+
+const DECOY_FILE_IDS: readonly number[] = DECOY_FILE_SPECS.map(
+  (spec) => spec.Id,
+);
+
+/**
+ * One file's request counts, always COUNTED FROM THE ROWS (never declared beside
+ * them) — which is what makes a fixture unable to claim a breakdown it does not
+ * carry.
+ */
+export interface RequestCounts {
+  total: number;
+  approved: number;
+  rejected: number;
+  /** `approved + rejected` — the "and the record of who decided them" number (R6). */
+  decided: number;
+}
+
+/** Counts the three numbers the confirmation states, from the rows themselves. */
+export const countRequests = (
+  requests: readonly TransactionRead[],
+): RequestCounts => {
+  const approved = requests.filter(
+    (request) => request.Status === TRANSACTION_STATUS_APPROVED,
+  ).length;
+  const rejected = requests.filter(
+    (request) => request.Status === TRANSACTION_STATUS_REJECTED,
+  ).length;
+  return {
+    total: requests.length,
+    approved,
+    rejected,
+    decided: approved + rejected,
+  };
+};
+
+/**
+ * A file about to be deleted, everything the two calls behind that confirmation
+ * would return, and what the confirmation must therefore say.
+ */
+export interface FileDeletionScenario {
+  /** The file the delete action is invoked on. */
+  file: FileLog;
+  /** `GET /v1/file-logs` rows: {@link file} plus the decoy files, so a list surface
+   * (story 3) can render the row this delete is asked for among others. */
+  fileLogs: FileLog[];
+  /** The WHOLE `GET /v1/transactions` body — this file's rows interleaved with the
+   * decoy files'. Neither block is contiguous, so a slice cannot stand in for a
+   * filter. Wrap with {@link transactionListResponse}. */
+  transactions: TransactionRead[];
+  /** Just this file's rows — what a correct `FileLogId` filter yields. */
+  ownRequests: TransactionRead[];
+  /** What the confirmation must state, counted from {@link ownRequests}. */
+  expected: RequestCounts;
+  /** What an implementation that FORGOT to filter would state, counted from
+   * {@link transactions}. Assert these numbers are absent from the screen. */
+  expectedIfUnfiltered: RequestCounts;
+}
+
+/** Spreads the decided rows through the file's requests instead of clustering them
+ * at one end, so "the first N" or "the last N" is never the same answer as a real
+ * status count. Approvals and rejections alternate. */
+const requestStatusSequence = (
+  total: number,
+  approved: number,
+  rejected: number,
+): string[] => {
+  const decided: string[] = [];
+  let remainingApproved = approved;
+  let remainingRejected = rejected;
+  while (remainingApproved > 0 || remainingRejected > 0) {
+    if (remainingApproved > 0) {
+      decided.push(TRANSACTION_STATUS_APPROVED);
+      remainingApproved -= 1;
+    }
+    if (remainingRejected > 0) {
+      decided.push(TRANSACTION_STATUS_REJECTED);
+      remainingRejected -= 1;
+    }
+  }
+  const sequence: string[] = Array.from(
+    { length: total },
+    () => TRANSACTION_STATUS_IMPORTED,
+  );
+  decided.forEach((status, index) => {
+    sequence[Math.floor((index * total) / decided.length)] = status;
+  });
+  return sequence;
+};
+
+/** The rows one file produced, in the given statuses — coherent with the file they
+ * came from (`FileLogId`, `FileName`) and each identifiable by its own reference. */
+const requestsForFile = (
+  file: FileLog,
+  statuses: readonly string[],
+  idBase: number,
+): TransactionRead[] =>
+  statuses.map((status, index) => {
+    const sequence = String(index + 1).padStart(4, '0');
+    const day = String((index % 28) + 1).padStart(2, '0');
+    return transactionWithStatus(status, {
+      Id: idBase + index,
+      FileLogId: file.Id,
+      FileName: file.CurrentFileName,
+      Reference: `TXN-${String(file.Id)}-${sequence}`,
+      TransactionDate: `2026-04-${day} 0${String(index % 10)}:45:00`,
+      AccountNumber: `3055-7712-${String(idBase + index)}`,
+      Description: `Expense request ${sequence} (${file.CurrentFileName})`,
+      Amount: 250 + index * 3.5,
+      TransactionType:
+        index % 2 === 0
+          ? TRANSACTION_TYPE_DEBIT_CODE
+          : TRANSACTION_TYPE_CREDIT_CODE,
+    });
+  });
+
+/** The two other imported files that share the transactions response. */
+export const otherFilesInTransactionsList = (): FileLog[] =>
+  DECOY_FILE_SPECS.map((spec) =>
+    fileLogWithStatus(FILE_STATUS_IMPORTED, {
+      Id: spec.Id,
+      CurrentFileName: spec.CurrentFileName,
+      ProcessDate: spec.ProcessDate,
+      RecordCount: String(spec.total),
+    }),
+  );
+
+/** Their rows — the ones a client-side `FileLogId` filter has to exclude. */
+const otherFilesRequests = (): TransactionRead[] => {
+  const files = otherFilesInTransactionsList();
+  return DECOY_FILE_SPECS.flatMap((spec, index) =>
+    requestsForFile(
+      files[index],
+      requestStatusSequence(spec.total, spec.approved, spec.rejected),
+      spec.idBase,
+    ),
+  );
+};
+
+/** Alternates two blocks so neither ends up contiguous in the response. */
+const interleave = (
+  first: readonly TransactionRead[],
+  second: readonly TransactionRead[],
+): TransactionRead[] => {
+  const merged: TransactionRead[] = [];
+  const longest = Math.max(first.length, second.length);
+  for (let index = 0; index < longest; index += 1) {
+    if (index < first.length) merged.push(first[index]);
+    if (index < second.length) merged.push(second[index]);
+  }
+  return merged;
+};
+
+const scenarioFor = (
+  file: FileLog,
+  ownRequests: TransactionRead[],
+): FileDeletionScenario => {
+  if (DECOY_FILE_IDS.includes(file.Id)) {
+    throw new Error(
+      `File id ${String(file.Id)} is one of the decoy files' ids ` +
+        `(${DECOY_FILE_IDS.join(', ')}). The scenario would then count other ` +
+        `files' rows as its own and prove nothing about the filter.`,
+    );
+  }
+  const transactions = interleave(ownRequests, otherFilesRequests());
+  return {
+    file,
+    fileLogs: [file, ...otherFilesInTransactionsList()],
+    transactions,
+    ownRequests,
+    expected: countRequests(ownRequests),
+    expectedIfUnfiltered: countRequests(transactions),
+  };
+};
+
+/**
+ * THE PAIRED FIXTURE: an `Imported` file, the requests it produced with a known
+ * decided breakdown, and the full transactions response those rows live in.
+ *
+ * `RecordCount` on the file agrees with `total` by default so the fixture is
+ * coherent — but it is NOT what the confirmation counts (BR4: the service's own
+ * transaction rows are). To prove the implementation counts the rows rather than
+ * reading the file's own field, pass a `file` override that disagrees:
+ * `importedFileWithRequests({ total: 40, file: { RecordCount: '999' } })` — the
+ * confirmation must still say 40.
+ *
+ * Throws if the breakdown is impossible, or if the rows it built do not count back
+ * to exactly what was asked for.
+ *
+ * @example
+ *   const scenario = importedFileWithRequests({ total: 40, approved: 12, rejected: 3 });
+ *   mockGet.mockResolvedValue(transactionListResponse(scenario.transactions));
+ *   // scenario.expected -> { total: 40, approved: 12, rejected: 3, decided: 15 }
+ */
+export const importedFileWithRequests = ({
+  total = 40,
+  approved = 12,
+  rejected = 3,
+  file: fileOverrides = {},
+}: {
+  total?: number;
+  approved?: number;
+  rejected?: number;
+  file?: Partial<FileLog>;
+} = {}): FileDeletionScenario => {
+  if (approved + rejected > total) {
+    throw new Error(
+      `Cannot build a file that produced ${String(total)} request(s) of which ` +
+        `${String(approved)} are approved and ${String(rejected)} rejected — that ` +
+        `is more decided requests than the file produced.`,
+    );
+  }
+  if (total > DELETION_REQUEST_CEILING) {
+    throw new Error(
+      `A scenario of ${String(total)} requests would collide with the decoy ` +
+        `files' transaction ids (ceiling ${String(DELETION_REQUEST_CEILING)}).`,
+    );
+  }
+  const file = fileLogWithStatus(FILE_STATUS_IMPORTED, {
+    Id: 5150,
+    CurrentFileName: 'expenses_2026-04-20.csv',
+    ProcessDate: '2026-04-20 07:15:00',
+    RecordCount: String(total),
+    ...fileOverrides,
+  });
+  const scenario = scenarioFor(
+    file,
+    requestsForFile(
+      file,
+      requestStatusSequence(total, approved, rejected),
+      OWN_REQUEST_ID_BASE,
+    ),
+  );
+  const built = scenario.expected;
+  if (
+    built.total !== total ||
+    built.approved !== approved ||
+    built.rejected !== rejected
+  ) {
+    throw new Error(
+      `Fixture miscount: asked for ${String(total)}/${String(approved)}/` +
+        `${String(rejected)} (total/approved/rejected) but built ` +
+        `${String(built.total)}/${String(built.approved)}/${String(built.rejected)}.`,
+    );
+  }
+  return scenario;
+};
+
+/**
+ * The ordinary case (story 2 AC-1, and the wording the brief's R6 spells out): an
+ * imported file that produced 40 requests, 12 of them already approved and 3
+ * rejected — 15 decisions destroyed with it.
+ */
+export const importedFileToDelete = (): FileDeletionScenario =>
+  importedFileWithRequests({ total: 40, approved: 12, rejected: 3 });
+
+/**
+ * An imported file that genuinely produced NO requests (story 2 AC-4). The
+ * transactions response is still full of other files' rows, so "none" here is the
+ * answer a working filter gives — not an empty response, and above all not the
+ * same thing as a count that could not be read (which is
+ * {@link transactionListFailureResponse}). The confirmation must be able to say
+ * "none" without ever reaching for the failed-read wording.
+ */
+export const importedFileWithNoRequests = (): FileDeletionScenario =>
+  importedFileWithRequests({
+    total: 0,
+    approved: 0,
+    rejected: 0,
+    file: {
+      Id: 5151,
+      CurrentFileName: 'expenses_2026-04-21-empty.csv',
+      ProcessDate: '2026-04-21 07:40:00',
+    },
+  });
+
+/**
+ * An imported file whose requests are ALL still `Imported` — it produced plenty,
+ * but nobody has decided any of them. The confirmation must state the total and
+ * must not claim anything was approved or rejected. The decoy rows include decided
+ * requests, so an unfiltered count would wrongly report decisions being destroyed
+ * here — the most alarming possible way to get this wrong.
+ */
+export const importedFileWithNothingDecided = (): FileDeletionScenario =>
+  importedFileWithRequests({
+    total: 18,
+    approved: 0,
+    rejected: 0,
+    file: {
+      Id: 5152,
+      CurrentFileName: 'expenses_2026-04-25.csv',
+      ProcessDate: '2026-04-25 06:55:00',
+    },
+  });
+
+/**
+ * A file in a status OTHER than `Imported` — the short-confirmation branch (R7,
+ * story 2 AC-2), where the transactions read must not happen at all.
+ *
+ * The scenario still carries the other files' rows in `transactions`, on purpose:
+ * that is what a read WOULD return if one happened. AC-2 says none does, and the
+ * way to prove it without counting mock calls is to script the transactions read to
+ * FAIL (`transactionListFailureResponse`, or a rejection) and then assert the short
+ * confirmation appeared with no "count could not be read" wording anywhere — a read
+ * that actually happened would visibly produce the failed-count state instead.
+ *
+ * `expected` is all zeroes here, which is NOT the same claim as
+ * {@link importedFileWithNoRequests}: this file never produced requests because it
+ * never imported, so the confirmation must not mention counts at all.
+ */
+export const fileNeverImportedToDelete = (
+  status: string,
+  overrides: Partial<FileLog> = {},
+): FileDeletionScenario => {
+  if (status === FILE_STATUS_IMPORTED) {
+    throw new Error(
+      'An Imported file gets the request-count confirmation (R6) — use ' +
+        'importedFileWithRequests for it, not the never-imported branch.',
+    );
+  }
+  return scenarioFor(
+    fileLogWithStatus(status, {
+      Id: 5160,
+      CurrentFileName: 'expenses_2026-04-26.csv',
+      ProcessDate: '2026-04-26 07:05:00',
+      ...overrides,
+    }),
+    [],
+  );
+};
+
+/**
+ * One scenario per non-imported status — `Uploaded`, `Validating`,
+ * `Validation failed`, `Cancelled` — derived from the file statuses the app knows,
+ * so a status added there cannot be silently missed here. Each file has its own id
+ * and name, so a test can name the row it means rather than pick one by index.
+ *
+ * @example
+ *   it.each(filesNeverImportedToDelete())('short confirmation for $file.CurrentStatus', ...)
+ */
+export const filesNeverImportedToDelete = (): FileDeletionScenario[] =>
+  FILE_STATUSES.filter((status) => status !== FILE_STATUS_IMPORTED).map(
+    (status, index) =>
+      fileNeverImportedToDelete(status, {
+        Id: 5160 + index,
+        CurrentFileName: `expenses_2026-04-2${String(6 + index)}.csv`,
+        ProcessDate: `2026-04-2${String(6 + index)} 07:05:00`,
+      }),
+  );
+
+/**
+ * `GET /v1/file-logs` rows as they stand once the service has genuinely deleted the
+ * file — it is gone, the other files are untouched and in the same order. This is
+ * the SECOND read the list makes after a successful delete (R11/R12: the row
+ * disappears because the list asked again, not because an array was spliced), so a
+ * test scripts read 1 with `scenario.fileLogs` and read 2 with this.
+ */
+export const fileLogsAfterDeleting = (
+  scenario: FileDeletionScenario,
+): FileLog[] =>
+  scenario.fileLogs.filter((file) => file.Id !== scenario.file.Id);
+
+/** The transactions response after a genuinely complete delete: this file's rows
+ * are gone, every other file's row is exactly where it was. */
+export const transactionsAfterDeletingFile = (
+  scenario: FileDeletionScenario,
+): TransactionRead[] =>
+  scenario.transactions.filter(
+    (request) => request.FileLogId !== scenario.file.Id,
+  );
+
+/**
+ * The PARTIAL outcome the brief names as an unverified possibility (BR6): the
+ * service reports the delete succeeded and the file leaves the active list, but the
+ * requests it produced are still returned by `GET /v1/transactions` — because they
+ * left the staging table this endpoint's description talks about long ago.
+ *
+ * No acceptance criterion requires this; it is here because the pieces already
+ * existed and because BUILD may discover it against the real service. If it turns
+ * out to be what the service does, this is the state the app must describe
+ * honestly rather than report as a clean success (R10).
+ */
+export interface PartialDeleteOutcome {
+  /** What the service said: success. */
+  deleteResponse: DefaultResponse;
+  /** The file really is gone from the active list. */
+  fileLogsAfter: FileLogList;
+  /** …but its requests are all still there, unchanged. */
+  transactionsAfter: TransactionReadList;
+}
+
+/** Builds {@link PartialDeleteOutcome} for a scenario. */
+export const partialDeleteOutcome = (
+  scenario: FileDeletionScenario,
+): PartialDeleteOutcome => ({
+  deleteResponse: deleteSuccessResponse(),
+  fileLogsAfter: fileLogListResponse(fileLogsAfterDeleting(scenario)),
+  transactionsAfter: transactionListResponse(scenario.transactions),
+});
