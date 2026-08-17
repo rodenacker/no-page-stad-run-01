@@ -14,39 +14,45 @@
       "Verify the preview is showing your own file: the app assumes that asking the service for the original file gives back exactly the CSV you uploaded. If it hands back something else — a reprocessed version, or a packaged/zipped file — the preview will report that it could not read the file instead of listing your rows.",
       "Verify a downloaded correction file can actually be sent back in: you chose to include a \"why this row was rejected\" column, which makes the file eight columns wide instead of the seven the upload normally takes. Nobody has been able to test whether the upload accepts that extra column. Download the rejected rows, correct one value, and upload the file through the normal upload flow. If the upload refuses it, say so — the fix is to drop that last column."
     ],
-    "manualTestResults": []
+    "manualTestResults": [
+      {
+        "skipped": true,
+        "at": "2026-08-17T08:35:00.000Z",
+        "note": "User chose Skip for now at the manual-test approval; three backend assumptions remain unconfirmed (see journal.md)."
+      }
+    ]
   },
-  "phase": "EPIC-END",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "auto-skipped:non-routable",
       "startedAt": "2026-08-17T07:25:35.000Z",
       "completedAt": "2026-08-17T07:32:10.000Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-17T07:33:00.000Z",
       "completedAt": "2026-08-17T07:52:00.000Z"
     },
     "3": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-17T07:33:00.000Z",
       "completedAt": "2026-08-17T07:52:00.000Z"
     },
     "4": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-17T07:53:00.000Z",
       "completedAt": "2026-08-17T08:05:00.000Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-17T05:52:14.336Z"
+  "lastUpdated": "2026-08-17T08:35:00.000Z"
 }
