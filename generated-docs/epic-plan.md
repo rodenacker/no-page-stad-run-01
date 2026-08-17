@@ -169,13 +169,18 @@ file either way. What the backend gap costs is the last step — rows shown as "
 not imported yet, and the epic says so plainly rather than implying otherwise. Once the service performs
 the split, those rows can be confirmed as imported against `GET /v1/transactions` (`FileLogId`).
 
-**Deleting an imported file may not be supported (epic 9).** `DELETE /v1/files` (`FilesDelete`) is documented
-as deleting a file "from the staging table". An imported file's rows have left staging and become expense
-payment requests, so whether the service deletes them, deletes only the file record, partially succeeds, or
-refuses outright is **unknown** — it needs a signed-in session against a real imported file to find out. The
-frontend is built to report whatever the service actually does, including a refusal, in the service's own
-words; it never claims a success it did not observe. If the service turns out to refuse, the honest fix is to
-put the not-yet-imported gate back, not to work around it.
+**~~Deleting an imported file may not be supported (epic 9).~~ RESOLVED at epic 9's manual test, 2026-08-17.**
+`DELETE /v1/files` (`FilesDelete`) is documented as deleting a file "from the staging table", and an imported
+file's rows have left staging — so whether the service would delete them, delete only the file record,
+partially succeed, or refuse was unknown, and untestable during BUILD (reading it needs a signed-in session,
+and the frontend holds no credentials by design). **Checked against the live service: it works.** An imported
+file deletes, and the requests list showed nothing orphaned afterwards — no decided requests left behind
+without a file. The confirmation's counts were also checked against the requests list for the same file, so
+the client-side `FileLogId` filter counts the right rows.
+Kept here rather than deleted, because the consequence is permanent and worth remembering: deleting an
+imported file genuinely destroys live expense payment requests **and the record of who approved or rejected
+them** — the user-directed reversal of R19/R24/R94, now confirmed to work end to end rather than merely
+offered.
 
 **CORS on both backend services.** Neither the auth-api/BFF (`http://localhost:4424`) nor the transactions-api
 (`http://localhost:4423/transactions-api`) returns an `Access-Control-Allow-Origin` header. Both are cross-origin
