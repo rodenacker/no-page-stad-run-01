@@ -41,11 +41,15 @@
  *   that does not reconcile with the record count the service reports all produce a
  *   plainly stated problem and NO table at all — a partial or misaligned table would
  *   quietly tell the user something false about their file.
- * - **A FAILED READ IS A DIFFERENT ANSWER FROM AN UNREADABLE FILE**, and is reported in
- *   the SERVICE's own words (`downloadFailureMessage` / `validationErrorsFailureMessage`
- *   — the client's internal placeholders never reach a user), with one control offering
- *   to load the preview again. It is worded `Load the preview again` because this page
- *   is crowded with ask-again controls and no two of them may share a name.
+ * - **A FAILED READ IS A DIFFERENT ANSWER FROM AN UNREADABLE FILE.** A refused call is
+ *   reported in the SERVICE's own words (`downloadFailureMessage` /
+ *   `validationErrorsFailureMessage` — the client's internal placeholders never reach a
+ *   user); a rejected-rows body the app cannot make sense of is reported in the app's,
+ *   but it is a FAILED read all the same, because the file is fine and asking again may
+ *   answer properly. Every failed read carries one control offering to load the preview
+ *   again — the ONLY states that offer one, so no message may tell a user to ask again
+ *   from a state without it. It is worded `Load the preview again` because this page is
+ *   crowded with ask-again controls and no two of them may share a name.
  * - **KEEPING CURRENT IS THE CALLER'S DECISION**, exactly as `RejectedRows` and
  *   `FileProcessingHistory` arrange it: `SubmittedFileDetail` owns the page's single
  *   interval and hands `refreshSignal` down, and a new value means "ask again". This
@@ -188,9 +192,17 @@ const UNEXPECTED_COLUMNS_MESSAGE =
 const PREVIEW_UNAVAILABLE_MESSAGE =
   'The preview of this file could not be loaded. Please ask for it again.';
 
-/** The service answered with something that is not a list of rejected rows, so which
+/**
+ * The service answered with something that is not a list of rejected rows, so which
  * rows were rejected is unknown — and every row would otherwise be shown as one that
- * will import, which is a claim the app cannot make (BR2). */
+ * will import, which is a claim the app cannot make (BR2).
+ *
+ * Reported as a FAILED read, not as an unreadable FILE: the file itself is fine, and
+ * this is one call's answer, so the next one may well come back properly. That is what
+ * the message asks the user to do — and `failed` is the phase that carries the control
+ * to do it. Saying "ask again" in a state with no way to ask is the one shape this
+ * must never take.
+ */
 const UNREADABLE_OVERLAY_MESSAGE =
   'The rejected rows for this file could not be read, so this preview cannot say what will happen to each row. Ask for the preview again — if it keeps happening, the file’s error file has the same rows in it.';
 
@@ -300,6 +312,32 @@ function RecordedValue({ value }: { value: string }) {
   return <>{value}</>;
 }
 
+/**
+ * What is wrong with a rejected row, in the shared wording (`lib/files/defectWording`).
+ *
+ * ONE DEFECT READS AS A SENTENCE, SEVERAL READ AS A LIST. Almost every rejected row has
+ * exactly one defect and must look exactly as it always has; a row the service reported
+ * more than one for (its amount is not a number AND its currency is not supported) says
+ * all of them, because the person correcting the file has to fix all of them — showing
+ * only the first would send them round the correct-and-re-upload loop twice.
+ */
+function DefectReasons({ reasons }: { reasons: string[] }) {
+  if (reasons.length === 0) {
+    // The service gave no defect signal for this row. Say so; never invent one.
+    return <span className="text-muted-foreground">{NO_REASON_GIVEN}</span>;
+  }
+  if (reasons.length === 1) {
+    return <>{reasons[0]}</>;
+  }
+  return (
+    <ul className="grid list-disc gap-1 ps-4">
+      {reasons.map((reason) => (
+        <li key={reason}>{reason}</li>
+      ))}
+    </ul>
+  );
+}
+
 /** What will happen to this row, as words paired with an intent colour and an icon. */
 function VerdictBadge({ verdict }: { verdict: ImportPreviewVerdict }) {
   return (
@@ -399,7 +437,7 @@ function ImportPreviewSection({
 
         const rejections = rejectedRowsIn(overlay.value);
         if (rejections === undefined) {
-          report({ phase: 'cannot-read', message: UNREADABLE_OVERLAY_MESSAGE });
+          report({ phase: 'failed', message: UNREADABLE_OVERLAY_MESSAGE });
           return;
         }
 
@@ -651,13 +689,9 @@ function ImportPreviewSection({
                     <TableCell className="max-w-prose whitespace-normal">
                       {/* Nothing is said about a row that will import: there is
                           nothing wrong with it. */}
-                      {isRejected
-                        ? (row.reason ?? (
-                            <span className="text-muted-foreground">
-                              {NO_REASON_GIVEN}
-                            </span>
-                          ))
-                        : null}
+                      {isRejected ? (
+                        <DefectReasons reasons={row.reasons} />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 );

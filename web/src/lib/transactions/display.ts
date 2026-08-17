@@ -24,11 +24,21 @@
 const TRANSACTION_TYPE_CREDIT = 'C';
 const TRANSACTION_TYPE_DEBIT = 'D';
 
-/** Plain language for the codes above, in the user's terms rather than the file's. */
-const TRANSACTION_TYPE_LABELS: Record<string, string> = {
-  [TRANSACTION_TYPE_CREDIT]: 'Credit — money in',
-  [TRANSACTION_TYPE_DEBIT]: 'Debit — money out',
-};
+/**
+ * Plain language for the codes above, in the user's terms rather than the file's.
+ *
+ * A `Map`, not an object literal, because the value looked up here is UNTRUSTED text:
+ * as well as the service's own `TransactionType`, the import preview passes the raw
+ * cell out of a CSV a user uploaded. Looking an arbitrary name up on an object literal
+ * can answer with something inherited rather than nothing (`toString`, `constructor`),
+ * which `??` would not catch — a row whose transaction type is literally `toString`
+ * would then print a function instead of the value the user has to correct. A `Map`
+ * answers `undefined` for every key but the two.
+ */
+const TRANSACTION_TYPE_LABELS = new Map<string, string>([
+  [TRANSACTION_TYPE_CREDIT, 'Credit — money in'],
+  [TRANSACTION_TYPE_DEBIT, 'Debit — money out'],
+]);
 
 /**
  * A transaction type as the user reads it: plain language where the app has wording
@@ -36,7 +46,7 @@ const TRANSACTION_TYPE_LABELS: Record<string, string> = {
  * unrecognised value is a legitimate value, never an error.
  */
 export const transactionTypeLabel = (transactionType: string): string =>
-  TRANSACTION_TYPE_LABELS[transactionType] ?? transactionType;
+  TRANSACTION_TYPE_LABELS.get(transactionType) ?? transactionType;
 
 /**
  * The last four digits of an account number — the only part of it any list surface

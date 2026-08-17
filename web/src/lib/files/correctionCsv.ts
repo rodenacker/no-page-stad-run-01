@@ -45,7 +45,7 @@
  *   10,000-row ceiling a single pass would hold the main thread, which is the freeze
  *   NFR-1 forbids. That is why {@link buildCorrectionCsv} is async.
  */
-import { NO_REASON_GIVEN } from '@/lib/files/defectWording';
+import { defectWordingLine } from '@/lib/files/defectWording';
 import {
   TOLERATED_TRAILING_COLUMN,
   UPLOAD_FILE_COLUMNS,
@@ -89,10 +89,12 @@ export const CORRECTION_COLUMNS: CorrectionColumn[] = [
   })),
   {
     heading: CORRECTION_REASON_COLUMN,
-    // The same wording the screen gives this row, from the shared defect wording. A row
-    // the service gave no defect signal for says so, rather than leaving a cell that
-    // looks like the reason was lost.
-    valueOf: (row: ImportPreviewRow): string => row.reason ?? NO_REASON_GIVEN,
+    // The same wording the screen gives this row, from the shared defect wording —
+    // EVERY defect it has, since one cell is all this file has to say them in and the
+    // person fixing the row has to fix all of them. A row the service gave no defect
+    // signal for says so, rather than leaving a cell that looks like the reason was
+    // lost.
+    valueOf: (row: ImportPreviewRow): string => defectWordingLine(row.reasons),
   },
 ];
 

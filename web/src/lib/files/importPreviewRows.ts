@@ -26,9 +26,19 @@
  *   the values and reason the payload itself carries — never dropped, never duplicated,
  *   and never attributed to a line it might not belong to. Guessing would be worse than
  *   the honest fallback.
- * - **ONE LINE, AT MOST ONE REJECTION.** A position already claimed is not offered to a
- *   second rejection carrying the same reference; that second rejection falls through to
- *   the fallback above rather than overwriting the first or vanishing.
+ * - **UNMATCHED MEANS "MATCHES NO LINE AT ALL", NEVER "THE LINE IS TAKEN".** Each line
+ *   carrying a key is claimed once, in file order, so two DIFFERENT lines sharing a
+ *   reference get one rejection each. Beyond that, a further rejection carrying that key
+ *   is a SECOND DEFECT ON A LINE THAT IS ALREADY LISTED — a row whose amount is not a
+ *   number and whose currency is not supported — so it is attached to that line rather
+ *   than becoming a row of its own. Listing it separately would show the user's single
+ *   line twice, push `willImport + rejected` past the number of rows the file holds, and
+ *   write the row into the correction file twice. Whether the service reports one entry
+ *   per row or one per defect is UNVERIFIED (the wire shape is inferred, see above); this
+ *   rule is correct under both, which is why it can ship without the answer.
+ * - **A ROW SAYS EVERY DEFECT IT HAS.** {@link ImportPreviewRow.reasons} is a list, in
+ *   the service's own order, because someone correcting the file has to fix all of them;
+ *   showing only the first would send them round the correct-and-re-upload loop twice.
  * - **NOTHING IS TRANSLATED OR REFORMATTED HERE.** Every value stays exactly the text
  *   the file (or the service) held — an `Amount` that is not a number, a
  *   `TransactionDate` that is not a date. How a row READS (masking, the plain-language
@@ -38,7 +48,7 @@
  *   matched and an unmatched rejection alike — so the preview, the `Rejected rows`
  *   section and the correction CSV cannot end up explaining the same defect three ways.
  */
-import { defectWordingFor } from '@/lib/files/defectWording';
+import { defectWordingsFor } from '@/lib/files/defectWording';
 
 import type {
   SubmittedFileColumn,
@@ -74,11 +84,14 @@ export interface ImportPreviewRow {
   /** The row's values as text, exactly as its source held them. */
   values: SubmittedFileRow;
   source: ImportPreviewRowSource;
-  /** The service's own entry for a rejected row — absent on a will-import row. */
-  rejection?: ValidationErrorRow;
-  /** What the user reads about the defect, from the shared wording. `undefined` when
-   * the service gave no defect signal at all; no reason is invented for it. */
-  reason?: string;
+  /** Every entry the service reported for this row, in its own order. EMPTY on a
+   * will-import row; more than one when the service reported more than one defect for
+   * the same line. */
+  rejections: ValidationErrorRow[];
+  /** What the user reads about this row's defects, from the shared wording, one per
+   * distinct defect. EMPTY when the service gave no defect signal at all — no reason
+   * is invented for it. */
+  reasons: string[];
 }
 
 /** Every row of the preview, and what its two halves add up to. */
@@ -140,8 +153,9 @@ const matchKeyIn = (
   return typeof key === 'string' && key !== '' ? key : undefined;
 };
 
-/** Which lines carry each match key, in file order — a queue per key, so two lines
- * sharing a reference are claimed one at a time rather than both at once. */
+/** Which lines carry each match key, in file order, so two lines sharing a reference
+ * are claimed one at a time rather than both at once. Every entry holds at least one
+ * position: a key with no line is simply absent. */
 const linePositionsByKey = (
   lines: readonly SubmittedFileRow[],
 ): Map<string, number[]> => {
@@ -170,31 +184,49 @@ export const importPreviewRows = (
   lines: readonly SubmittedFileRow[],
   rejections: readonly ValidationErrorRow[],
 ): ImportPreviewRows => {
-  const unclaimed = linePositionsByKey(lines);
-  const rejectionByPosition = new Map<number, ValidationErrorRow>();
+  const positionsByKey = linePositionsByKey(lines);
+  /** How many rejections each key has already taken, so the key's lines are claimed
+   * one at a time, in file order. */
+  const claimsByKey = new Map<string, number>();
+  const rejectionsByPosition = new Map<number, ValidationErrorRow[]>();
   const unmatched: ValidationErrorRow[] = [];
 
   for (const rejection of rejections) {
     const key = matchKeyIn(rejection);
-    const positions = key === undefined ? undefined : unclaimed.get(key);
-    const position = positions?.shift();
-    if (position === undefined) {
-      // No line to attach it to — it is listed on its own rather than guessed onto
-      // somebody else's line or quietly dropped.
+    const positions = key === undefined ? undefined : positionsByKey.get(key);
+    if (key === undefined || positions === undefined) {
+      // The key matches NO line in the file — the only thing BR9 calls unmatched. It
+      // is listed on its own rather than guessed onto somebody else's line or quietly
+      // dropped.
       unmatched.push(rejection);
       continue;
     }
-    rejectionByPosition.set(position, rejection);
+
+    const claimed = claimsByKey.get(key) ?? 0;
+    claimsByKey.set(key, claimed + 1);
+    // Each line carrying the key takes one rejection, in file order; a rejection
+    // beyond that is a FURTHER DEFECT on the last line carrying it, not a second row
+    // for a line that is already listed.
+    const position = positions[Math.min(claimed, positions.length - 1)];
+
+    const attached = rejectionsByPosition.get(position);
+    if (attached === undefined) {
+      rejectionsByPosition.set(position, [rejection]);
+    } else {
+      attached.push(rejection);
+    }
   }
 
   const fileRows: ImportPreviewRow[] = lines.map((values, position) => {
-    const rejection = rejectionByPosition.get(position);
-    if (rejection === undefined) {
+    const attached = rejectionsByPosition.get(position);
+    if (attached === undefined) {
       return {
         key: `line-${String(position)}`,
         verdict: 'will-import',
         values,
         source: 'file-line',
+        rejections: [],
+        reasons: [],
       };
     }
     return {
@@ -202,8 +234,8 @@ export const importPreviewRows = (
       verdict: 'rejected',
       values,
       source: 'file-line',
-      rejection,
-      reason: defectWordingFor(rejection),
+      rejections: attached,
+      reasons: defectWordingsFor(attached),
     };
   });
 
@@ -213,16 +245,19 @@ export const importPreviewRows = (
       verdict: 'rejected',
       values: valuesOfRejection(rejection),
       source: 'validation-errors',
-      rejection,
-      reason: defectWordingFor(rejection),
+      rejections: [rejection],
+      reasons: defectWordingsFor([rejection]),
     }),
   );
 
   return {
     rows: [...fileRows, ...unmatchedRows],
     counts: {
-      willImport: lines.length - rejectionByPosition.size,
-      rejected: rejectionByPosition.size + unmatchedRows.length,
+      // A line the service reported twice is ONE rejected row, counted once — which
+      // is what keeps willImport + rejected equal to the file's own row count plus
+      // the rejections that belong to no line.
+      willImport: lines.length - rejectionsByPosition.size,
+      rejected: rejectionsByPosition.size + unmatchedRows.length,
     },
   };
 };

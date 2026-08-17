@@ -14,7 +14,7 @@
  * client-side CSV reader that turns a downloaded submitted file into one record
  * per data line, returning an explicit unreadable outcome instead of throwing.
  * Its own behaviour is covered by the story's Vitest suite
- * (web/src/__tests__/integration/epic-import-preview-story-1-read-a-submitted-files-rows.test.tsx).
+ * (web/src/__tests__/integration/epic-import-preview-story-1-read-a-submitted-files-rows.test.ts).
  */
 import { test } from '@playwright/test';
 

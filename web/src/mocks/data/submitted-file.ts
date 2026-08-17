@@ -392,7 +392,15 @@ const lineFromRejection = (
   Currency: rejection.Currency ?? '',
 });
 
-/** One rejection to place on a line of the file. */
+/**
+ * One rejection to place on a line of the file.
+ *
+ * TWO ENTRIES MAY NAME THE SAME LINE — a row whose amount is not a number AND whose
+ * currency is not supported. The file's line then holds BOTH defective values, and both
+ * entries report that same line (see {@link submittedFilePreview}); it is still ONE
+ * rejected row. Whether the live service reports one entry per row or one per defect is
+ * an open wire-shape question, which is exactly why the fixture can describe both.
+ */
 export interface RejectedLine {
   /** 1-based position of the line in the file's DATA rows (the header is not a line). */
   line: number;
@@ -468,6 +476,11 @@ export interface SubmittedFilePreviewOptions {
  * A rejected line's CSV text is written FROM its validation-errors row, so the file
  * really does hold the value the service objected to — which is what makes story 4's
  * "written exactly as the file held it" assertion meaningful rather than circular.
+ *
+ * A LINE REPORTED MORE THAN ONCE is defective in more than one place: its CSV text
+ * carries every defective value reported for it, and every entry describing it reports
+ * that same line, differing only in its own defect signal. It is still one line of the
+ * file and one rejected row.
  */
 export const submittedFilePreview = ({
   lineCount = 5,
@@ -479,13 +492,44 @@ export const submittedFilePreview = ({
   body,
 }: SubmittedFilePreviewOptions = {}): SubmittedFilePreview => {
   const rows = [...(givenRows ?? submittedFileRows(lineCount))];
-  const rejectedLineNumbers = reject.map(({ line }) => line);
+  /** The lines before any rejection rewrote one — what each entry's own values are
+   * compared against, so "what this entry made defective" is a real question. */
+  const asGenerated = [...rows];
+  /** ONE ENTRY PER REJECTED LINE, however many entries the service reported for it. */
+  const rejectedLineNumbers = [...new Set(reject.map(({ line }) => line))];
 
-  const matched = reject.map(({ line, column, values }) => {
-    const rejection = rejectionForLine(line, column, values);
-    rows[line - 1] = lineFromRejection(rejection);
-    return rejection;
+  const reported = reject.map(({ line, column, values }) => ({
+    line,
+    row: rejectionForLine(line, column, values),
+  }));
+
+  rejectedLineNumbers.forEach((line) => {
+    const asGeneratedLine = asGenerated[line - 1];
+    const written = { ...asGeneratedLine };
+    for (const entry of reported) {
+      if (entry.line !== line) {
+        continue;
+      }
+      const entryValues = lineFromRejection(entry.row);
+      for (const column of SUBMITTED_FILE_COLUMNS) {
+        // Whatever THIS entry changed from the generated line — the value its defect
+        // is about, and anything the caller deliberately overrode — belongs on the
+        // file's line, alongside whatever another entry changed.
+        if (entryValues[column] !== asGeneratedLine[column]) {
+          written[column] = entryValues[column];
+        }
+      }
+    }
+    rows[line - 1] = written;
   });
+
+  // Every entry describing a line reports that whole line; only its defect signal
+  // differs. (One entry per row or one per defect is the open wire-shape question —
+  // both shapes describe the same row.)
+  const matched = reported.map(({ line, row }) => ({
+    ...row,
+    ...rows[line - 1],
+  }));
 
   const rejections = [...matched, ...unmatchable];
   const csv = submittedFileCsv(rows, body);
@@ -574,6 +618,47 @@ export const previewWithUnmatchableRejection = (): SubmittedFilePreview =>
         PrimaryKeyValue: 99,
         Reference: UNMATCHABLE_REFERENCE,
         TransactionDate: '2026/04/15 19:02',
+        AccountNumber: '4400-9917-2288',
+        Description: 'Conference travel - Durban',
+      }),
+    ],
+  });
+
+/**
+ * ONE LINE, TWO DEFECTS — the file line the service reported TWICE: line 2 is rejected
+ * both for an `Amount` that is not a number and for an unsupported `Currency`, so its
+ * CSV text holds both bad values and the payload holds two entries carrying the same
+ * `Reference`.
+ *
+ * Whether a live `GET /v1/files/validation-errors` reports one entry per row or one per
+ * DEFECT is unverified (see this module's header). This fixture is the second shape, and
+ * it exists because the behaviour that must hold under BOTH is easy to get wrong: the
+ * line is ONE rejected row, listed once, saying both things that are wrong with it —
+ * never a second "unmatched" row, which would show the user's single line twice, break
+ * the reconciliation the preview promises (`willImport + rejected`), and write the row
+ * into the correction file twice.
+ *
+ * The file also carries an ordinary single-defect rejection (line 4) and a genuinely
+ * orphaned entry — one whose reference appears in NO line (BR9) — so one fixture tells
+ * the three apart: a second entry for a line that EXISTS is another defect, and only an
+ * entry matching no line at all is a row of its own.
+ */
+export const MULTI_DEFECT_LINE = 2;
+
+export const previewWithMultiDefectRow = (): SubmittedFilePreview =>
+  submittedFilePreview({
+    lineCount: 5,
+    file: { Id: 5009 },
+    reject: [
+      { line: MULTI_DEFECT_LINE, column: 'Amount' },
+      { line: MULTI_DEFECT_LINE, column: 'Currency' },
+      { line: 4, column: 'TransactionType' },
+    ],
+    unmatchable: [
+      invalidRowWithDefectOn('TransactionDate', {
+        Id: 99,
+        PrimaryKeyValue: 99,
+        Reference: UNMATCHABLE_REFERENCE,
         AccountNumber: '4400-9917-2288',
         Description: 'Conference travel - Durban',
       }),

@@ -149,9 +149,11 @@ import { fileLogListResponse } from '@/mocks/data/file-log';
 import { fileProcessLogListResponse } from '@/mocks/data/file-process-log';
 import {
   CORRECTION_REASON_COLUMN,
+  MULTI_DEFECT_LINE,
   SUBMITTED_FILE_COLUMNS,
   UNMATCHABLE_REFERENCE,
   previewWithHostileRejectedRow,
+  previewWithMultiDefectRow,
   previewWithNoRejectedRows,
   previewWithRejectedRows,
   previewWithUnmatchableRejection,
@@ -253,6 +255,10 @@ const ORIGINAL_FILE_CONTROL_NAME = /^download original file$/i;
  * see contract note 5.
  */
 const APP_OWNED_CURRENCY_REASON = 'Currency must be a supported currency code.';
+
+/** The APP's own fixed sentence for an `Amount` defect (source `R39`), stated as the
+ * requirement's literal for the same reason as the one above. */
+const APP_OWNED_AMOUNT_REASON = 'Amount must be a number, for example 1245.67.';
 
 /** How the test identifies one line of a file — the upload's first column. */
 const REFERENCE_COLUMN: SubmittedFileColumn = 'Reference';
@@ -738,6 +744,57 @@ describe('Epic import-preview, Story 4: Download the rejected rows to fix and re
     expect(
       uploadColumnsOf(recordFor(savedUnmatchable, UNMATCHABLE_REFERENCE)),
     ).toEqual(reportedValuesOf(reported));
+  });
+
+  // AC-3 and AC-4 for the row the service reported TWICE — one line of the file whose
+  // amount is not a number AND whose currency is not supported.
+  //
+  // The correction file is where duplicating that row costs the most: a line written
+  // twice is a line the person corrects twice and re-uploads twice, and the second copy
+  // would be built from the payload's reported values rather than the file's own bytes.
+  // It is written ONCE, from the file's own line, and its single reason cell has to
+  // carry BOTH defects — naming only the first sends the person back round the
+  // download → correct → re-upload loop for a problem the app already knew about.
+  it('writes a line the service reported two defects for exactly once, with both reasons in its one reason cell', async () => {
+    const user = userEvent.setup();
+    const preview = previewWithMultiDefectRow();
+    stubTransactionsService(preview);
+
+    // Fixture precondition: the two entries really do describe ONE line of the file.
+    const twiceReported = referenceRejectedOn(preview, 'Amount');
+    expect(referenceRejectedOn(preview, 'Currency')).toBe(twiceReported);
+    expect(preview.rows[MULTI_DEFECT_LINE - 1].Reference).toBe(twiceReported);
+
+    renderFileSurface(preview);
+    await takeTheCorrectionDownload(user);
+
+    const saved = await savedCorrectionFile();
+
+    // One record per rejected LINE, plus the one rejection that belongs to no line at
+    // all — and `recordFor` insists on exactly one record for the twice-reported line.
+    expect(saved.rows).toHaveLength(
+      preview.rejectedRows.length + preview.unmatchableRejections.length,
+    );
+    // Written from the original file's own bytes, so both defective values come back
+    // for the person to correct.
+    expect(uploadColumnsOf(recordFor(saved, twiceReported))).toEqual(
+      originalFileLines(preview.csv).get(twiceReported),
+    );
+
+    // BOTH defects, in the app's own sentences, in the one cell the file has for them.
+    const written = reasonWrittenFor(saved, twiceReported);
+    expect(written).toContain(APP_OWNED_AMOUNT_REASON);
+    expect(written).toContain(APP_OWNED_CURRENCY_REASON);
+    // The app owns both of those rules, so neither of the service's machine-phrased
+    // sentences reaches the file (contract note 5).
+    expect(written).not.toContain(SERVICE_DEFECT_REASONS.Amount);
+    expect(written).not.toContain(SERVICE_DEFECT_REASONS.Currency);
+
+    // The genuinely orphaned rejection is unaffected: still its own record, once, from
+    // the only values it has.
+    expect(uploadColumnsOf(recordFor(saved, UNMATCHABLE_REFERENCE))).toEqual(
+      reportedValuesOf(preview.unmatchableRejections[0]),
+    );
   });
 
   // AC-5

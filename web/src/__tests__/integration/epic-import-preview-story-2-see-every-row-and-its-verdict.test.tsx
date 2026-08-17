@@ -92,6 +92,15 @@
  *     carries — never dropped, never duplicated, never merged onto a parsed line. Its
  *     account number is masked with the same per-row reveal (it is a rejected row like
  *     any other).
+ * 11a. UNMATCHABLE MEANS "MATCHES NO LINE AT ALL" — never "that line is already
+ *     spoken for". A SECOND validation-errors entry for a line that IS in the file (a
+ *     row whose amount is not a number AND whose currency is not supported) is another
+ *     defect on a row that is already listed: the line appears ONCE, saying BOTH
+ *     things that are wrong with it, and the counts still reconcile. Listing it a
+ *     second time as an "unmatched" row would show the user's single line twice and
+ *     push `will import + rejected` past the number of rows the file holds. Whether
+ *     the live service reports one entry per row or one per defect is unverified, and
+ *     this rule is what holds under either.
  * 12. `APP_OWNED_DEFECT_WORDING` and `defectWordingFor` are currently module-private in
  *     `web/src/components/files/RejectedRows.tsx`. **Extract them to
  *     `web/src/lib/files/defectWording.ts`** and have BOTH components import them —
@@ -174,7 +183,9 @@ import {
   TRANSACTION_TYPE_DEBIT_CODE,
 } from '@/mocks/data/transaction';
 import {
+  MULTI_DEFECT_LINE,
   UNMATCHABLE_REFERENCE,
+  previewWithMultiDefectRow,
   previewWithNoRejectedRows,
   previewWithRejectedRows,
   previewWithUnmatchableRejection,
@@ -692,6 +703,99 @@ describe('Epic import-preview, Story 2: see every row of the file, and what will
     expect(within(table).getAllByText(REJECTED_LABEL)).toHaveLength(
       preview.counts.rejected,
     );
+  });
+
+  // AC-5 (BR9), the other side of it — the distinction the fallback turns on.
+  // A second entry for a line that IS in the file is another DEFECT on a row already
+  // listed, not a row of its own; only an entry matching no line at all is the
+  // unmatched case. Getting this wrong shows the user's single line twice, puts the
+  // counts past the number of rows their file holds, and (story 4) writes the row into
+  // the correction file twice.
+  it('lists a line the service reported two defects for exactly once, saying both of them, while a genuinely orphaned rejection still gets a row of its own', async () => {
+    const preview = serve(previewWithMultiDefectRow());
+    const multiDefectLine = lineOf(preview, MULTI_DEFECT_LINE);
+    const badAmount = rejectionOn(preview, 'Amount');
+    const badCurrency = rejectionOn(preview, 'Currency');
+    const [orphan] = preview.unmatchableRejections;
+
+    // Fixture preconditions. TWO entries, ONE line: both carry the same reference as
+    // the file's line, and that line really does hold both defective values...
+    expect(badAmount.Reference).toBe(multiDefectLine.Reference);
+    expect(badCurrency.Reference).toBe(multiDefectLine.Reference);
+    expect(multiDefectLine.Amount).toBe(String(badAmount.Amount));
+    expect(multiDefectLine.Currency).toBe(String(badCurrency.Currency));
+    // ...the app owns the wording for both of those rules, and the service's own text
+    // for them is different, so "the app's sentence, not the service's" is testable...
+    expect(badAmount.ErrorMessage).not.toBe(APP_OWNED_WORDING.Amount);
+    expect(badCurrency.ErrorMessage).not.toBe(APP_OWNED_WORDING.Currency);
+    // ...and one entry in the same payload matches NO line of the file at all.
+    expect(preview.unmatchableRejections).toHaveLength(1);
+    expect(orphan.Reference).toBe(UNMATCHABLE_REFERENCE);
+    expect(
+      preview.rows.filter((row) => row.Reference === UNMATCHABLE_REFERENCE),
+    ).toHaveLength(0);
+
+    renderImportPreview(preview.file);
+
+    const table = await screen.findByRole('table');
+
+    // ONE row per line of the file, plus ONE for the orphaned entry, plus the header —
+    // the twice-reported line has NOT produced a phantom second row.
+    await waitFor(() => {
+      expect(within(table).getAllByRole('row')).toHaveLength(
+        preview.rows.length + preview.unmatchableRejections.length + 1,
+      );
+    });
+    preview.rows.forEach((row) => {
+      expect(rowsCarrying(row.Reference)).toBe(1);
+    });
+
+    // BOTH defects reach the screen on that one row, in the app's own words — the
+    // person correcting the file has to fix both, and the service's machine-phrased
+    // text for either rule still never reaches them.
+    const multiDefectRow = rowFor(multiDefectLine.Reference);
+    expect(
+      within(multiDefectRow).getByText(REJECTED_LABEL),
+    ).toBeInTheDocument();
+    expect(
+      within(multiDefectRow).getByText(APP_OWNED_WORDING.Amount),
+    ).toBeInTheDocument();
+    expect(
+      within(multiDefectRow).getByText(APP_OWNED_WORDING.Currency),
+    ).toBeInTheDocument();
+    expect(multiDefectRow).not.toHaveTextContent(
+      String(badAmount.ErrorMessage),
+    );
+    expect(multiDefectRow).not.toHaveTextContent(
+      String(badCurrency.ErrorMessage),
+    );
+
+    // ...and it still shows the file's own values, both bad ones included, so the
+    // reader can see exactly what to correct.
+    expect(multiDefectRow).toHaveTextContent(multiDefectLine.Amount);
+    expect(multiDefectRow).toHaveTextContent(multiDefectLine.Currency);
+
+    // The genuinely orphaned entry is unaffected: still its own rejected row, once.
+    expect(rowsCarrying(UNMATCHABLE_REFERENCE)).toBe(1);
+    expect(
+      within(rowFor(UNMATCHABLE_REFERENCE)).getByText(REJECTED_LABEL),
+    ).toBeInTheDocument();
+
+    // THE COUNTS RECONCILE: every line of the file is counted exactly once, whichever
+    // half it fell in, plus the one rejection that belongs to no line.
+    const { willImport, rejected } = preview.counts;
+    expect(willImport + rejected).toBe(
+      preview.rows.length + preview.unmatchableRejections.length,
+    );
+    expect(String(preview.rows.length)).toBe(preview.file.RecordCount);
+    expect(within(table).getAllByText(WILL_IMPORT_LABEL)).toHaveLength(
+      willImport,
+    );
+    expect(within(table).getAllByText(REJECTED_LABEL)).toHaveLength(rejected);
+    await waitFor(() => {
+      expect(statedOnce(willImportStatement(willImport))).toBeInTheDocument();
+    });
+    expect(statedOnce(rejectedStatement(rejected))).toBeInTheDocument();
   });
 
   // AC-6 (FR5, BR2)
