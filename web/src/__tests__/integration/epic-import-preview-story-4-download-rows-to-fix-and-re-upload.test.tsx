@@ -127,7 +127,7 @@
  * These tests WILL FAIL until the story is implemented (TDD red): there is no
  * correction download on the submitted-file surface yet.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -536,13 +536,57 @@ const renderFileSurface = (preview: SubmittedFilePreview) =>
     </ToastProvider>,
   );
 
+/**
+ * The preview section, once the file's own surface has rendered it — the same handle
+ * stories 2 and 3 address it by (`aria-labelledby` naming it a preview).
+ */
+const previewSection = (): Promise<HTMLElement> =>
+  screen.findByRole('region', { name: /preview/i });
+
+/**
+ * The preview once it has FINISHED READING THE FILE — the signal every wait in this file
+ * hangs off, rather than each one racing the whole chain on its own.
+ *
+ * Reaching this story's control means waiting out a chain of asynchronous work nothing on
+ * screen hints at: the file's own record is resolved from the active list, the submitted
+ * file is downloaded, its bytes are read with a `FileReader` (a real macrotask, even in
+ * jsdom), the CSV is read, and only the commit after all of that renders the preview and
+ * this control inside it. Waiting on the control alone made every test here a bet on that
+ * whole chain landing inside one query's window: measured, it takes ~65 ms when this file
+ * runs on its own and 338–1201 ms in the full 43-file run, and the bet was lost about one
+ * run in four against Testing Library's 1 s default. The budget is raised once, for every
+ * test, in `vitest.setup.ts`; what belongs HERE is waiting on the right thing.
+ *
+ * The preview announces its own wait (`role="status"`), so its DISAPPEARANCE is the
+ * observable "the preview has settled" signal — and it is the honest one: it goes when
+ * the rows arrive AND when the file could not be read, so a preview that failed produces
+ * "there is no correction control in this section, here is the alert that is there
+ * instead" rather than a bare "could not find a button", which says nothing about which
+ * of the two happened.
+ */
+const previewFinishedReading = async (): Promise<HTMLElement> => {
+  const preview = await previewSection();
+  await waitFor(() => {
+    expect(within(preview).queryByRole('status')).not.toBeInTheDocument();
+  });
+  return preview;
+};
+
+/**
+ * This story's control, inside the preview it belongs to (contract note 1) — asked for
+ * only once the preview has settled, so its absence is a decision about the file rather
+ * than a read still in flight.
+ */
+const correctionDownload = async (): Promise<HTMLElement> =>
+  within(await previewFinishedReading()).getByRole('button', {
+    name: CORRECTION_CONTROL_NAME,
+  });
+
 /** Takes this story's download, waiting for the preview to offer it first. */
 const takeTheCorrectionDownload = async (
   user: ReturnType<typeof userEvent.setup>,
 ): Promise<void> => {
-  await user.click(
-    await screen.findByRole('button', { name: CORRECTION_CONTROL_NAME }),
-  );
+  await user.click(await correctionDownload());
 };
 
 /** The one file the correction download handed the browser, read back. */
@@ -850,9 +894,7 @@ describe('Epic import-preview, Story 4: Download the rejected rows to fix and re
 
     const rejectedRowsPage = renderFileSurface(withRejections);
 
-    const correction = await screen.findByRole('button', {
-      name: CORRECTION_CONTROL_NAME,
-    });
+    const correction = await correctionDownload();
     const errorFile = screen.getByRole('button', {
       name: ERROR_FILE_CONTROL_NAME,
     });
