@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "file-deletion",
+    "name": "Delete a submitted file",
+    "createdAt": "2026-08-17T09:24:07.761Z",
+    "dependsOn": [
+      "expense-file-upload",
+      "file-validation-and-retry",
+      "expense-decisions"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [],
+    "manualTestResults": []
+  },
+  "phase": "PLAN",
+  "stories": {},
+  "halt": null,
+  "lastUpdated": "2026-08-17T09:24:07.761Z"
+}
