@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "import-preview",
+    "name": "Preview the rows of an import",
+    "createdAt": "2026-08-17T05:52:14.336Z",
+    "dependsOn": [
+      "expense-file-upload",
+      "file-validation-and-retry"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [],
+    "manualTestResults": []
+  },
+  "phase": "PLAN",
+  "stories": {},
+  "halt": null,
+  "lastUpdated": "2026-08-17T05:52:14.336Z"
+}
