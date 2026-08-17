@@ -150,12 +150,38 @@ Extracted from `documentation/design-system-light.html` and `documentation/desig
 | Text (dark) | `#E9ECED` |
 | Text muted (light) | `#515151` |
 | Text muted (dark) | `#A5B1B6` |
-| Font family (headings) | `Cabin` (Google Fonts) |
-| Font family (body) | `Cabin` (Google Fonts) |
+| Font family (headings) | `Public Sans` (Google Fonts) |
+| Font family (body) | `Public Sans` (Google Fonts) |
+| Font family (figures & field notation) | `Azeret Mono` (Google Fonts) |
 | Theme | both |
 | Source | `documentation/design-system-light.html` + `documentation/design-system-dark.html` |
 
-> The design system's own metadata records the brand heading/body font as proprietary self-hosted "Barclays Effra" (`@font-face`, not loadable), substituted with `Cabin` as the nearest loadable humanist-sans equivalent. Treat `Cabin` as the production font; do not attempt to source "Barclays Effra".
+> The design system's own metadata records the brand heading/body font as proprietary self-hosted "Barclays Effra" (`@font-face`, not loadable).
+>
+> **User-confirmed 2026-08-17: the typeface is NOT a brand commitment.** `Cabin` was only a stand-in for the unloadable proprietary face, never a design decision, so it is retired. The production faces are:
+>
+> - **`Public Sans`** — all text. An institutional-forms face (US Web Design System, derived from Libre Franklin) with real tabular figures. Chosen as an object from this audience's own document world.
+> - **`Azeret Mono`** — figures, references, masked account numbers, control totals and field labels. Carries the fixed-field notation the design is built on.
+>
+> Two faces, no more. Both are loaded and self-hosted via `next/font` in the root layout. Do not attempt to source "Barclays Effra".
+
+### Colour strategy — user-confirmed 2026-08-17
+
+The palette above is **unchanged and remains binding**. What is recorded here is how it is spent.
+
+**Restrained** (neutrals plus accent) — the correct strategy for an Operate-mode app — but spent at **page scale**, not scattered as accents:
+
+- `--brand-accent` (`#006DE3` / `#5CA1EB`) owns whole regions as a saturated field, starting with the request list's control block. This finally spends a token that was declared in both themes and used nowhere.
+- `--primary` (`#00AEEF` / `#49BEE9`) carries interactive state and status marks.
+- Everything else is ground, ink, hairline, and the four semantic status tokens.
+
+**Light is the primary theme** — this is a paper-derived control artifact read in a finance office under daylight. **Dark ships as an equal citizen** (a standing brand commitment), rendered as the same artifact under a different press, never as a neon terminal.
+
+Contrast discipline is inherited, not renegotiated: the brand blues are light colours, so `--primary` keeps a dark foreground (5.9:1) rather than white (2.5:1).
+
+### Design authority
+
+`documentation/design-brief-batch-listing.md` — the confirmed visual direction ("The Batch Listing", clearing-house payment batch listing; selected via the `impeccable` skill, seed key `29469d17`). It sits alongside the two design-system HTML files as binding styling input for this and later redesign epics. A `DESIGN.md` recording the built system is written at the end of the redesign work, from the built world — not before.
 
 ### Semantic status colors (light / dark)
 
