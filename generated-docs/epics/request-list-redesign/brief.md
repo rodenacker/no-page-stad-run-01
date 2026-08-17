@@ -157,3 +157,16 @@ The redesign itself, from the design brief's §3 sequence and its named raises:
 - **The UI-16 density tension is explicitly resolved by design, not exception** (design brief §7, point 1) — do not read the 428-row/22-page volume test (R10) as an invitation to relax the page-size cap; the control block is what lets a batch-level truth coexist with a 20-row page.
 - **`StatusBadge` is in scope; nothing else in `components/status/`** beyond it is implicated by this brief unless a later requirement above names it.
 
+### Resolved spec gap — what `BATCH` and `RUN DATE` show (user-decided at the stories approval, 2026-08-17)
+
+R11 requires the control block to carry `BATCH` and `RUN DATE`, but neither is derivable: `GET /v1/transactions` returns requests drawn from **many** originating files (hence the `FileName` column and the originating-file filter), and `TransactionRead` carries `FileName` / `FileLogId` / `TransactionDate` / `LastChangedDate` but nothing naming a single batch or a single run. A developer must not invent one.
+
+**Decided:** the screen is a **whole-queue listing**, and the control block says so.
+
+- With no originating-file narrowing active, `BATCH` reads `ALL FILES` and `RUN DATE` shows the newest `TransactionDate` present in the fetched set.
+- When the originating-file filter narrows to one file, `BATCH` sharpens to that file's name and `RUN DATE` to that file's newest `TransactionDate`.
+
+Chosen because it is the only reading that is true at every moment — the band never implies a batch identity the data cannot support. Both values remain derived, client-side, presentation-only (consistent with §Data Model); neither adds a field, a fetch, or a contract.
+
+Naming one batch per row belongs to the **files-list** redesign epic, where one row genuinely is one batch. Do not pre-empt it here.
+
