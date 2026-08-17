@@ -9,11 +9,44 @@
       "file-validation-and-retry"
     ],
     "introducesSharedSurface": false,
-    "unverifiedAssumptions": [],
+    "unverifiedAssumptions": [
+      "Verify that rejected rows line up with your file: the app assumes each rejected row the service reports can be tied back to the exact line it came from in the file you uploaded. If the service's answer carries nothing that identifies the line, rejected rows will be listed on their own instead of in place among their neighbours — check that no rejected row is missing, none appears twice, and none is attached to the wrong line.",
+      "Verify the preview is showing your own file: the app assumes that asking the service for the original file gives back exactly the CSV you uploaded. If it hands back something else — a reprocessed version, or a packaged/zipped file — the preview will report that it could not read the file instead of listing your rows.",
+      "Verify a downloaded correction file can actually be sent back in: you chose to include a \"why this row was rejected\" column, which makes the file eight columns wide instead of the seven the upload normally takes. Nobody has been able to test whether the upload accepts that extra column. Download the rejected rows, correct one value, and upload the file through the normal upload flow. If the upload refuses it, say so — the fix is to drop that last column."
+    ],
     "manualTestResults": []
   },
-  "phase": "PLAN",
-  "stories": {},
+  "phase": "BUILD",
+  "stories": {
+    "1": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "4": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
   "halt": null,
   "lastUpdated": "2026-08-17T05:52:14.336Z"
 }
