@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "request-list-redesign",
+    "name": "Redesign the request list as a batch listing",
+    "createdAt": "2026-08-17T15:28:18.884Z",
+    "dependsOn": [
+      "sign-in-and-app-shell",
+      "bulk-approval-and-live-refresh",
+      "csv-export"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [],
+    "manualTestResults": []
+  },
+  "phase": "PLAN",
+  "stories": {},
+  "halt": null,
+  "lastUpdated": "2026-08-17T15:28:18.884Z"
+}
