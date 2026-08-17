@@ -29,12 +29,16 @@
  *   section. Which is also why a confirmed delete sends the user back to the Expense
  *   files list rather than leaving them on a page whose file no longer exists.
  * - **The delete is gated by the project's shared confirmation (source UI-09).**
- *   `ConfirmAction` is the one implementation of that convention — it NAMES the file
- *   here, says the file and its rows go and that it cannot be undone, opens with the way
- *   OUT holding focus (a stray Enter keeps the file), and sends nothing until the
- *   confirming choice is taken. The way out reads "keep", and must never be reworded to
- *   "Cancel": the destructive choice is called Delete the file, so a way out reading
- *   "Cancel" would be the one ambiguous wording left on the surface.
+ *   `DeleteFileConfirmation` — the epic's ONE confirmation, shared with the Expense
+ *   files list — wraps `ConfirmAction`: it NAMES the file, states what deleting
+ *   actually destroys (the real request numbers for a file that has imported, the
+ *   short warning otherwise, and its own state when the count could not be read),
+ *   opens with the way OUT holding focus (a stray Enter keeps the file), and sends
+ *   nothing until the confirming choice is taken. None of that wording belongs here:
+ *   two surfaces must say the same thing, so it lives in
+ *   `lib/files/deleteConfirmation.ts`. The way out reads "keep", and must never be
+ *   reworded to "Cancel": the destructive choice is called Delete the file, so a way
+ *   out reading "Cancel" would be the one ambiguous wording left on the surface.
  * - **A refusal is reported HERE, in the service's own words**, with the confirmation
  *   closed and the delete still on offer — a user is never trapped in a dialog to read
  *   why something did not happen, and the file is left exactly as it was. Whether the
@@ -47,7 +51,10 @@ import { RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { ConfirmAction } from '@/components/common/ConfirmAction';
+import {
+  DeleteFileConfirmation,
+  useDeleteFileConfirmation,
+} from '@/components/files/DeleteFileConfirmation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,6 +64,7 @@ import {
   retryFileValidation,
 } from '@/lib/api/files';
 import { UPLOAD_PATH } from '@/lib/auth/access-map';
+import { DELETE_FILE_LABEL } from '@/lib/files/deleteConfirmation';
 import { FILE_STATUS_VALIDATION_FAILED } from '@/types/files';
 
 import type { FileLog } from '@/types/files';
@@ -66,30 +74,15 @@ const HEADING_ID = 'submitted-file-actions-heading';
 const HEADING = 'Actions';
 
 /**
- * The four controls' own wording, reserved across this surface.
+ * This surface's own control wording. The delete's three labels are NOT here: they
+ * are shared with the Expense files list, so they live in
+ * `lib/files/deleteConfirmation.ts` with everything else the two surfaces must say
+ * identically.
  *
  * `RETRY_LABEL` is deliberately NOT the bare "Try again": that belongs to the
- * processing history's own failed read on this same screen. And the three delete
- * labels are deliberately all different, so no query — and no user — can mistake the
- * control that ASKS for the one that DOES it or the one that backs out. None of them
- * may read "Cancel" (`file-deletion` R4): the way out is the only unambiguous wording
- * left once the destructive choice is itself called Delete.
+ * processing history's own failed read on this same screen.
  */
 const RETRY_LABEL = 'Retry validation';
-const DELETE_LABEL = 'Delete file';
-const CONFIRM_DELETE_LABEL = 'Delete the file';
-const KEEP_FILE_LABEL = 'Keep the file';
-
-/** The confirmation names the file it is about — nothing vague like "this file". */
-const confirmationTitleFor = (file: FileLog): string =>
-  `Delete ${file.CurrentFileName}?`;
-
-/**
- * What deleting actually does, and that there is no way back from it (source UI-09).
- * The rows are named because they, not just the file, are what the user loses.
- */
-const CONFIRMATION_MESSAGE =
-  'The file and all of its rows are removed, and none of them will become expense payment requests. This cannot be undone — you would have to submit the file again.';
 
 /** Announced while a call is on its way, since nothing on the page has changed yet. */
 const RETRY_IN_FLIGHT = 'Asking for this file to be validated again…';
@@ -134,8 +127,12 @@ function OfferedActions({
   onRetried: () => void;
 }) {
   const [state, setState] = useState<ActionState>(IDLE);
-  /** Whether the user is being asked to confirm the delete. Nothing is sent while it is. */
-  const [deleteAsked, setDeleteAsked] = useState(false);
+  /**
+   * Whether the user is being asked to confirm the delete, and what the confirmation
+   * knows about the file's expense payment requests. Nothing is sent while it is open;
+   * asking is what starts the count, so the dialog opens already saying so.
+   */
+  const deleteConfirmation = useDeleteFileConfirmation();
   const router = useRouter();
 
   /** Whether a call is already on its way — a second press must not send a second. */
@@ -167,13 +164,13 @@ function OfferedActions({
       });
   };
 
-  const confirmDelete = (): void => {
+  const confirmDelete = (confirmed: FileLog): void => {
     if (working) {
       return;
     }
     setState({ phase: 'working', message: DELETE_IN_FLIGHT });
 
-    void deleteSubmittedFile(file.Id, actingUploader)
+    void deleteSubmittedFile(confirmed.Id, actingUploader)
       .then(() => {
         // The file is inactive now, so this page would only be able to say it is no
         // longer available. The list is where there is something to do instead — and
@@ -223,22 +220,19 @@ function OfferedActions({
           type="button"
           variant="outline"
           onClick={() => {
-            setDeleteAsked(true);
+            // Asking is the event that both opens the confirmation and starts reading
+            // what this file would destroy — never a render reacting to the dialog.
+            deleteConfirmation.ask(file);
           }}
         >
           <Trash2 aria-hidden="true" />
-          {DELETE_LABEL}
+          {DELETE_FILE_LABEL}
         </Button>
-        {/* The project's one confirmation: it names the file, holds focus on the
-            way out, and sends nothing until the confirming choice is taken. */}
-        <ConfirmAction
-          open={deleteAsked}
-          onOpenChange={setDeleteAsked}
-          title={confirmationTitleFor(file)}
-          description={CONFIRMATION_MESSAGE}
-          confirmLabel={CONFIRM_DELETE_LABEL}
-          wayOutLabel={KEEP_FILE_LABEL}
-          destructive
+        {/* The epic's one confirmation, shared with the Expense files list: it names
+            the file, says what deleting actually destroys, holds focus on the way out,
+            and sends nothing until the confirming choice is taken. */}
+        <DeleteFileConfirmation
+          confirmation={deleteConfirmation}
           onConfirm={confirmDelete}
         />
       </div>
