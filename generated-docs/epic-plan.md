@@ -16,6 +16,7 @@ Every epic in this project, what it delivers, and what it builds on. Live status
 | 5 | Approve or reject a request (`expense-decisions`) | Let an Approver record one final decision on an imported expense payment request — approve it, or reject it with a note — after a confirmation, with no way to decide the same request twice and a visible record of who decided what. | The shared expense request list (`expense-request-list`) |
 | 6 | Bulk approval and a self-updating list (`bulk-approval-and-live-refresh`) | Let an Approver select many imported requests and approve them in one action with a clear report of any it skipped, and keep every approver's list current on its own so nobody acts on a request a colleague has already decided. | Approve or reject a request (`expense-decisions`) |
 | 7 | Export requests for the payment system (`csv-export`) | Let either role export the requests currently listed as a CSV file for the external payment system, attributed to the person who produced it. | The shared expense request list (`expense-request-list`) |
+| 8 | Preview the rows of an import (`import-preview`) | Show the Importer every row of a submitted file with a clear imported/rejected verdict once validation has run, and let them download the rejected rows as a re-uploadable CSV to send back for correction. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`) |
 
 ## Coverage
 
@@ -121,6 +122,16 @@ Everything in the spec is assigned to an epic:
 
 _95 requirements, all assigned._
 
+### Added after the original plan
+
+Requested by the user on 2026-08-17, after epics 1–7 had shipped. Not in the original source spec:
+
+| What you asked for | Epic |
+|---|---|
+| See every row of a submitted file, marked as passing validation or rejected (N1) | Preview the rows of an import (`import-preview`) |
+| Download the rejected rows as a CSV an employee can correct and re-upload (N2) | Preview the rows of an import (`import-preview`) |
+| Import a file's valid rows even when other rows were rejected (N3) | Preview the rows of an import (`import-preview`) |
+
 ## Decisions made at the plan approval
 
 These were settled with the user during INTAKE and apply across epics:
@@ -128,6 +139,8 @@ These were settled with the user during INTAKE and apply across epics:
 - **Transaction types are displayed, not policed.** The app holds no accepted-value list for transaction type — the transactions service is the sole authority on validity. The list renders whatever value the service returns, translated to plain words for the reader ("Credit — money in", "Debit — money out"); an untranslated value displays exactly as returned and is never treated as an error. Resolved a conflict between the sample CSV (`C`/`D`) and the API's documented example (`Debit`).
 - **Dark mode follows the device, with an override.** The app respects the OS colour-scheme preference on first load; a control in the signed-in header lets the user override it, and that override persists. Both `:root` and `.dark` token blocks come from the two supplied design-system files. Recorded in `project.md` §Styling & Branding; the control itself belongs to epic 1.
 - **Compliance is POPIA (South Africa)**, user-confirmed. Account numbers are masked to their last four digits wherever requests are listed, with the full value revealed only by an explicit action on a single request — except in the exported CSV, which carries unmasked values because the external payment system consumes it as-is.
+
+- **A part-valid file now imports its good rows (2026-08-17, supersedes R29).** The original rule was that a file with *any* invalid row imports nothing until a retry succeeds (R29 / requirements §2.3 invariant `C-031`, assigned to `file-validation-and-retry` as its BR1). At the user's request this is reversed for epic 8: the valid rows import, and the rejected rows come back as a correctable CSV for a separate upload. **The split itself is the backend's to make** — until the transactions-api does it, a part-valid file still imports nothing. The preview works regardless (it reads the submitted file directly), but it says "will import", not "imported", for rows the service has not actually taken. See the open backend dependency below.
 
 ## Conventions that cross epic boundaries
 
@@ -139,7 +152,16 @@ Recorded here because the requirement lives in one epic but the obligation is wi
 - **Bulk approval is N calls.** `TransactionApprove` decides one request per call, so bulk approval issues one call per selected request and reports how many were approved and how many were skipped.
 - **"Already decided" cannot be read from the response.** The service returns the same generic response either way, so the app re-reads current state immediately before submitting a decision and reports anything no longer awaiting a decision as skipped.
 
-## Known dependency outside this project
+## Known dependencies outside this project
+
+**Partial import of a part-valid file (epic 8).** The transactions-api currently holds a file with any
+invalid row in `Validation failed` and imports none of its rows (requirements invariant `C-031`). Epic 8's
+premise — valid rows import, rejected rows split off for a separate upload — needs the service to change
+that behaviour. **Epic 8 is not blocked on it:** the preview reads the originally-submitted file directly
+(`GET /v1/files/download`) and marks each row as passing validation or rejected, so the user sees the whole
+file either way. What the backend gap costs is the last step — rows shown as "will import" genuinely have
+not imported yet, and the epic says so plainly rather than implying otherwise. Once the service performs
+the split, those rows can be confirmed as imported against `GET /v1/transactions` (`FileLogId`).
 
 **CORS on both backend services.** Neither the auth-api/BFF (`http://localhost:4424`) nor the transactions-api
 (`http://localhost:4423/transactions-api`) returns an `Access-Control-Allow-Origin` header. Both are cross-origin
