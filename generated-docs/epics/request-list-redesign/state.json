@@ -18,7 +18,9 @@
       "BATCH and RUN DATE follow the originating-file filter only, as the brief settles them - so typing in the search box re-states the four totals (and brings in the struck-through whole-batch count) while BATCH still reads ALL FILES and RUN DATE still shows the whole queue's newest transaction date. Worth an eye at manual test, since it is the one place the band deliberately does not move with a narrowing.",
       "The narrowing strip's visible heading reads 'NARROW THE BATCH'. The wording is the developer's choice (the requirement only said the fields must read as one named strip) - confirm that is what you want above the fields.",
       "A range typed the wrong way round is now shown as a red message inside the strip plus a heavier red underline under the two fields of that range, replacing the old bordered warning box - confirm it reads clearly enough at a glance.",
-      "Export requests to CSV and Clear all are now ruled text controls in the strip's notation rather than boxed buttons - confirm the export still reads as prominent enough to find."
+      "Export requests to CSV and Clear all are now ruled text controls in the strip's notation rather than boxed buttons - confirm the export still reads as prominent enough to find.",
+      "The status word is now set in the request list's tracked 11px mono UPPERCASE notation everywhere the shared mark appears - including the submitted-files list, a file's page, its import preview and its rejected rows, which this epic does not otherwise restyle. Worth a look at manual test to confirm 'a capitalised word' is meant as full caps rather than sentence case.",
+      "Two file statuses that share an intent (Uploaded and Validating, both informational) now share one shape, where before each had its own icon. They are still told apart by their words. Confirm the files list is no harder to scan for it."
     ],
     "manualTestResults": []
   },
@@ -46,11 +48,11 @@
       "completedAt": "2026-08-18T06:31:48.000Z"
     },
     "4": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-18T06:32:30.000Z",
+      "completedAt": "2026-08-18T06:50:27.000Z"
     },
     "5": {
       "status": "pending",
@@ -89,5 +91,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-18T06:31:48.000Z"
+  "lastUpdated": "2026-08-18T06:50:27.000Z"
 }

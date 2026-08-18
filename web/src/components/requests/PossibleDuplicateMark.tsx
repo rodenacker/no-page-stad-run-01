@@ -4,12 +4,13 @@
  *
  * Three things here are deliberate and easy to break:
  *
- * - **It is WORDING paired with an intent colour, never colour alone** (R8, R14, WCAG
- *   2.2 AA) — so it is readable in the list itself, without opening the request and
- *   without seeing the colour at all. It is the shared `StatusBadge`, which owns the
- *   intents and their `globals.css` tokens: `attention` is the `--warning` one, because
- *   a possible duplicate is something the reader has to look at rather than something
- *   that has gone well or been refused.
+ * - **It is WORDING paired with a shape and an intent colour, never colour alone** (R8,
+ *   R14, WCAG 2.2 AA) — so it is readable in the list itself, without opening the request
+ *   and without seeing the colour at all. It is the shared `StatusBadge`, which owns the
+ *   intents, their `globals.css` tokens and the shape each is drawn as: `attention` is the
+ *   `--warning` one, marked with the doubled bar, because a possible duplicate is
+ *   something the reader has to look at rather than something that has gone well or been
+ *   refused — and it reads in the same notation as a status because it sits beside one.
  * - **One implementation, both presentations.** The desktop row and the phone-width card
  *   render this same component, so the mark cannot end up worded or coloured one way in
  *   the table and another way on a card.
@@ -20,18 +21,16 @@
  * It marks; it decides nothing. Nothing about a possible duplicate is acted on in this
  * epic — the request is still read-only (BR1).
  */
-import { Copy } from 'lucide-react';
-
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { POSSIBLE_DUPLICATE_MARK } from '@/lib/transactions/duplicates';
 
 import type { StatusPresentation } from '@/components/status/StatusBadge';
 
 /**
- * What the mark means, in the shared badge's vocabulary: something for the reader to
- * attend to, beside an icon of one thing copied onto another.
+ * What the mark means, in the shared mark's vocabulary: something for the reader to
+ * attend to. The shape that says so is the shared component's, not this file's.
  */
-const PRESENTATION: StatusPresentation = { intent: 'attention', icon: Copy };
+const PRESENTATION: StatusPresentation = { intent: 'attention' };
 
 export function PossibleDuplicateMark() {
   return (

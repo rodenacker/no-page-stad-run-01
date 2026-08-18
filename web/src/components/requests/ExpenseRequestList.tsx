@@ -339,15 +339,7 @@
  *   moves with them rather than a render ahead of them.
  */
 
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  CircleCheck,
-  CircleX,
-  Inbox,
-  TriangleAlert,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import {
   memo,
@@ -627,16 +619,17 @@ const LOADING: ListState = { phase: 'loading', wait: 'brief' };
 /**
  * What each recognised status MEANS (brief §Data Model, R14): an imported request is
  * simply where it stands, an approved one finished well, a rejected one was refused.
- * The colours those intents wear belong to the shared badge.
+ * The colours and the shapes those intents wear belong to the shared mark.
  *
  * "Cancelled" is not here on purpose: it is a FILE state, and a cancelled file's
- * requests never reach this list. The shared badge keeps a neutral intent available
- * for it, so its absence from this map is expected rather than an omission.
+ * requests never reach this list (BR11). The shared mark keeps a neutral intent and its
+ * ruled shape available for it, so its absence from this map is expected rather than an
+ * omission.
  */
 const STATUS_PRESENTATION: Record<TransactionStatus, StatusPresentation> = {
-  [TRANSACTION_STATUS_IMPORTED]: { intent: 'informational', icon: Inbox },
-  [TRANSACTION_STATUS_APPROVED]: { intent: 'positive', icon: CircleCheck },
-  [TRANSACTION_STATUS_REJECTED]: { intent: 'negative', icon: CircleX },
+  [TRANSACTION_STATUS_IMPORTED]: { intent: 'informational' },
+  [TRANSACTION_STATUS_APPROVED]: { intent: 'positive' },
+  [TRANSACTION_STATUS_REJECTED]: { intent: 'negative' },
 };
 
 /**

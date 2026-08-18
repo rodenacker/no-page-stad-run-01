@@ -1,13 +1,19 @@
 /**
- * THE request list's field-label notation, stated once (design brief §3, Typography —
- * `request-list-redesign` R11/R12/R16/R24).
+ * THE tracked micro-label notation, stated once (design brief §3, Typography —
+ * `request-list-redesign` R11/R12/R16/R24/R26).
  *
- * This screen is a control document, and every label on it — the control block's figure
- * labels, the narrowing strip's micro-labels, the actions that sit with the strip, the
- * summary of what is applied — is the same object: 11px Azeret Mono, tracked, upper-cased
- * in CSS. Four surfaces carrying four copies of that string is how the tracking on one of
- * them quietly drifts from the others, which in a design whose whole discipline is
- * withholding reads as unfinished rather than restrained.
+ * The request list is a control document, and every label on it — the control block's
+ * figure labels, the narrowing strip's micro-labels, the actions that sit with the strip,
+ * the summary of what is applied — is the same object: 11px Azeret Mono, tracked,
+ * upper-cased in CSS. Four surfaces carrying four copies of that string is how the
+ * tracking on one of them quietly drifts from the others, which in a design whose whole
+ * discipline is withholding reads as unfinished rather than restrained.
+ *
+ * It reaches one surface BEYOND that screen, deliberately: the shared status mark
+ * (`components/status/StatusBadge`) sets its word in this same notation, and that mark is
+ * rendered by the files screens as well as this one (R26/R28). A status label and a field
+ * label are the same object in this world, so they are one string here rather than two
+ * that look alike.
  *
  * Two things it deliberately does NOT carry:
  *

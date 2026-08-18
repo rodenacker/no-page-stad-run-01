@@ -15,3 +15,11 @@ the code, and the trade-offs taken along the way. One section per story.
 - The "wrong way round" message no longer sits in a bordered warning box. It now appears inside the strip itself, and the two fields of the range it is about get a heavier red underline, so the message and the fields it is about are read together. It still never applies the range, and the list still stays exactly as it was.
 - Export and Clear all were re-seated as ruled text controls on the strip so they read as part of the same document. Approve selected kept its solid button, because it is the one control on that line that commits something that cannot be undone.
 - The small tracked label used by the control block, the strip, its actions and the applied-narrowing summary is now written in one place, so the four cannot drift apart as later stories add more of them.
+
+## Story 4: A status becomes a ruled mark, not a coloured pill
+
+- Statuses across the whole app now read as a small drawn shape beside the status in tracked capitals, instead of a rounded coloured pill. Because it is one shared mark, the submitted-files list, a file's own page, its import preview and the request list all changed at once — that was the point, not a side effect.
+- The four shapes differ in form rather than in colour, so they can be told apart in a greyscale screenshot: an empty box for something still awaiting a decision, the same box filled in for approved, the box struck through for rejected, and a plain rule for a cancelled file. The possible-duplicate mark gets a doubled bar in the margin, like an editor's change bar.
+- A status the app has no wording for still comes through in the service's own words and is given no shape at all — a shape there would be the app pretending to know what the value means.
+- The pill component the old badge was built from has been removed from the project entirely, so a future screen cannot quietly bring the capsule back; anything that needs a short phrase with a colour uses the shared mark.
+- Two file statuses that mean the same kind of thing (Uploaded and Validating) now share one shape and are told apart by their words. They previously had different small icons.
