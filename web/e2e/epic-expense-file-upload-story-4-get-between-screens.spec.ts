@@ -348,14 +348,25 @@ const listedRequestRow = (page: Page): Locator =>
     .filter({ hasText: LISTED_REQUEST.Reference });
 
 /**
- * The row the expense files screen shows for the mocked file — content only that
- * screen renders, so it is how this spec recognises having arrived there.
+ * The row the expense files screen shows for the mocked file, so it is how this spec
+ * recognises having arrived there — and, just as importantly, how it recognises
+ * having LEFT there.
+ *
+ * The file's NAME alone will not do that second job: every request on the expense
+ * request list names the file it was imported from, and the request served here came
+ * from this very file (both come from the same project-wide factories), so a row
+ * carrying `expenses_2026-04-15.csv` is on either screen. What only the files screen
+ * puts on that file's row is how far the file itself has got — its most recent
+ * processing activity, which no request row carries. Matching on both is what makes
+ * this locator mean "the files screen's row for this file" rather than "somewhere
+ * this file is mentioned".
  */
 const listedFileRow = (page: Page): Locator =>
   page
     .getByRole('main')
     .getByRole('row')
-    .filter({ hasText: LISTED_FILE.CurrentFileName });
+    .filter({ hasText: LISTED_FILE.CurrentFileName })
+    .filter({ hasText: LISTED_FILE.LastExecutedActivityName });
 
 /** How a control reads to a user, for readable failure output. */
 const labelOf = (control: Locator): Promise<string> =>
@@ -472,7 +483,8 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     await expect(page).toHaveURL(REQUESTS_PATH);
     await expect(listedRequestRow(page)).toBeVisible();
     // The expense files screen really was left behind, rather than the request list's
-    // content appearing beside it.
+    // content appearing beside it. (The file's name on its own proves nothing here —
+    // the request that just arrived names the file it came from; see `listedFileRow`.)
     await expect(listedFileRow(page)).toHaveCount(0);
 
     // 2. ...and back into the expense files screen, by the HEADER's destination for it

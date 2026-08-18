@@ -16,19 +16,19 @@
     ],
     "manualTestResults": []
   },
-  "phase": "EPIC-END",
+  "phase": "MANUAL-TEST",
   "stories": {
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed-after-fix",
       "startedAt": "2026-08-18T14:42:49Z",
       "completedAt": "2026-08-18T14:57:00Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-18T14:58:00Z",
       "completedAt": "2026-08-18T15:11:00Z"
     }

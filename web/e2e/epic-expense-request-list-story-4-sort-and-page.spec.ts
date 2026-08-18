@@ -358,6 +358,24 @@ const requestsOnPage = async (
 ): Promise<number> => (await referencesInOrder(page, served)).length;
 
 /**
+ * How many of the served requests are anywhere on the screen — the whole screen, not
+ * a table on it. This is what "the request list was left behind" has to be asked in
+ * terms of: the screen the user leaves for is the expense files screen, which has a
+ * listing of its own, so "no table on the screen" would be false there for a reason
+ * that has nothing to do with the request list. Whether a single request the user was
+ * just looking at is still readable does say it, and says it of the whole screen
+ * rather than of one region of it.
+ */
+const servedRequestsOnScreen = async (
+  page: Page,
+  served: TransactionRead[],
+): Promise<number> => {
+  const screenText = await listScreen(page).innerText();
+  return served.filter((request) => screenText.includes(request.Reference))
+    .length;
+};
+
+/**
  * The references of `requests` in amount order — the order the list must be in
  * after the amount column is sorted. Derived from the fixture's own values, so the
  * expectation cannot drift from the data the mocked service served, and it fails an
@@ -675,7 +693,13 @@ test.describe('Epic expense-request-list, Story 4: sort and page through the req
     const header = page.getByRole('banner');
     await header.locator(`a[href="${LANDING_PATH}"]`).first().click();
     await expect(page).toHaveURL(UPLOAD_PATH);
-    await expect(requestList(page)).toHaveCount(0);
+    await expect
+      .poll(() => servedRequestsOnScreen(page, requests), {
+        message:
+          'leaving the request list must leave the requests behind: not one of ' +
+          'them may still be readable on the screen the user arrives at',
+      })
+      .toBe(0);
 
     // ...and come back to it from the header navigation, the way a user would.
     await header.locator(`a[href="${REQUESTS_PATH}"]`).first().click();
