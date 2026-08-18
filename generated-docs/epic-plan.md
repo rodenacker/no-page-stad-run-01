@@ -19,6 +19,7 @@ Every epic in this project, what it delivers, and what it builds on. Live status
 | 8 | Preview the rows of an import (`import-preview`) | Show the Importer every row of a submitted file with a clear imported/rejected verdict once validation has run, and let them download the rejected rows as a re-uploadable CSV to send back for correction. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`) |
 | 9 | Delete a submitted file (`file-deletion`) | Let the Importer delete any submitted file — including one whose rows have already imported — from the files list as well as the file's own page, after a confirmation that states exactly what is being destroyed. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`), Approve or reject a request (`expense-decisions`) |
 | 10 | Redesign the request list as a batch listing (`request-list-redesign`) | Rebuild the shared expense request list in the Batch Listing design — a control block showing the batch's outstanding count at a glance, a scannable exception gutter, and no change to what anyone can do. | Sign in and the signed-in app shell (`sign-in-and-app-shell`), Bulk approval and a self-updating list (`bulk-approval-and-live-refresh`), Export requests for the payment system (`csv-export`) |
+| 11 | Land on the screen your role uses (`role-aware-landing`) | Send a person straight to the screen their role actually works in after they sign in — the expense requests list for an Approver, the expense files screen for an Importer — instead of a menu, while leaving who may open what exactly as it is. | Sign in and the signed-in app shell (`sign-in-and-app-shell`), Upload an expense file (`expense-file-upload`), The shared expense request list (`expense-request-list`) |
 
 ## Coverage
 
@@ -135,6 +136,12 @@ Requested by the user on 2026-08-17, after epics 1–7 had shipped. Not in the o
 | Import a file's valid rows even when other rows were rejected (N3) | Preview the rows of an import (`import-preview`) |
 | Delete a file straight from the files list, without opening it (N4) | Delete a submitted file (`file-deletion`) |
 | Delete a file whose rows have already imported (N5) | Delete a submitted file (`file-deletion`) |
+
+Requested by the user on 2026-08-18, after epics 1–10 had shipped:
+
+| What you asked for | Epic |
+|---|---|
+| Land on the expense requests list as an Approver, and on the expense files screen as an Importer, instead of choosing from a menu (N6) | Land on the screen your role uses (`role-aware-landing`) |
 
 ## Decisions made at the plan approval
 
