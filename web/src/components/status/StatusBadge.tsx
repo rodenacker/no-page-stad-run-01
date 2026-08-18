@@ -77,6 +77,19 @@ const INTENT_INK: Record<StatusIntent, string> = {
 };
 
 /**
+ * The ink one intent is drawn in, for a surface that renders {@link StatusMark} on its
+ * own — a listing's reserved gutter, where the shape has no word beside it to carry the
+ * ink for it, and where the row around it may be desaturated (`request-list-redesign`
+ * R20) so `currentColor` would quietly mute the mark that is carrying the decision.
+ *
+ * It answers a token class, never a colour: the intent → token mapping stays stated in
+ * exactly one place, so the gutter's mark and the mark beside the word can never be
+ * inked differently.
+ */
+export const statusInkFor = (intent: StatusIntent): string =>
+  INTENT_INK[intent];
+
+/**
  * The shape each intent is drawn as, in a 12×12 field, at `currentColor` (R18/BR11).
  *
  * They are told apart by FORM, not by tint — which is what makes the column scannable

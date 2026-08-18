@@ -215,9 +215,10 @@
  * - **Each row and card gets a plain `selected` boolean, never the set.** Handing the
  *   set down would defeat the memo on every row on every tick — and, once this list
  *   refreshes itself, on every poll. Same shape as `possibleDuplicate` and `canDecide`.
- * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick, no
- *   selection column, no "select everything listed" and no count. Absent from the
- *   markup, never disabled — the rule this project applies everywhere.
+ * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick in the
+ *   gutter, no "select everything listed" and no count. Absent from the markup, never
+ *   disabled — the rule this project applies everywhere. The gutter itself stays, for
+ *   both roles: it is where the marks they scan for live (see below).
  * - **"Select everything currently listed" means the NARROWED set**, not the page on
  *   screen and not the whole fetched set, and it covers only requests still awaiting a
  *   decision (BR1). Unticking it is this screen's clear-the-selection action.
@@ -337,6 +338,38 @@
  *   endpoint, and there does not need to be (brief §Data Model).
  * - **It reads the DEFERRED narrowing**, like the rows and the summary do, which is why it
  *   moves with them rather than a render ahead of them.
+ *
+ * The exception gutter down the left (`request-list-redesign` R15/R18/R20, BR5):
+ *
+ * - **The gutter is a real, permanently reserved first column** — two characters wide, on
+ *   every row, for every reader, whether or not anything on the page needs marking. An
+ *   empty gutter is the design and not wasted space: it is what makes a marked row
+ *   findable by scanning one narrow column instead of reading nine. It is never dropped,
+ *   hidden or collapsed, and an ordinary row's gutter carries NOTHING — no placeholder
+ *   glyph, no dash (brief §Data Model settles R18 against R15/BR5).
+ * - **Selection lives IN it, and the column it used to have of its own is gone** — removed,
+ *   not hidden. What moved is only where the control sits: it is still the Shadcn
+ *   `checkbox`, still named for the request it selects, still carrying its checked state
+ *   and still disabled while a batch is in flight, so every selection semantic above holds
+ *   unchanged and `lib/transactions/selecting.ts` is reused untouched. Restyled as one of
+ *   the gutter's marks — square and unshadowed, so an unticked request reads as the
+ *   taxonomy's hollow rule-box and a ticked one as the inked box — and never rebuilt as a
+ *   `div` with a click handler, which would take no focus, answer no Space key and report
+ *   no state.
+ * - **The shapes are the shared mark's, not a second set** (`StatusMark` from
+ *   `components/status/StatusBadge`, sized to the column). A decided request's decision is
+ *   what its gutter carries, in the intent's own ink — named explicitly, because the row
+ *   around it has receded and `currentColor` would mute the one thing still marking it.
+ * - **A row that needs attention is marked by a rule down its outer edge** rather than by
+ *   a shape in the two characters, because those two characters may already be carrying an
+ *   offer to select the request — and a possible duplicate still awaiting a decision is
+ *   exactly the row an Approver most needs to find. The wording stays beside the status
+ *   (`PossibleDuplicateMark`), so the mark supplements words and never replaces them (BR3).
+ * - **A decided row recedes, it does not disappear** (R20). It stays listed, keeps every
+ *   value on it and keeps its controls working — the audit trail, and what a second
+ *   Approver needs to see — and simply drops to ink-on-ground so only the requests still
+ *   awaiting a decision hold full contrast. Not `aria-hidden`, not `aria-disabled`, not a
+ *   dim: a relative contrast move, and one that stays comfortably readable.
  */
 
 import { ArrowDown, ArrowUp, ArrowUpDown, TriangleAlert } from 'lucide-react';
@@ -366,7 +399,11 @@ import { RequestCards } from '@/components/requests/RequestCards';
 import { RequestDetailPanel } from '@/components/requests/RequestDetailPanel';
 import { RequestListPagination } from '@/components/requests/RequestListPagination';
 import { RequestNarrowingControls } from '@/components/requests/RequestNarrowingControls';
-import { StatusBadge } from '@/components/status/StatusBadge';
+import {
+  StatusBadge,
+  StatusMark,
+  statusInkFor,
+} from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -461,7 +498,6 @@ import {
 } from '@/lib/transactions/refreshing';
 import {
   NOTHING_SELECTED,
-  SELECTION_COLUMN_LABEL,
   SELECTION_COUNT_LABEL,
   SELECT_EVERYTHING_LISTED_LABEL,
   selectRequestLabel,
@@ -487,7 +523,10 @@ import {
   isKnownTransactionStatus,
 } from '@/types/transactions';
 
-import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type {
+  StatusIntent,
+  StatusPresentation,
+} from '@/components/status/StatusBadge';
 import type { DecisionOutcome } from '@/lib/api/decisions';
 import type {
   NarrowingField,
@@ -547,6 +586,23 @@ const NARROWED_EMPTY_HINT =
 const ACTIONS_COLUMN_LABEL = 'Actions';
 
 /**
+ * Heads the reserved gutter (`request-list-redesign` R15/BR5), read by a screen reader
+ * only: what a sighted reader scans is the marks in the column, and a visible heading
+ * over two characters would be wider than the column it names.
+ *
+ * The wording is pinned from two directions at once, and both are real:
+ *
+ * - it must SAY "exceptions", because a leftmost column of shapes is otherwise unnamed
+ *   to anyone reading by name — the marks in it are the whole reason the column exists;
+ * - it must NOT contain any word another column's heading contains (`status`, `amount`,
+ *   `reference`, `file`, `date`, `account`, `description`, `type`). A heading of "Status
+ *   mark" — the obvious choice — would make "the column headed status" ambiguous, and
+ *   every surface that addresses a column by its own distinctive word (this screen's
+ *   sort controls are addressed that way throughout) would then match two columns.
+ */
+const GUTTER_COLUMN_LABEL = 'Exceptions and selection';
+
+/**
  * FULL-BLEED TO THE PAGE PADDING, stated once for every part of this screen that runs
  * edge to edge (`request-list-redesign` R13 — the same convention the control block and
  * the narrowing strip already use).
@@ -601,6 +657,79 @@ const LISTING_EDGE_PADDING_CLASS =
  */
 const LISTING_ROW_CLASS =
   'transition-none hover:bg-transparent has-aria-expanded:bg-transparent';
+
+/**
+ * The reserved gutter's own cell, for the heading row and for every listed row alike
+ * (R15/BR5).
+ *
+ * Three things about it are the requirement rather than styling:
+ *
+ * - **`font-mono` and `w-[2ch]` together are the two-character width.** The width is
+ *   stated in the notation this design measures a character in (Azeret Mono, the same
+ *   face the references and figures beside it are set in), so "two characters" is
+ *   literally two characters and not a rounded pixel value that drifts with the face.
+ * - **It is on EVERY row and for EVERY reader**, which is what makes the column
+ *   permanently reserved: an empty gutter is the design, because it is what leaves a
+ *   marked row findable by scanning one narrow column instead of reading nine.
+ * - **The left rule is always drawn**, transparent unless the row is an exception, so a
+ *   marked row and an ordinary one line up to the pixel down the column.
+ */
+const GUTTER_CELL_CLASS = 'w-[2ch] border-l-2 border-l-transparent font-mono';
+
+/**
+ * The mark's own field inside that cell: exactly two characters wide whether or not it
+ * holds anything, which is what reserves the column when nothing on the page needs
+ * marking (BR5). Reserved by CSS rather than by a placeholder character — an ordinary
+ * row's gutter carries no glyph and no dash (brief §Data Model).
+ */
+const GUTTER_MARK_BOX_CLASS = 'flex w-[2ch] items-center justify-center';
+
+/** A mark in the gutter, drawn at the gutter's own width — the shape sized to the column. */
+const GUTTER_MARK_CLASS = 'size-[2ch]';
+
+/**
+ * The selection control AS ONE OF THE GUTTER'S MARKS (R15/BR5/AC-3).
+ *
+ * It is still the Shadcn `checkbox` primitive underneath — a real, focusable control
+ * that reports its own checked state and answers the Space key — restyled to the
+ * gutter's notation and never replaced by a `div` with a click handler. Squared off
+ * (nothing in this world has a radius) and stripped of the primitive's drop shadow, it
+ * becomes the taxonomy's own hollow rule-box while a request is unticked and the inked
+ * box once it is: the same two shapes the status marks beside it are drawn as, which is
+ * what lets one narrow column carry both an exception and an offer to act.
+ *
+ * The focus ring is deliberately left exactly as the primitive draws it: a two-character
+ * column is precisely where a focus indicator gets styled away, and a keyboard user has
+ * to be able to see where they are (R5, WCAG 2.2 AA).
+ */
+const SELECTION_MARK_CLASS = `${GUTTER_MARK_CLASS} rounded-none shadow-none`;
+
+/**
+ * A row that needs attention, marked in the gutter as a rule down its outer edge — the
+ * editorial change-bar a reader scans a margin for (R15: the gutter marks a row that
+ * needs attention as well as one that has been decided).
+ *
+ * It is a RULE rather than a shape (R18's marks are a shape-and-rule taxonomy) because
+ * the two characters themselves may already be carrying an offer to select the request:
+ * a possible duplicate awaiting a decision is exactly the row an Approver most needs to
+ * find, so the exception cannot be the thing that loses the gutter. The wording stays
+ * beside the status where it always was (`PossibleDuplicateMark`), so the mark
+ * supplements words and never replaces them (BR3).
+ */
+const EXCEPTION_RULE_CLASS = 'border-l-warning';
+
+/**
+ * A request somebody has already decided: still listed, still readable, but dropped to
+ * ink-on-ground so only the requests still awaiting a decision hold full contrast
+ * (R20). The batch visibly works itself towards zero.
+ *
+ * A relative contrast move, NOT a disabled state and not a dim: the row keeps every
+ * value on it, its controls keep working, and the ink it drops to is the token the whole
+ * app reads secondary text in — which stays well clear of the contrast bar in both
+ * themes. What keeps its full ink is the decision itself: the gutter's mark, and the
+ * status beside it.
+ */
+const DECIDED_ROW_CLASS = 'text-muted-foreground';
 
 /**
  * A figure in the listing: Azeret Mono, tabular, and right-aligned so the digits line up
@@ -730,6 +859,24 @@ const presentationOf = (
     : undefined;
 
 /**
+ * Which of the shared shapes a request's own state puts in the gutter, and `undefined`
+ * for the rows that carry none (R15/R18/BR5).
+ *
+ * Two readings are settled here, and both are deliberate:
+ *
+ * - **A request still awaiting a decision has an EMPTY gutter.** R18 reads as though
+ *   every status should carry a shape, which would contradict R15/BR5's "empty on an
+ *   ordinary row"; the brief's §Data Model settles it — the mark for "ordinary,
+ *   undecided, no exception" is *empty*. That empty column is what makes the marked rows
+ *   findable, so nothing stands in for it: no placeholder glyph, no dash.
+ * - **A status this app has never heard of draws NO shape**, exactly as the shared mark
+ *   treats it beside the word: a shape would claim a meaning the app does not have. The
+ *   row still recedes, because it is no longer awaiting a decision.
+ */
+const gutterIntentOf = (request: TransactionRead): StatusIntent | undefined =>
+  awaitsDecision(request) ? undefined : presentationOf(request)?.intent;
+
+/**
  * One request's row: the service's values, its type in plain language, its status, and
  * the controls that open it.
  *
@@ -748,7 +895,6 @@ const presentationOf = (
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
-  selectionOffered,
   selectable,
   selected,
   selectionLocked,
@@ -762,15 +908,11 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request: TransactionRead;
   possibleDuplicate: boolean;
   /**
-   * Whether the list is offering selection at all — i.e. whether there IS a selection
-   * column. Separate from `selectable` so a request nobody may select still keeps the
-   * column's cell and the rows stay aligned with the heading row.
-   */
-  selectionOffered: boolean;
-  /**
    * Whether THIS request may be selected: an Approver, and a request still awaiting a
-   * decision (BR1). False means no control at all in the cell — absent, never a
-   * disabled tick (BR10).
+   * decision (BR1). False means no control at all in the gutter — absent, never a
+   * disabled tick (BR10). The gutter's cell is there either way: it is reserved for
+   * every row and every reader (BR5), so the rows stay aligned with the heading row
+   * whoever is signed in.
    */
   selectable: boolean;
   /** Whether this request is in the selection. A plain boolean, so the memo holds. */
@@ -796,12 +938,38 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   onOpen: (request: TransactionRead) => void;
   onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }) {
+  /**
+   * Whether this request has stopped awaiting a decision, which is what makes its row
+   * recede (R20). Taken as "not awaiting one" rather than as a list of decided statuses,
+   * so it agrees with the control totals above the listing — where DECIDED is likewise
+   * the remainder — however the service's status vocabulary grows.
+   */
+  const decided = !awaitsDecision(request);
+  const gutterIntent = gutterIntentOf(request);
+
   return (
-    <TableRow className={LISTING_ROW_CLASS}>
-      {selectionOffered && (
-        <TableCell className="w-10">
-          {selectable && (
+    <TableRow
+      className={`${LISTING_ROW_CLASS}${decided ? ` ${DECIDED_ROW_CLASS}` : ''}`}
+    >
+      {/* THE RESERVED GUTTER (R15/BR5) — this listing's first column, two characters
+          wide, present and empty on an ordinary row and never collapsed away when
+          nothing on the page needs marking.
+
+          It carries at most one mark, because two characters hold one:
+          - the request's own selection control, for an Approver looking at a request
+            still awaiting a decision — selection lives IN the gutter, composed as one
+            of its marks, and the column it used to have of its own is gone (AC-3);
+          - otherwise the shape the shared mark draws for a decision already recorded,
+            which is what carries that decision on a row that has receded (R20).
+          An exception is the rule down the cell's outer edge, so it is never the thing
+          the tick displaces. */}
+      <TableCell
+        className={`${GUTTER_CELL_CLASS}${possibleDuplicate ? ` ${EXCEPTION_RULE_CLASS}` : ''}`}
+      >
+        <span className={GUTTER_MARK_BOX_CLASS}>
+          {selectable ? (
             <Checkbox
+              className={SELECTION_MARK_CLASS}
               checked={selected}
               disabled={selectionLocked}
               onCheckedChange={() => {
@@ -812,9 +980,20 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
               // column of identical "Select"s.
               aria-label={selectRequestLabel(request.Reference)}
             />
+          ) : (
+            gutterIntent !== undefined && (
+              // The SAME shape the mark beside the status is drawn as — the shared
+              // component's, sized to the column, never a second drawing of it. Ink
+              // named here because the row around it has receded and the mark carrying
+              // the decision must not recede with it.
+              <StatusMark
+                intent={gutterIntent}
+                className={`${GUTTER_MARK_CLASS} ${statusInkFor(gutterIntent)}`}
+              />
+            )
           )}
-        </TableCell>
-      )}
+        </span>
+      </TableCell>
       <TableCell>{request.FileName}</TableCell>
       {/* The request's own identifier, in the notation this design reads a reference in
           (R13/AC-2). Its weight is the notation's, not an added emphasis: down a ruled
@@ -2285,30 +2464,39 @@ export function ExpenseRequestList({
                    what frames the listing is the ruling. */
                 <div className={`${PAGE_BLEED_CLASS} border-b`}>
                   <Table className={LISTING_EDGE_PADDING_CLASS}>
+                    {/* The caption names the columns in the order they are
+                        read, the reserved gutter included. It stays SHORT on
+                        what the gutter's marks mean: the states themselves are
+                        named in words in the row's own status column, and a
+                        caption that restated them would put this screen's
+                        phrases on the page twice over. */}
                     <TableCaption className="sr-only">
-                      Imported expense payment requests: the file each came
-                      from, its reference, transaction date, the last four
-                      digits of its account number, its description, amount,
-                      transaction type and status, and the controls each request
-                      offers — opening it, and, where one is still awaiting a
-                      decision and you may make it, selecting it to be approved
-                      with others, or approving or rejecting it on its own.
-                      Every value heading orders the list by its own column.
+                      Imported expense payment requests: a narrow reserved
+                      column down the left carrying each request&apos;s mark,
+                      and the control that selects it where you may select one;
+                      then the file each came from, its reference, transaction
+                      date, the last four digits of its account number, its
+                      description, amount, transaction type and status, and the
+                      controls each request offers — opening it, and, where one
+                      is still awaiting a decision and you may make it,
+                      approving or rejecting it on its own. Every value heading
+                      orders the list by its own column.
                     </TableCaption>
                     <TableHeader>
                       {/* Drawn from the column definitions, so every displayed
                           column has a sort control (R13) rather than most of
                           them having one. */}
                       <TableRow className={LISTING_ROW_CLASS}>
-                        {/* The selection column, for an Approver only: nothing
-                            to order by, and the ticks in it name themselves. */}
-                        {isApprover && (
-                          <TableHead scope="col" className="w-10">
-                            <span className="sr-only">
-                              {SELECTION_COLUMN_LABEL}
-                            </span>
-                          </TableHead>
-                        )}
+                        {/* The reserved gutter's own heading (R15/BR5). It is
+                            here for EVERY reader — the column is permanently
+                            reserved, so the listing has the same columns
+                            whoever is signed in — and it is not sortable:
+                            there is no value in the column to order by, and
+                            the marks in it belong to the row's other columns
+                            anyway. */}
+                        <TableHead scope="col" className={GUTTER_CELL_CLASS}>
+                          <span className="sr-only">{GUTTER_COLUMN_LABEL}</span>
+                        </TableHead>
                         {REQUEST_COLUMNS.map((column) => (
                           <SortableColumnHeading
                             key={column.key}
@@ -2334,7 +2522,6 @@ export function ExpenseRequestList({
                           possibleDuplicate={possibleDuplicateIds.has(
                             request.Id,
                           )}
-                          selectionOffered={isApprover}
                           selectable={isApprover && awaitsDecision(request)}
                           selected={selectedIds.has(request.Id)}
                           selectionLocked={bulkApprovalRunning}
