@@ -30,3 +30,29 @@
  */
 export const FIELD_LABEL_CLASS =
   'font-mono text-[11px] font-medium tracking-[0.18em] uppercase';
+
+/**
+ * THE ruled field notation, stated once beside the label that names it (design brief §3,
+ * Sequence steps 2 and 4 — `request-list-redesign` R12/R14).
+ *
+ * A field on this screen is marked by an UNDERLINE and nothing else: no border box, no
+ * filled surface, no rounded corner. It is here rather than in one component's file
+ * because two surfaces now wear it — the narrowing strip's eight fields and the foot's
+ * requests-per-page field — and a field on the strip and a field on the continuation line
+ * are the same object in this design.
+ *
+ * Two things about it are load-bearing rather than cosmetic:
+ *
+ * - **The underline's COLOUR is deliberately absent**, so the primitives' own
+ *   `border-input` stands. `--input` is the darker of the two hairline tokens precisely so
+ *   an underline clears 3:1 against the ground (WCAG 1.4.11) — and with the box gone that
+ *   underline is the only thing outlining the field, so `--border` in its place would drop
+ *   it below the bar.
+ * - **The focus ring is untouched.** An underline-only field still has to paint a visible
+ *   focus indicator, and this project's one focus notation is the primitives' ring.
+ *
+ * Size and width belong to the surface, not here: a strip field fills its column, the
+ * foot's page-size field is as wide as the figure it holds.
+ */
+export const RULED_FIELD_CLASS =
+  'rounded-none border-0 border-b bg-transparent px-0 shadow-none dark:bg-transparent dark:hover:bg-transparent';

@@ -370,6 +370,18 @@
  *   Approver needs to see — and simply drops to ink-on-ground so only the requests still
  *   awaiting a decision hold full contrast. Not `aria-hidden`, not `aria-disabled`, not a
  *   dim: a relative contrast move, and one that stays comfortably readable.
+ *
+ * The continuation line at the foot (`request-list-redesign` R14):
+ *
+ * - **The listing states its own continuation** — `RECORDS 1–20 OF 428 · PAGE 1 OF 22` —
+ *   instead of scattering those figures through a row of controls. It is
+ *   `RequestListPagination`'s, derived from the same page slice the rows are drawn from,
+ *   and it is the screen's ONLY statement of the records range and the page counter: a
+ *   second copy anywhere (a narrow-width duplicate, a screen-reader-only one) would leave
+ *   the reader with two answers to "where am I".
+ * - **The rule between the listing and that line is ONE rule.** The full-bleed listing box
+ *   below draws the closing hairline, and the foot deliberately draws none — see the
+ *   comment at the `RequestListPagination` call.
  */
 
 import { ArrowDown, ArrowUp, ArrowUpDown, TriangleAlert } from 'lucide-react';
@@ -2459,7 +2471,9 @@ export function ExpenseRequestList({
                    values inside keep that padding through the outer cells. The closing
                    hairline is drawn here rather than on the last row, which the primitive
                    deliberately leaves unruled — a listing worked down a page needs a
-                   bottom edge as much as it needs the rules between its rows.
+                   bottom edge as much as it needs the rules between its rows. That one
+                   rule is also the continuation line's top edge (R14), which is why the
+                   foot beneath it draws none of its own.
                    There is no card, no panel and no striped-row treatment left around it;
                    what frames the listing is the ruling. */
                 <div className={`${PAGE_BLEED_CLASS} border-b`}>
@@ -2540,8 +2554,17 @@ export function ExpenseRequestList({
             </>
           )}
 
-          {/* Always on the screen, whether or not there is anywhere to page to
-              (R12) — including when the narrowing has left nothing listed. */}
+          {/* The listing's continuation line — `RECORDS 1–20 OF 428 · PAGE 1 OF 22`
+              — and the controls that move through it (R14). Always on the screen,
+              whether or not there is anywhere to page to (R12), including when the
+              narrowing has left nothing listed.
+
+              It deliberately brings NO rule of its own: the hairline closing the
+              listing above it (drawn on the full-bleed box below) is the single rule
+              between the last row and this line, and is therefore the line's own top
+              edge as well. Two hairlines a `gap-4` apart with nothing between them
+              read as an empty band rather than as a closed listing — so if either
+              side ever changes, the rule stays ONE. */}
           <RequestListPagination
             total={orderedRequests.length}
             pageSize={pageSize}

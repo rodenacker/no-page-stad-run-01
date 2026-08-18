@@ -66,7 +66,10 @@
 
 import { useMemo } from 'react';
 
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  FIELD_LABEL_CLASS,
+  RULED_FIELD_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -158,17 +161,15 @@ const reportElementId = (reportId: string): string =>
   `expense-request-narrowing-report-${reportId}`;
 
 /**
- * A field's whole notation: an underline and nothing else. `border-0 border-b` is what
- * takes the box away — the primitive's own `border-input` COLOUR is deliberately left
- * alone (see the ⚠ in this file's header) — and `rounded-none px-0 shadow-none` takes
- * away the radius, the inset and the raised edge that made it read as a box.
+ * A field in this strip: the shared ruled notation (`fieldNotation.ts` — an underline and
+ * nothing else, with the primitive's own `border-input` COLOUR deliberately left alone,
+ * see the ⚠ in this file's header), sized to fill its column.
  *
- * The focus indicator is the primitives' own ring, untouched: an underline-only field
- * still has to paint a visible focus indicator for a keyboard user, and this project's
- * one focus notation is the ring.
+ * The notation itself is imported rather than restated: the foot's requests-per-page field
+ * wears the same one, and two copies of the string is how the underline on one of them
+ * quietly drifts from the others.
  */
-const UNDERLINED_FIELD_CLASS =
-  'h-9 w-full rounded-none border-0 border-b bg-transparent px-0 text-sm shadow-none dark:bg-transparent dark:hover:bg-transparent';
+const UNDERLINED_FIELD_CLASS = `${RULED_FIELD_CLASS} h-9 w-full text-sm`;
 
 /** A figure or a date is fixed-field notation: mono, and tabular so bounds line up. */
 const FIGURE_FIELD_CLASS = 'font-mono tabular-nums';

@@ -25,7 +25,8 @@
       "Every control on a row now reads with the same weight (no filled Approve): in this design the confirmation protects a decision, not the button's heaviness. Worth confirming by eye that Approve and Reject are still easy enough to pick out at a glance down a full page of rows.",
       "The listing's bottom edge is closed with a hairline. Story 7 rebuilds the foot of the screen as a continuation line, so if that line brings a rule of its own the two will need to be reconciled to one.",
       "A request that repeats another is marked in the gutter as a rule down the row's outer edge rather than as one of the shapes in the two characters - the two characters can only hold one thing and an Approver's tick has to win on a request still awaiting a decision. Worth a look: is the edge bar findable enough when scanning the column for duplicates?",
-      "On a decided row the row's values recede but the decision keeps full colour in two places - the gutter mark and the status word beside it. That is R20's own 'with its gutter mark carrying the decision', but it does mean an approved row still has one saturated green element on it. Worth confirming by eye that it reads as 'quieter' rather than as 'still shouting'."
+      "On a decided row the row's values recede but the decision keeps full colour in two places - the gutter mark and the status word beside it. That is R20's own 'with its gutter mark carrying the decision', but it does mean an approved row still has one saturated green element on it. Worth confirming by eye that it reads as 'quieter' rather than as 'still shouting'.",
+      "When a search or filter has hidden every request, the foot reads 'RECORDS 0 OF 0 - PAGE 1 OF 1'. R14 fixes the notation for a page of records and nothing pins the empty case, so this is a chosen wording - confirm '0 of 0' reads as intended there rather than something like 'NO RECORDS'."
     ],
     "manualTestResults": []
   },
@@ -74,11 +75,11 @@
       "completedAt": "2026-08-18T07:45:55.000Z"
     },
     "7": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-18T07:46:40.000Z",
+      "completedAt": "2026-08-18T08:04:48.000Z"
     },
     "8": {
       "status": "pending",
@@ -96,5 +97,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-18T07:45:55.000Z"
+  "lastUpdated": "2026-08-18T08:04:48.000Z"
 }

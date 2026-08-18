@@ -211,6 +211,43 @@ export const pageOf = <TItem>(
   pageSize: number,
 ): TItem[] => items.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
+/** Which records of the set a page holds, as a reader counts them — from 1. */
+export interface RecordRange {
+  /** The first record on the page. */
+  firstRecord: number;
+  /** The last record on the page, inclusive. */
+  lastRecord: number;
+}
+
+/**
+ * The same slice `pageOf` takes, described in the reader's own numbering — what the
+ * listing's continuation line states (`RECORDS 1–20 OF 428`, brief R14).
+ *
+ * It lives beside the slice deliberately: the line and the rows it claims to describe
+ * are then two readings of one calculation rather than two calculations that have to
+ * agree. Two ends of it are the whole of the arithmetic and both are where this is
+ * usually got wrong:
+ *
+ * - **The last page is CLAMPED to the set.** Page 22 of 428 at 20 a page ends at 428,
+ *   not at 440 — the naive `(pageIndex + 1) * pageSize` overshoots, and the line then
+ *   claims records the listing cannot show.
+ * - **An empty set holds no records at all**, so it is `0` and `0` rather than a
+ *   first record of 1 the set does not contain. That is a real state on this screen:
+ *   a narrowing that has hidden every request still states its continuation, because
+ *   the page controls are never taken away (R2/UI-16).
+ */
+export const recordRangeOf = (
+  total: number,
+  pageIndex: number,
+  pageSize: number,
+): RecordRange =>
+  total === 0
+    ? { firstRecord: 0, lastRecord: 0 }
+    : {
+        firstRecord: pageIndex * pageSize + 1,
+        lastRecord: Math.min((pageIndex + 1) * pageSize, total),
+      };
+
 /**
  * A chosen page size, as one of the sizes actually on offer (R12). The selector only
  * offers those four, so this is the guard for a value arriving from anywhere else
