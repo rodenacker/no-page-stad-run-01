@@ -263,6 +263,47 @@
   }
 }
 
+/*
+ * THE ONE ORCHESTRATED MOTION ON THE REQUEST LIST (request-list-redesign R22/BR8): the
+ * batch's outstanding count settling onto its new value as a decision resolves. The whole
+ * screen's motion grammar is this and nothing else — no hover fills, no row transitions, no
+ * entrance animations — so anything added beside it competes with the one moment that is
+ * meant to be noticed.
+ *
+ * Four things about it are the requirement rather than taste:
+ *
+ * - **It changes DIGITS IN PLACE, at zero layout shift.** The figure is set tabular
+ *   (`tabular-nums`, Azeret Mono), so every digit has the same advance width and the box the
+ *   count sits in does not depend on which digits are showing. This keyframe moves the
+ *   digits only — a transform, which takes no part in layout — so nothing below the control
+ *   block can move while the count rolls.
+ * - **It is STEPPED, not eased.** `steps()` is what makes it read as a mechanical
+ *   counter clicking over rather than as a UI flourish — the register of a printed batch
+ *   listing, which is the whole design direction.
+ * - **The `to` state is the element's own natural state**, and the animation carries NO
+ *   fill mode. That is what makes it work WITH the reduced-motion rule below rather than
+ *   against it: that rule forces every duration to `0.01ms`, so under it the roll simply
+ *   ends immediately, on exactly the value and the position the animated path lands on. One
+ *   information design, two paces — there is no second, competing declaration anywhere for
+ *   the reduced-motion path, and there must not be.
+ * - **It rolls DOWNWARD**, entering from above, because what it almost always shows is a
+ *   batch working itself towards zero. The travel is stated in `em` so it stays in
+ *   proportion to whatever figure it moves, and is kept well inside the control block's own
+ *   top padding — the digits must settle within the band, never over the header above it.
+ */
+@keyframes figureRoll {
+  from {
+    transform: translateY(-0.22em);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@theme {
+  --animate-figure-roll: figureRoll 240ms steps(4, end);
+}
+
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   *,

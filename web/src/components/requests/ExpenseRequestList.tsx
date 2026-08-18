@@ -376,6 +376,30 @@
  *   awaiting a decision hold full contrast. Not `aria-hidden`, not `aria-disabled`, not a
  *   dim: a relative contrast move, and one that stays comfortably readable.
  *
+ * Watching the batch balance (`request-list-redesign` R17/R22, BR7/BR8):
+ *
+ * - **Before an irreversible decision commits, the screen ITSELF shows what the batch will
+ *   look like afterwards** (R17/BR7) — not the confirmation's wording, which describes an
+ *   outcome rather than showing one. Two things say it together: the control block states the
+ *   OUTSTANDING count the batch will have while `RECORDS` and `DECIDED` go on stating what it
+ *   is, so the three visibly do not add up; and every affected row carries the words `Not yet
+ *   confirmed` beside its status. Both readings come from ONE derived set of ids
+ *   (`awaitingConfirmationIds`), which is why they can never disagree.
+ * - **Nothing about it is stored, and nothing about it is optimistic.** The set is a reading
+ *   of the two confirmations this component already owned, so backing out of either restores
+ *   every figure and every row exactly and decides nothing (AC-3) — there is no second state
+ *   to unwind. What actually happened still arrives only by RE-READING, exactly as before.
+ * - **The machinery underneath is untouched** (R1/BR2). `lib/transactions/deciding.ts`,
+ *   `bulkApproval.ts` and `refreshing.ts` are reused as they shipped: the re-read before
+ *   anything is sent, the already-decided refusal in its own words, the three-bucket outcome
+ *   with its scoped retry, and the self-refresh with its pausing rules all behave identically.
+ *   This is a presentation layer OVER them, never inside them.
+ * - **The one orchestrated motion on this screen is the outstanding count settling** (R22/
+ *   BR8) — see `BatchControlBlock` and the `figureRoll` keyframes in `globals.css`. It follows
+ *   the count the batch ACTUALLY has, so a decision produces one settle rather than three
+ *   (into the projection, back out of it, then down), and it is the reason this screen has no
+ *   hover fills or row transitions to compete with it.
+ *
  * The continuation line at the foot (`request-list-redesign` R14):
  *
  * - **The listing states its own continuation** — `RECORDS 1–20 OF 428 · PAGE 1 OF 22` —
@@ -409,6 +433,7 @@ import { BatchControlBlock } from '@/components/requests/BatchControlBlock';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
 import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
+import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RejectionNoteStep } from '@/components/requests/RejectionNoteStep';
 import { RequestActions } from '@/components/requests/RequestActions';
@@ -914,6 +939,7 @@ const gutterIntentOf = (request: TransactionRead): StatusIntent | undefined =>
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
+  awaitingConfirmation,
   selectable,
   selected,
   selectionLocked,
@@ -926,6 +952,13 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
 }: {
   request: TransactionRead;
   possibleDuplicate: boolean;
+  /**
+   * Whether a decision on this request is waiting to be confirmed — the reader's own,
+   * single or as part of a selection (R17/BR7). A plain boolean, so the memo still holds,
+   * and the list's answer rather than this row's: the same value reaches the phone-width
+   * line-group, so the mark cannot appear at one width and not the other.
+   */
+  awaitingConfirmation: boolean;
   /**
    * Whether THIS request may be selected: an Approver, and a request still awaiting a
    * decision (BR1). False means no control at all in the gutter — absent, never a
@@ -1033,15 +1066,22 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
       <TableCell className={FIGURE_CELL_CLASS}>{request.Amount}</TableCell>
       <TableCell>{transactionTypeLabel(request.TransactionType)}</TableCell>
       <TableCell>
-        {/* Where the request stands, and — beside it, in words — whether another
-            request in the same load repeats it (R8). The mark sits in the row itself
-            so it is readable without opening anything, and it is one element carrying
-            one phrase. */}
+        {/* Where the request stands, and — beside it, in words — whether a decision on it
+            is waiting to be confirmed (R17/BR7) and whether another request in the same
+            load repeats it (R8). Each mark sits in the row itself so it is readable
+            without opening anything, and each is one element carrying one phrase.
+
+            The pre-commit mark comes FIRST because it is the most immediate thing about
+            the row: the reader is being asked about this request right now. It is words
+            rather than a shape in the gutter for two reasons — those two characters are
+            usually already carrying the tick that put the decision in flight, and a mark
+            with no accompanying text anywhere on the row would not satisfy R3 (BR3). */}
         <div className="flex flex-wrap items-center gap-1">
           <StatusBadge
             status={request.Status}
             presentation={presentationOf(request)}
           />
+          {awaitingConfirmation && <NotYetConfirmedMark />}
           {possibleDuplicate && <PossibleDuplicateMark />}
         </div>
       </TableCell>
@@ -2155,6 +2195,36 @@ export function ExpenseRequestList({
   };
 
   /**
+   * The requests a decision is waiting to be confirmed on, by id (R17/BR7) — the pre-commit
+   * state, and the ONE thing this story adds to the screen's state.
+   *
+   * Four things about it are deliberate:
+   *
+   * - **It is DERIVED, never stored.** It is a reading of the two confirmations this
+   *   component already owns, so backing out of either one — the way out, Escape, or a
+   *   selection emptying underneath it — restores every figure and takes every mark off by
+   *   construction (AC-3). There is no second piece of state to forget to clear, and nothing
+   *   optimistic anywhere: the machinery underneath is untouched and still learns what
+   *   happened by re-reading (`lib/transactions/{deciding,bulkApproval,refreshing}.ts`).
+   * - **The single decision takes precedence**, because `pendingDecision` is the more
+   *   specific ask; the two confirmations are modal, so they cannot honestly be open at once.
+   * - **The bulk half reads the SELECTION and the `bulkApprovalAsked` gate**, and the gate
+   *   is what keeps the marks off the rows once the batch is under way: a request whose call
+   *   was refused stays selected so it can be tried again (bulk-approval BR11), and it must
+   *   not go on claiming a decision is awaiting confirmation on it.
+   * - **The rejection note step is deliberately NOT in it.** The pre-commit state is the
+   *   answer to "you are being asked to commit this"; while the note is being written nothing
+   *   has been confirmed and nothing has been asked yet, and the reader is looking at the
+   *   note step rather than at the batch behind it.
+   */
+  const awaitingConfirmationIds = useMemo<ReadonlySet<number>>(() => {
+    if (pendingDecision !== null) {
+      return new Set([pendingDecision.request.Id]);
+    }
+    return bulkApprovalAsked ? selectedIds : NOTHING_SELECTED;
+  }, [pendingDecision, bulkApprovalAsked, selectedIds]);
+
+  /**
    * The request the panel is showing, resolved from the fetched set rather than kept as
    * a copy — so the panel can never show a value the list no longer holds. A request
    * that is no longer there closes the panel rather than freezing an old version of it.
@@ -2186,6 +2256,7 @@ export function ExpenseRequestList({
           narrowed={applied.length > 0}
           narrowedToFile={appliedNarrowing.fileName}
           selectedIds={selectedIds}
+          awaitingConfirmationIds={awaitingConfirmationIds}
         />
       )}
 
@@ -2462,6 +2533,7 @@ export function ExpenseRequestList({
                   presentationOf={presentationOf}
                   gutterIntentOf={gutterIntentOf}
                   possibleDuplicateIds={possibleDuplicateIds}
+                  awaitingConfirmationIds={awaitingConfirmationIds}
                   maySelect={isApprover}
                   selectedIds={selectedIds}
                   selectionLocked={bulkApprovalRunning}
@@ -2542,6 +2614,9 @@ export function ExpenseRequestList({
                           key={request.Id}
                           request={request}
                           possibleDuplicate={possibleDuplicateIds.has(
+                            request.Id,
+                          )}
+                          awaitingConfirmation={awaitingConfirmationIds.has(
                             request.Id,
                           )}
                           selectable={isApprover && awaitsDecision(request)}

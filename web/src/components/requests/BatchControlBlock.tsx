@@ -46,14 +46,29 @@
  *   `<legend>` names its `<fieldset>` NATIVELY, which resolves both: one element points at
  *   the label, one element carries the count. `aria-label` on the live region is
  *   specifically wrong — it would freeze the region's name over its changing contents.
+ *
+ * And two more that arrived with the pre-commit state and the roll (R17/R22, BR7/BR8):
+ *
+ * - **While decisions are awaiting confirmation the block DELIBERATELY DOES NOT BALANCE**
+ *   (R17). `AWAITING DECISION` states what the batch will be; `RECORDS` and `DECIDED` go on
+ *   stating what it is, so the reader can see the after-picture and see that it has not
+ *   happened yet. The gap is NAMED beside it (`NOT YET CONFIRMED`) rather than left as a
+ *   mystery, and that pair is absent while nothing is pending. `lib/transactions/
+ *   controlTotals.ts` owns the arithmetic and the ⚠ about which figure may move.
+ * - **The roll follows the SETTLED count, never the stated one** (BR8). A projection
+ *   appearing or reverting is a state change, not a resolution: it swaps the digits with no
+ *   motion at all. The one orchestrated motion on this screen is the count settling onto a
+ *   decision that has actually been recorded — one per resolution, so a decision confirmed
+ *   does not roll three times on its way (into the projection, back out of it, then down).
  */
-import { useId, useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 
 import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
 import {
   AWAITING_DECISION_LABEL,
   BATCH_LABEL,
   DECIDED_LABEL,
+  NOT_YET_CONFIRMED,
   RECORDS_LABEL,
   RUN_DATE_LABEL,
   SELECTED_VALUE_LABEL,
@@ -62,6 +77,7 @@ import {
   batchNameOf,
   controlTotalsOf,
   figureText,
+  preCommitReadingOf,
   runDateOf,
   selectionSubtotalOf,
 } from '@/lib/transactions/controlTotals';
@@ -97,6 +113,26 @@ const FIGURE_CLASS = 'font-mono text-base tabular-nums';
  */
 const OUTSTANDING_FIGURE_CLASS =
   'font-mono text-[88px] leading-none tabular-nums';
+
+/**
+ * The box the digits roll inside (R22's "in place", and the zero-layout-shift half of it).
+ *
+ * `block` rather than the span's own `inline`, stated unconditionally so the figure's own box
+ * is IDENTICAL whether or not it is rolling: a block child of the `<p>` fills the same single
+ * line box the text filled directly, and a transform on it takes no part in layout at all.
+ * That is what leaves the count's box — and therefore every rule and row beneath the control
+ * block — exactly where it was while the digits move.
+ */
+const ROLL_BOX_CLASS = 'block';
+
+/**
+ * The roll itself, declared once in the token layer (`globals.css`, `@keyframes figureRoll`)
+ * with the reasoning for its stepped timing and its reduced-motion behaviour. Applied only
+ * to a figure that has something to roll TO: an element carrying it on first paint would
+ * animate the batch's opening count, which is not a resolution and is not this screen's one
+ * motion.
+ */
+const ROLL_CLASS = 'animate-figure-roll';
 
 /**
  * One space, closing each field's own text.
@@ -164,9 +200,44 @@ function WholeBatchRecords({ records }: { records: number }) {
   );
 }
 
-/** The focal figure — see the ⚠ in this file's header for why it is a `<fieldset>`. */
-function OutstandingFigure({ awaitingDecision }: { awaitingDecision: number }) {
+/**
+ * The focal figure — see the ⚠ in this file's header for why it is a `<fieldset>`, and the
+ * last two bullets for why it takes two numbers rather than one.
+ */
+function OutstandingFigure({
+  stated,
+  settled,
+}: {
+  /**
+   * What the figure SAYS: the projection while decisions are awaiting confirmation, and
+   * otherwise the batch's own count.
+   */
+  stated: number;
+  /**
+   * What the batch actually IS. The roll follows this and only this, so committing a
+   * decision produces one settle rather than three, and a projection appearing or being
+   * backed out of swaps the digits with no motion at all (BR8).
+   */
+  settled: number;
+}) {
   const labelId = useId();
+
+  /**
+   * Which roll the figure is on. React's documented way to adjust state when a value
+   * changes: the comparison happens during the render that first sees the new count, so the
+   * generation below is already correct in the commit that paints it — no effect, therefore
+   * no frame of the old count sitting on screen before the roll starts.
+   *
+   * It is a COUNTER rather than the value itself because that is what has to change for the
+   * element to be re-created and the animation to run again: two decisions that happen to
+   * land on the same count in a row are still two resolutions.
+   */
+  const [settledBefore, setSettledBefore] = useState(settled);
+  const [roll, setRoll] = useState(0);
+  if (settledBefore !== settled) {
+    setSettledBefore(settled);
+    setRoll((rolls) => rolls + 1);
+  }
 
   return (
     <fieldset className="m-0 border-0 p-0">
@@ -174,13 +245,26 @@ function OutstandingFigure({ awaitingDecision }: { awaitingDecision: number }) {
         {AWAITING_DECISION_LABEL}
       </legend>
       {/* Polite, and named by the legend above rather than by an `aria-label` that would
-          override its own changing contents. Its text is the count and nothing else. */}
+          override its own changing contents. Its text is the count and nothing else — which
+          is also why the roll animates ONE element holding the whole figure rather than a
+          strip of digits: a strip left in the markup would be read out as "0 1 2 3 4 5 6 7
+          8 9" by a screen reader, and this element is the app's statement of the count. */}
       <p
         role="status"
         aria-labelledby={labelId}
         className={OUTSTANDING_FIGURE_CLASS}
       >
-        {figureText(awaitingDecision)}
+        {/* Re-created on each resolution, which is what restarts the roll (a CSS animation
+            runs when the element carrying it is inserted). The first paint carries no
+            animation class at all — see `ROLL_CLASS`. */}
+        <span
+          key={roll}
+          className={
+            roll === 0 ? ROLL_BOX_CLASS : `${ROLL_BOX_CLASS} ${ROLL_CLASS}`
+          }
+        >
+          {figureText(stated)}
+        </span>
       </p>
       {FIELD_SEPARATOR}
     </fieldset>
@@ -208,6 +292,16 @@ interface BatchControlBlockProps {
   narrowedToFile: string;
   /** What is selected, by id: the money about to be committed (R19). */
   selectedIds: ReadonlySet<number>;
+  /**
+   * The requests a decision is awaiting confirmation on, by id — one for a single decision,
+   * the whole selection for a bulk approval, and NOTHING once either confirmation has been
+   * answered either way (R17/BR7).
+   *
+   * The block derives its unbalanced reading from this and holds no pre-commit state of its
+   * own, which is what makes AC-3's revert exact: the list stops asking, the set empties, and
+   * every figure is back.
+   */
+  awaitingConfirmationIds: ReadonlySet<number>;
 }
 
 export function BatchControlBlock({
@@ -216,6 +310,7 @@ export function BatchControlBlock({
   narrowed,
   narrowedToFile,
   selectedIds,
+  awaitingConfirmationIds,
 }: BatchControlBlockProps) {
   /**
    * Memoised on the arrays the list already memoises, so a keystroke that leaves the
@@ -230,6 +325,17 @@ export function BatchControlBlock({
   const selection = useMemo(
     () => selectionSubtotalOf(batch, selectedIds),
     [batch, selectedIds],
+  );
+
+  /**
+   * What the block states while the reader is being asked to commit something (R17/BR7).
+   * With nothing pending this reads `notYetConfirmed: 0` and an `awaitingDecision` identical
+   * to the batch's own, so the pre-commit pair is simply absent and every other figure is
+   * untouched.
+   */
+  const preCommit = useMemo(
+    () => preCommitReadingOf(totals, listed, awaitingConfirmationIds),
+    [totals, listed, awaitingConfirmationIds],
   );
 
   return (
@@ -253,7 +359,28 @@ export function BatchControlBlock({
             narrowed ? <WholeBatchRecords records={batch.length} /> : undefined
           }
         />
-        <OutstandingFigure awaitingDecision={totals.awaitingDecision} />
+        <OutstandingFigure
+          stated={preCommit.awaitingDecision}
+          settled={totals.awaitingDecision}
+        />
+
+        {/* The gap, NAMED — how many decisions are waiting to be confirmed, in the same
+            label-over-figure grammar as everything else on the band (R17/BR7). It joins the
+            line only while something is actually pending and is absent from the markup
+            otherwise, exactly as the selection pair below is: an indicator permanently
+            reading "0 not yet confirmed" is a fixture rather than an answer. Without it a
+            projected outstanding count would be indistinguishable, to a screen-reader user,
+            from a decision that had already been recorded. */}
+        {preCommit.notYetConfirmed > 0 && (
+          <ControlFigure
+            label={NOT_YET_CONFIRMED}
+            figure={figureText(preCommit.notYetConfirmed)}
+          />
+        )}
+
+        {/* ⚠ The batch as it IS, and it does not move for a pending decision (R17) — see
+            the header. `RECORDS` above is the same: only the outstanding count states the
+            projection, which is what leaves the three visibly not adding up. */}
         <ControlFigure
           label={DECIDED_LABEL}
           figure={figureText(totals.decided)}

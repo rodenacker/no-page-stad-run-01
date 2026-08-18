@@ -72,12 +72,16 @@
  * The possible-duplicate mark is the same `PossibleDuplicateMark` the wide row renders —
  * the mark has to be readable in the listing at every width — and which requests carry it
  * is decided once per load over the whole fetched set, upstream of the page this group is
- * on.
+ * on. The same goes for the pre-commit mark (`NotYetConfirmedMark`, R17/BR7): a phone-width
+ * reader being asked to confirm a decision sees the batch's after-picture on the affected
+ * groups exactly as a wide-screen reader does, and which groups those are is the list's
+ * answer, handed down rather than re-derived here.
  */
 
 import { memo } from 'react';
 
 import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RequestActions } from '@/components/requests/RequestActions';
 import {
@@ -207,6 +211,12 @@ interface RequestLineGroupProps {
   /** Whether this load marked the request a possible duplicate (brief R18/BR3). */
   possibleDuplicate: boolean;
   /**
+   * Whether a decision on this request is waiting to be confirmed — this reader's own,
+   * single or as part of a selection (R17/BR7). A plain boolean, so the memo holds, and
+   * decided by the list, so the mark cannot appear at one width and not the other.
+   */
+  awaitingConfirmation: boolean;
+  /**
    * Whether THIS request may be selected to be approved with others — an Approver, and
    * a request still awaiting a decision (bulk-approval BR1/BR10). False means no
    * control at all in the gutter, never a disabled one; the gutter itself stays either
@@ -254,6 +264,7 @@ const RequestLineGroup = memo(function RequestLineGroup({
   presentationOf,
   gutterIntentOf,
   possibleDuplicate,
+  awaitingConfirmation,
   selectable,
   selected,
   selectionLocked,
@@ -332,14 +343,16 @@ const RequestLineGroup = memo(function RequestLineGroup({
           </div>
 
           {/* Where the request stands — first on its line in every group, so the marks
-              read as one column down the page — then, in words, whether another request
-              in the same load repeats it (R18/BR3), then the day it happened. The date is
-              printed exactly as the service wrote it; nothing here normalises one. */}
+              read as one column down the page — then, in words, whether a decision on it is
+              waiting to be confirmed (R17/BR7) and whether another request in the same load
+              repeats it (R18/BR3), then the day it happened. The date is printed exactly as
+              the service wrote it; nothing here normalises one. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <StatusBadge
               status={request.Status}
               presentation={presentationOf(request)}
             />
+            {awaitingConfirmation && <NotYetConfirmedMark />}
             {possibleDuplicate && <PossibleDuplicateMark />}
             <span className="flex items-baseline gap-2">
               <span className={FIELD_LABEL}>{TRANSACTION_DATE_LABEL}</span>
@@ -386,6 +399,12 @@ interface RequestCardsProps {
    */
   possibleDuplicateIds: ReadonlySet<number>;
   /**
+   * The ids a decision is awaiting confirmation on (R17/BR7). Read here and handed to each
+   * group as a plain boolean, exactly as the selection is — a group must never receive the
+   * set itself.
+   */
+  awaitingConfirmationIds: ReadonlySet<number>;
+  /**
    * Whether the reader may select requests at all (an Approver — bulk-approval
    * R7/BR10). Which requests may be selected is asked per request below, so this stays
    * one stable boolean.
@@ -428,6 +447,7 @@ export function RequestCards({
   presentationOf,
   gutterIntentOf,
   possibleDuplicateIds,
+  awaitingConfirmationIds,
   maySelect,
   selectedIds,
   selectionLocked,
@@ -450,6 +470,7 @@ export function RequestCards({
           presentationOf={presentationOf}
           gutterIntentOf={gutterIntentOf}
           possibleDuplicate={possibleDuplicateIds.has(request.Id)}
+          awaitingConfirmation={awaitingConfirmationIds.has(request.Id)}
           selectable={maySelect && awaitsDecision(request)}
           selected={selectedIds.has(request.Id)}
           selectionLocked={selectionLocked}

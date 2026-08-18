@@ -58,6 +58,20 @@ export const DECIDED_LABEL = 'Decided';
 export const TOTAL_VALUE_LABEL = 'Total value';
 
 /**
+ * The pre-commit wording (R17/BR7) — ONE phrase, deliberately used in two places, so the
+ * band and the rows can never come to say two different things about one pending decision:
+ *
+ * - as the control block's label for the gap, over the number of decisions awaiting
+ *   confirmation — and ABSENT from the block while nothing is pending, this project's
+ *   convention for an indicator whose only other reading would be a permanent `0` (the
+ *   ambient selection count, and the selection subtotal beside it);
+ * - as the MARK every affected row carries, in the shared `StatusBadge` grammar — words
+ *   paired with a shape and an intent colour, because a shape in the gutter alone would not
+ *   satisfy R3/BR3 (see `components/requests/NotYetConfirmedMark`).
+ */
+export const NOT_YET_CONFIRMED = 'Not yet confirmed';
+
+/**
  * What the whole-batch record count is called while a narrowing is active (R21). It is
  * kept beside the narrowed figures with a line through it, and a line through a number
  * says nothing on its own — so it carries this as its accessible name.
@@ -127,6 +141,72 @@ export const controlTotalsOf = (
     awaitingDecision,
     decided: requests.length - awaitingDecision,
     totalValue,
+  };
+};
+
+/**
+ * What the control block states while decisions are AWAITING CONFIRMATION — the batch as
+ * it will be, beside the batch as it is (R17/BR7).
+ *
+ * ⚠ **Only `AWAITING DECISION` moves.** `RECORDS` and `DECIDED` go on stating what the
+ * batch actually IS, so the three visibly do not add up while a decision is pending — which
+ * is the whole of R17: the reader sees the after-picture and can see it has not happened
+ * yet. Moving `DECIDED` with the outstanding count would re-balance the block and leave
+ * nothing to see, which defeats the requirement entirely. Nothing here decides anything and
+ * nothing here is optimistic: it is arithmetic over a set of ids the screen is still ASKING
+ * about, so backing out restores every figure by simply handing over an empty set.
+ */
+export interface PreCommitReading {
+  /**
+   * How many decisions are awaiting confirmation. `0` means nothing is pending, and the
+   * block states the pair NOT AT ALL rather than a fixture reading zero.
+   */
+  notYetConfirmed: number;
+  /**
+   * What `AWAITING DECISION` states: the figure the batch will have once those decisions
+   * are committed.
+   */
+  awaitingDecision: number;
+}
+
+/**
+ * How many of a set's requests a decision is awaiting confirmation on.
+ *
+ * Counted over the requests the block is describing — so a narrowing that hides a selected
+ * request keeps the named gap and the visible movement in step — and only over requests a
+ * decision is still open on (`awaitsDecision`, imported rather than restated, exactly as
+ * {@link controlTotalsOf} takes it), so a request a colleague decided while the
+ * confirmation stood cannot be counted twice.
+ */
+export const decisionsAwaitingConfirmationIn = (
+  requests: readonly TransactionRead[],
+  awaitingConfirmation: ReadonlySet<number>,
+): number =>
+  awaitingConfirmation.size === 0
+    ? 0
+    : requests.filter(
+        (request) =>
+          awaitsDecision(request) && awaitingConfirmation.has(request.Id),
+      ).length;
+
+/**
+ * The two figures the pre-commit state adds to the block, from the totals it already has
+ * and the decisions currently awaiting confirmation. See {@link PreCommitReading} for the
+ * ⚠ about which figures may move.
+ */
+export const preCommitReadingOf = (
+  totals: ControlTotals,
+  listed: readonly TransactionRead[],
+  awaitingConfirmation: ReadonlySet<number>,
+): PreCommitReading => {
+  const notYetConfirmed = decisionsAwaitingConfirmationIn(
+    listed,
+    awaitingConfirmation,
+  );
+
+  return {
+    notYetConfirmed,
+    awaitingDecision: totals.awaitingDecision - notYetConfirmed,
   };
 };
 
