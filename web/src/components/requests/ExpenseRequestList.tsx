@@ -89,13 +89,18 @@
  *   request is open (by id); the panel holds the reveal, so closing it returns the
  *   reader to their place, ordering and page untouched. See `RequestDetailPanel`.
  * - **Still nothing changes a request** (BR1/R5). The only per-request control is
- *   "open it", a direct control on the row and on the card alike — see `RequestActions`
+ *   "open it", a direct control on the row and on the narrow line-group alike — see `RequestActions`
  *   for why there is no ⋯ overflow behind it.
- * - **At phone width the requests are CARDS, not a table.** Which presentation is
- *   rendered is decided by the browser's own media query, watched as external state, so
- *   only one of the two is ever in the markup: a table hidden by CSS would still be read
- *   by assistive technology and would still be the thing a test finds. A wide table in a
- *   sideways-scrolling wrapper does not satisfy R16 either way.
+ * - **At phone width the requests are RULED LINE-GROUPS, not a table — and not cards
+ *   either** (`request-list-redesign` R4/R10). Which presentation is rendered is decided
+ *   by the browser's own media query, watched as external state, so only one of the two is
+ *   ever in the markup: a table hidden by CSS would still be read by assistive technology
+ *   and would still be the thing a test finds. A wide table in a sideways-scrolling
+ *   wrapper does not satisfy R4 either way. The narrow presentation is `RequestCards`
+ *   (the file name is historical — the Shadcn `Card` per request it once composed is a
+ *   named anti-goal of this design and is gone), and it is handed the same readings this
+ *   file settles for the wide listing: how a status reads, and which shape a request's own
+ *   state puts in the gutter.
  *
  * Possible duplicates, and who is told about them (R4/R8/R21, BR2/BR3):
  *
@@ -148,13 +153,13 @@
  *
  * Deciding one request (`expense-decisions` R1/R10/R11/R12/R14/R15, BR3/BR6/BR7):
  *
- * - **This component owns the decide flow; the row, the card and the panel only ask.**
+ * - **This component owns the decide flow; the row, the line-group and the panel only ask.**
  *   `RequestActions` and `RequestDetailPanel` are handed `onDecide` — and handed it
  *   ONLY for an Approver looking at a request that is still `Imported` — so a reader who
  *   may not decide, or a request that has already been decided, has no decide control in
  *   its markup at all. Absent, never disabled: the project's rule everywhere, and the
  *   thing a greyed-out Approve would quietly break.
- * - **The two decisions are DIRECT controls on the row and on the card** (user decision
+ * - **The two decisions are DIRECT controls on the row and on the narrow line-group** (user decision
  *   at manual test), and there is no ⋯ overflow anywhere on a request — so deciding one
  *   costs one activation rather than two. They are therefore on
  *   screen once per listed request, which is why each one's accessible name carries the
@@ -212,7 +217,7 @@
  *   were. The deliberate consequence, accepted at the stories approval, is that a bulk
  *   action may cover requests that are not on screen — which is why the count is always
  *   visible and why the action that uses it names an exact figure.
- * - **Each row and card gets a plain `selected` boolean, never the set.** Handing the
+ * - **Each row and line-group gets a plain `selected` boolean, never the set.** Handing the
  *   set down would defeat the memo on every row on every tick — and, once this list
  *   refreshes itself, on every poll. Same shape as `possibleDuplicate` and `canDecide`.
  * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick in the
@@ -872,7 +877,9 @@ const presentationOf = (
 
 /**
  * Which of the shared shapes a request's own state puts in the gutter, and `undefined`
- * for the rows that carry none (R15/R18/BR5).
+ * for the rows that carry none (R15/R18/BR5). Stated once and handed to BOTH
+ * presentations — the wide row below and the narrow line-group (`RequestCards`) — so the
+ * gutter cannot mark the same request two ways at two widths.
  *
  * Two readings are settled here, and both are deliberate:
  *
@@ -1206,7 +1213,7 @@ export function ExpenseRequestList({
     useState<ReadonlySet<number>>(NOTHING_SELECTED);
 
   /**
-   * One request ticked or unticked. Stable, because every row and card holds it — and
+   * One request ticked or unticked. Stable, because every row and line-group holds it — and
    * it takes the REQUEST rather than being rebuilt per row, which is what keeps them
    * memoised through a selection change (see `ExpenseRequestRow`).
    */
@@ -1571,7 +1578,7 @@ export function ExpenseRequestList({
    * Choosing a decision asks for it — it does not record it (R10/BR6). A rejection is
    * asked WHY first (R7/R9): the note step comes before the confirmation, and an
    * approval goes straight to it with nothing to write. Stable, because every row and
-   * card holds it.
+   * line-group holds it.
    */
   const askToDecide = useCallback(
     (request: TransactionRead, outcome: DecisionOutcome): void => {
@@ -2453,6 +2460,7 @@ export function ExpenseRequestList({
                 <RequestCards
                   requests={requestsOnPage}
                   presentationOf={presentationOf}
+                  gutterIntentOf={gutterIntentOf}
                   possibleDuplicateIds={possibleDuplicateIds}
                   maySelect={isApprover}
                   selectedIds={selectedIds}

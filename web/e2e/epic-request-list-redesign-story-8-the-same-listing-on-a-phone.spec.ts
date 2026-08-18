@@ -250,8 +250,17 @@ const approveRequestName = (reference: string): RegExp =>
 const selectRequestName = (reference: string): RegExp =>
   new RegExp(`select request ${reference}`, 'i');
 
-/** The confirming choice inside a decision's confirmation, never its Cancel. */
-const APPROVE_CHOICE = /^approve$/i;
+/**
+ * The confirming choice inside a decision's confirmation, never its Cancel.
+ *
+ * Deliberately narrow rather than anchored: the confirmation's choices are worded APART
+ * from the row's own control on purpose (`lib/transactions/deciding.ts` — the row's
+ * "Approve" asks, the dialog's "Approve request" does it, "Cancel" backs out), so an
+ * anchored `/^approve$/` would match neither. Scoped to the `alertdialog`, this is the
+ * same narrow form `expense-decisions` story 2 uses for the same choice: the dismissing
+ * choice is "Cancel", which cannot match it.
+ */
+const APPROVE_CHOICE = /approve/i;
 
 /** The detail panel's own written-out close control (`RequestDetailPanel.tsx`). */
 const CLOSE_PANEL = /^close$/i;
@@ -472,9 +481,21 @@ const amountOnScreen = (amount: number): RegExp => {
   return new RegExp(`${grouped}([.,]${String(cents)})?`);
 };
 
-/** A status as the service sent it, matched however the design cases it (R26). */
+/**
+ * A status as the service sent it, matched however the design cases it (R26).
+ *
+ * Anchored, so it names an ELEMENT whose whole text is the status — which is what R26/BR3
+ * ask of the mark (a shape paired with the status in words, and nothing else in with it).
+ * It is therefore always used through `getByText`, never through `toContainText`: a
+ * container's text also holds the request's reference, its figures and its controls, and
+ * an anchored pattern tested against all of that could never match.
+ */
 const statusOnScreen = (status: string): RegExp =>
   new RegExp(`^${status}$`, 'i');
+
+/** The one element in a request's group whose whole text is that request's status. */
+const statusMarkOn = (group: Locator, status: string): Locator =>
+  group.getByText(statusOnScreen(status));
 
 /**
  * A control's accessible name, for the parity sweep and for readable failure output.
@@ -808,7 +829,10 @@ test.describe('Epic request-list-redesign, Story 8: the same listing on a phone'
     // (the reference) plus key values a reader can act on without opening it.
     const group = requestGroup(page, firstAwaiting.Reference);
     await expect(group).toContainText(firstAwaiting.Reference);
-    await expect(group).toContainText(statusOnScreen(firstAwaiting.Status));
+    await expect(
+      statusMarkOn(group, firstAwaiting.Status),
+      `${firstAwaiting.Reference} must carry its status in words at phone width, on one mark of its own (R26/BR3)`,
+    ).toBeVisible();
     await expect(group).toContainText(amountOnScreen(firstAwaiting.Amount));
     await expect(
       group,
@@ -886,7 +910,7 @@ test.describe('Epic request-list-redesign, Story 8: the same listing on a phone'
     const markLeftEdges: number[] = [];
     for (const request of decided) {
       const group = requestGroup(page, request.Reference);
-      const mark = group.getByText(statusOnScreen(request.Status));
+      const mark = statusMarkOn(group, request.Status);
       await expect(
         mark,
         `${request.Reference} is ${request.Status}, and its mark must still carry that wording at phone width — a glyph paired with a readable label (R26/BR3)`,
@@ -1068,9 +1092,12 @@ test.describe('Epic request-list-redesign, Story 8: the same listing on a phone'
     await expect(typedConfirmation).toBeHidden();
 
     await expect(
-      requestGroup(page, typed.Reference),
+      statusMarkOn(
+        requestGroup(page, typed.Reference),
+        TRANSACTION_STATUS_APPROVED,
+      ),
       `${typed.Reference} was approved with the keyboard alone, so the listing must report it ${TRANSACTION_STATUS_APPROVED} at phone width — every action on this screen is completable by keyboard (R5, WCAG 2.2 AA)`,
-    ).toContainText(statusOnScreen(TRANSACTION_STATUS_APPROVED));
+    ).toBeVisible();
 
     /* ---- 2. By tapping, on a second request ---- */
 
@@ -1108,9 +1135,12 @@ test.describe('Epic request-list-redesign, Story 8: the same listing on a phone'
       .tap();
     await expect(tappedConfirmation).toBeHidden();
     await expect(
-      requestGroup(page, tapped.Reference),
+      statusMarkOn(
+        requestGroup(page, tapped.Reference),
+        TRANSACTION_STATUS_APPROVED,
+      ),
       `${tapped.Reference} was approved by tapping, so the listing must report it ${TRANSACTION_STATUS_APPROVED} at phone width too`,
-    ).toContainText(statusOnScreen(TRANSACTION_STATUS_APPROVED));
+    ).toBeVisible();
 
     await expectNothingScrollsSideways(
       page,

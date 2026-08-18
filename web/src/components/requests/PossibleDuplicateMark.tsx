@@ -11,9 +11,9 @@
  *   `--warning` one, marked with the doubled bar, because a possible duplicate is
  *   something the reader has to look at rather than something that has gone well or been
  *   refused — and it reads in the same notation as a status because it sits beside one.
- * - **One implementation, both presentations.** The desktop row and the phone-width card
- *   render this same component, so the mark cannot end up worded or coloured one way in
- *   the table and another way on a card.
+ * - **One implementation, both presentations.** The desktop row and the phone-width
+ *   line-group render this same component, so the mark cannot end up worded or coloured
+ *   one way in the table and another way at narrow width.
  * - **Exactly one element carries the wording.** No screen-reader-only second copy: the
  *   visible text IS the accessible text, and duplicating it would have a screen reader
  *   say the same phrase twice for one request.

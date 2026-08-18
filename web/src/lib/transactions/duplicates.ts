@@ -39,7 +39,7 @@ import { TRANSACTION_STATUS_REJECTED } from '@/types/transactions';
 import type { TransactionRead } from '@/types/transactions';
 
 /**
- * The wording the mark carries wherever it is shown. Stated once, so the row, the card
+ * The wording the mark carries wherever it is shown. Stated once, so the row, the narrow line-group
  * and the Approver's notification cannot describe the same thing differently.
  */
 export const POSSIBLE_DUPLICATE_MARK = 'Possible duplicate';

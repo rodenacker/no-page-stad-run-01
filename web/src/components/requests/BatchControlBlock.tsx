@@ -98,6 +98,21 @@ const FIGURE_CLASS = 'font-mono text-base tabular-nums';
 const OUTSTANDING_FIGURE_CLASS =
   'font-mono text-[88px] leading-none tabular-nums';
 
+/**
+ * One space, closing each field's own text.
+ *
+ * The band's fields are separate elements with no whitespace between them, so without
+ * this the band's own text run reads `RECORDS8AWAITING DECISION5DECIDED3` — every figure
+ * welded to the label of the field after it. Nothing about the LAYOUT needs it (a
+ * white-space-only run inside a flex or grid container is not rendered at all, so it
+ * costs nothing), and a screen reader hears each pair correctly either way through
+ * `aria-labelledby` — but anything reading the band FLAT gets a sentence rather than one
+ * unbroken token: a copy of the band, and a test asserting that a label is followed by
+ * its own figure. It closes the whole field rather than the figure element, so a figure's
+ * accessible name still carries the value and nothing else.
+ */
+const FIELD_SEPARATOR = ' ';
+
 /** One label-over-figure pair, with an optional second figure beside the first. */
 function ControlFigure({
   label,
@@ -124,6 +139,7 @@ function ControlFigure({
         </span>
         {beside}
       </div>
+      {FIELD_SEPARATOR}
     </div>
   );
 }
@@ -166,6 +182,7 @@ function OutstandingFigure({ awaitingDecision }: { awaitingDecision: number }) {
       >
         {figureText(awaitingDecision)}
       </p>
+      {FIELD_SEPARATOR}
     </fieldset>
   );
 }

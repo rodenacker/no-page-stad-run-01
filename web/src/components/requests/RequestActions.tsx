@@ -3,8 +3,9 @@
 /**
  * What a reader may DO with one expense payment request: open it, and — for an Approver
  * looking at a request that is still awaiting a decision — approve or reject it. One
- * component for both presentations, so a table row and a phone-width card offer the
- * same controls under the same wording.
+ * component for both presentations, so a table row and a phone-width line-group offer
+ * the same controls under the same wording — which is what makes "nothing is reachable
+ * only on a wide screen" true by construction rather than by inspection.
  *
  * Four things here are deliberate and easy to break:
  *
@@ -15,8 +16,9 @@
  *   sitting on the row — so the user had it removed outright at a later manual test.
  *   That supersedes the MECHANISM `expense-request-list` R16 named (an action overflow
  *   at phone width) while still serving its purpose: this one component renders both
- *   the table row and the phone-width card, so every per-request action is reachable at
- *   every width, now in one activation. Do not restore the menu as a missing feature.
+ *   the table row and the phone-width line-group, so every per-request action is
+ *   reachable at every width, now in one activation. Do not restore the menu as a
+ *   missing feature.
  * - **The decide actions are OFFERED OR ABSENT, never disabled.** `onDecide` arriving
  *   is the whole condition: the list hands it over only for an Approver
  *   (`expense-decisions` R14/BR7) looking at a request that is still `Imported`
