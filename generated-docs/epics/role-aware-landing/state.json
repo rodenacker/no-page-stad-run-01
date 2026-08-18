@@ -10,11 +10,28 @@
       "expense-request-list"
     ],
     "introducesSharedSurface": false,
-    "unverifiedAssumptions": [],
+    "unverifiedAssumptions": [
+      "Verify that your real accounts each hold just one of the two roles: this epic decides where to send someone from the roles the sign-in service reports for them. If real Approver accounts also carry Importer (or the other way round), those people will keep landing on the \"What you can do\" screen and will not notice any change — which may not be what you expected from this epic."
+    ],
     "manualTestResults": []
   },
-  "phase": "PLAN",
-  "stories": {},
+  "phase": "BUILD",
+  "stories": {
+    "1": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
   "halt": null,
   "lastUpdated": "2026-08-18T14:22:21.243Z"
 }
