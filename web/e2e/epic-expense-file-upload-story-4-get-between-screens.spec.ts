@@ -8,8 +8,8 @@
  * - Requirements: R11, BR6
  *
  * Coverage split (feature-planner tags — one tag, one test, one layer):
- * - AC-5 (the header alone gets a user from the expense files screen to the landing
- *   screen and back, never the browser's Back button), AC-6 (the navigation is
+ * - AC-5 (the header alone gets a user off the expense files screen and back again,
+ *   never the browser's Back button), AC-6 (the navigation is
  *   reachable and operable by keyboard alone, and stays usable at phone width) and
  *   AC-7 (an address with no screen still keeps the header, and the user can leave by
  *   it) → this file.
@@ -45,6 +45,9 @@
  *    them: `/transactions-api/...` is the app's OWN same-origin mount point, so an
  *    unmocked read is forwarded to the live transactions service by the app's route
  *    handler from inside the Next.js process — where `blockLiveBackends` cannot see it.
+ *    The journeys that now move through the expense request list (see the paths below)
+ *    mock its single read, `GET /transactions-api/v1/transactions`, for the same
+ *    reason.
  *
  * - Sign-in is faked with the mock `session` cookie the stub recognises for a role
  *   (`sessionTokenFor(role)`), seeded via `context.addCookies()` rather than by driving
@@ -66,9 +69,14 @@
  *   which link to the same address.
  * - The app's name in the header is a link (AC-3). It is located by its accessible
  *   name, which is the app name the header already shows.
- * - The way back to the landing screen is the app's name: `entryPointsFor()` offers no
- *   entry point for `/` (it is where entry points are offered), so the navigation
- *   itself never lists it. That is why AC-5's return leg uses the app name.
+ * - The app's address is not in the navigation: `entryPointsFor()` offers no entry
+ *   point for `/` (it is where entry points are offered), so the navigation itself
+ *   never lists it — the app's name is the only way to it. Since epic
+ *   `role-aware-landing` that address sends a person holding one recognised role
+ *   straight on to the screen that role uses, so for the Importer here it is not a
+ *   screen of its own to move to; the journeys below move between the two screens the
+ *   navigation does offer, and the app's name is exercised for reachability and for
+ *   where it leaves an Importer.
  * - At phone width the navigation may stay inline OR collapse behind a control. If it
  *   collapses, that control must be a `button` in the header whose accessible name
  *   says what it opens (something like "menu" or "navigation") — that is the one thing
@@ -120,12 +128,25 @@ import { createFileLog, fileLogListResponse } from '../src/mocks/data/file-log';
 import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
 import { ROLE_APPROVER, ROLE_IMPORTER } from '../src/mocks/data/role';
+import {
+  createTransaction,
+  transactionListResponse,
+} from '../src/mocks/data/transaction';
 
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 
-/** The two signed-in screens this story moves between (`lib/auth/access-map.ts`). */
-const LANDING_PATH = '/';
+/**
+ * The two signed-in screens this story moves between (`lib/auth/access-map.ts`).
+ *
+ * They used to be the expense files screen and the landing screen. Since epic
+ * `role-aware-landing` the app's address sends a person holding exactly one
+ * recognised role straight on to the screen that role uses, so an Importer has no
+ * landing screen of their own to move to — the journeys below move between the two
+ * screens both roles may open, which is what the header's navigation offers anyway.
+ * The moves are the same moves; only the far end of them changed.
+ */
 const UPLOAD_PATH = '/upload';
+const REQUESTS_PATH = '/requests';
 
 /**
  * An address inside the app that matches no screen — a mistyped or stale one, which is
@@ -138,8 +159,8 @@ const UPLOAD_PATH = '/upload';
 const ADDRESS_WITH_NO_SCREEN = '/expense-reqeusts';
 
 /**
- * The app's name as the header shows it — the accessible name of the link that takes
- * a user back to the landing screen (AC-3).
+ * The app's name as the header shows it — the accessible name of the link to the app's
+ * own address (AC-3).
  */
 const APP_NAME = /employee expenses/i;
 
@@ -170,6 +191,13 @@ const PHONE_VIEWPORT = { width: 390, height: 844 };
  * literal. Its row is how this spec recognises the expense files screen.
  */
 const LISTED_FILE = createFileLog();
+
+/**
+ * The one expense request the mocked service returns, from the project-wide factory.
+ * Its row is how this spec recognises the expense request list — the other screen the
+ * header gets a user to.
+ */
+const LISTED_REQUEST = createTransaction();
 
 /**
  * The real services' own origins (project.md §Data Source & Backend Integration).
@@ -266,7 +294,24 @@ const mockFileSettingList = async (page: Page): Promise<void> => {
 };
 
 /**
- * The header's link back to the landing screen — the app's own name (AC-3). Scoped to
+ * Answers the expense request list's single read with the shared envelope factory —
+ * the other screen the header moves to. Mocked for the same reason as the two reads
+ * above: `/transactions-api/...` is the app's own same-origin mount point, so an
+ * unmocked read is forwarded to the live transactions service from inside the Next.js
+ * process, where `blockLiveBackends` cannot see it.
+ */
+const mockTransactionList = async (page: Page): Promise<void> => {
+  await page.route('**/transactions-api/v1/transactions**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(transactionListResponse([LISTED_REQUEST])),
+    }),
+  );
+};
+
+/**
+ * The header's link to the app's own address — the app's own name (AC-3). Scoped to
  * the `banner` landmark, which the header must stay (existing header contract), and
  * found by its accessible name rather than by `href`, so it reads the way a user finds
  * it.
@@ -291,11 +336,16 @@ const headerDestination = (page: Page, path: string): Locator =>
   page.locator(`nav a[href="${path}"]`).filter({ visible: true });
 
 /**
- * The landing screen's own entry-point card for a screen — content only that screen
- * renders, so it is how this spec recognises having arrived there.
+ * The row the expense request list shows for the mocked request — content only that
+ * screen renders, so it is how this spec recognises having arrived there. Found by the
+ * request's own reference rather than by position, so the listing may be re-ordered or
+ * re-columned without touching this spec.
  */
-const landingEntryPoint = (page: Page, path: string): Locator =>
-  page.getByRole('main').locator(`a[href="${path}"]`);
+const listedRequestRow = (page: Page): Locator =>
+  page
+    .getByRole('main')
+    .getByRole('row')
+    .filter({ hasText: LISTED_REQUEST.Reference });
 
 /**
  * The row the expense files screen shows for the mocked file — content only that
@@ -394,7 +444,13 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
   // The browser's Back button is never touched here — nothing in this file steps back
   // through history. Both moves are made by operating the header, which is the whole
   // point of the criterion: the user reported having no way out of a screen.
-  test('the header alone gets a user from the expense files screen to the landing screen and back again', async ({
+  //
+  // The way out used to be the app's own name, back to the landing screen. Since epic
+  // `role-aware-landing` the app's address sends an Importer straight back to the
+  // expense files screen, so the way out of it is the header's OTHER destination — the
+  // expense request list, which both roles may open. Same criterion, same two moves,
+  // both still made by the header alone.
+  test('the header alone gets a user from the expense files screen to another screen and back again', async ({
     page,
     context,
   }) => {
@@ -402,18 +458,21 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileLogList(page);
     await mockFileSettingList(page);
+    await mockTransactionList(page);
     await blockLiveBackends(page);
 
     // Start where the user was stuck: on the expense files screen.
     await page.goto(UPLOAD_PATH);
     await expect(listedFileRow(page)).toBeVisible();
 
-    // 1. Out to the landing screen, by the app's own name in the header.
-    await appNameLink(page).click();
-    await expect(page).toHaveURL(LANDING_PATH);
-    await expect(landingEntryPoint(page, UPLOAD_PATH)).toBeVisible();
-    // The expense files screen really was left behind, rather than the landing
-    // screen's content appearing beside it.
+    // 1. Out to the expense request list, by the header's destination for it.
+    const expenseRequests = headerDestination(page, REQUESTS_PATH);
+    await expect(expenseRequests).toBeVisible();
+    await expenseRequests.click();
+    await expect(page).toHaveURL(REQUESTS_PATH);
+    await expect(listedRequestRow(page)).toBeVisible();
+    // The expense files screen really was left behind, rather than the request list's
+    // content appearing beside it.
     await expect(listedFileRow(page)).toHaveCount(0);
 
     // 2. ...and back into the expense files screen, by the HEADER's destination for it
@@ -437,9 +496,13 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     await mockBrowserIdentityCall(page, ROLE_IMPORTER);
     await mockFileLogList(page);
     await mockFileSettingList(page);
+    await mockTransactionList(page);
     await blockLiveBackends(page);
 
-    await page.goto(LANDING_PATH);
+    // Started from the other screen both roles may open, rather than from the app's
+    // address: since epic `role-aware-landing` that address sends an Importer straight
+    // on to the expense files screen, which is where this journey is going.
+    await page.goto(REQUESTS_PATH);
 
     // 1. Keyboard only: reach the header's expense files destination by Tab, and follow
     // it with Enter. A destination taken out of the tab order, or one that only
@@ -451,20 +514,22 @@ test.describe('Epic expense-file-upload, Story 4: get between screens from anywh
     await expect(page).toHaveURL(UPLOAD_PATH);
     await expect(listedFileRow(page)).toBeVisible();
 
-    // 2. Keyboard only, the other way: the app's name takes them back. Reached with
-    // Shift+Tab — walking back up the header the way a keyboard user does, rather than
-    // relying on Tab wrapping round the end of the document.
+    // 2. Keyboard only, the other way: the app's name is still reachable and still
+    // gets them somewhere. Reached with Shift+Tab — walking back up the header the way
+    // a keyboard user does, rather than relying on Tab wrapping round the end of the
+    // document. For this Importer the app's address is their own screen, so following
+    // the name leaves them on it instead of on a chooser.
     const appName = appNameLink(page);
     await expect(appName).toBeVisible();
     await pressUntilFocused(page, 'Shift+Tab', appName);
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(LANDING_PATH);
-    await expect(landingEntryPoint(page, UPLOAD_PATH)).toBeVisible();
+    await expect(page).toHaveURL(UPLOAD_PATH);
+    await expect(listedFileRow(page)).toBeVisible();
 
     // 3. The same navigation on a phone-sized screen, freshly rendered at that width
     // so the header lays itself out the way a phone user receives it.
     await page.setViewportSize(PHONE_VIEWPORT);
-    await page.goto(LANDING_PATH);
+    await page.goto(REQUESTS_PATH);
 
     const narrowExpenseFiles = headerDestination(page, UPLOAD_PATH);
     await openHeaderNavigation(page, narrowExpenseFiles);
