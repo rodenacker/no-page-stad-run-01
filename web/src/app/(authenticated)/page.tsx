@@ -104,13 +104,22 @@ export default async function SignedInHomePage() {
     //
     // 'replace' is stated rather than left to the default, because the default is
     // not one value: `redirect()` replaces when a page resolves it and PUSHES when a
-    // server action does. Both readings are plausible for a landing decision, and
-    // pushing is precisely the trap R9/BR4 forbid — the landing entry would survive
-    // in history and re-fire the moment someone pressed Back. Saying which one this
-    // is keeps it a decision rather than an inherited default. (Written as the
-    // literal the parameter's own type is made of, not as `RedirectType.replace`:
-    // the value is the same, and this way the only thing this page needs from
-    // `next/navigation` remains `redirect` itself.)
+    // server action does. Pushing is the trap R9/BR4 forbid — a landing entry left in
+    // history would re-fire the moment someone pressed Back — so this says which one
+    // it is rather than inheriting it. (Written as the literal the parameter's own
+    // type is made of, not as `RedirectType.replace`: the value is the same, and this
+    // way the only thing this page needs from `next/navigation` remains `redirect`
+    // itself.)
+    //
+    // It is NOT, on its own, what makes R9/BR4 hold, so do not read it as the whole
+    // guarantee: this type is carried into browser history only for a redirect a
+    // SERVER ACTION resolved. On a document load the browser gets a real 3xx, which
+    // never leaves an entry for `/` behind; on a client-side navigation (the header's
+    // app name) the router follows this redirect while fetching and the destination
+    // simply becomes the canonical address of the navigation already in flight, so
+    // `/` takes no entry of its own there either. What actually holds the guarantee
+    // is this epic's story-2 E2E spec, which walks Back and the app's name in a real
+    // browser — keep it passing.
     redirect(destination, 'replace');
   }
 
