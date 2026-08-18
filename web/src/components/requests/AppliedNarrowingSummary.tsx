@@ -24,7 +24,10 @@
  * pills it used to be — the strip it belongs to has no boxes left for it to match.
  */
 
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  FIELD_LABEL_CLASS,
+  RULED_ACTION_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 
 import type { AppliedNarrowing } from '@/lib/transactions/narrowing';
@@ -64,7 +67,7 @@ export function AppliedNarrowingSummary({
           type="button"
           variant="ghost"
           size="sm"
-          className={`${FIELD_LABEL_CLASS} border-input h-auto rounded-none border-b px-1 py-0.5`}
+          className={`${RULED_ACTION_CLASS} py-0.5`}
           onClick={onClearAll}
         >
           {CLEAR_ALL_LABEL}

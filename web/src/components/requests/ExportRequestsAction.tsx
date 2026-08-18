@@ -70,7 +70,10 @@
 
 import { Download } from 'lucide-react';
 
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastContext';
 import { deliverFile } from '@/lib/files/deliverFile';
@@ -193,10 +196,10 @@ export function ExportRequestsAction({
     <Button
       type="button"
       variant="ghost"
-      className={`${FIELD_LABEL_CLASS} border-input h-auto rounded-none border-b px-1 py-1`}
+      className={RULED_ACTION_CLASS}
       onClick={exportListedRequests}
     >
-      <Download aria-hidden="true" />
+      <Download aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
       {EXPORT_ACTION_LABEL}
     </Button>
   );

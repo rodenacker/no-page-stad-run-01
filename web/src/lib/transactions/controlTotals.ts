@@ -100,6 +100,51 @@ export const WHOLE_QUEUE_BATCH = 'ALL FILES';
  */
 export const NO_RUN_DATE = '—';
 
+/**
+ * The most decimal places this screen will carry in a summed figure.
+ *
+ * A guard rather than a format: `Amount` is a JSON number and nothing on the wire promises
+ * two decimals, so the scale a sum is settled at is taken from the data itself (below) and
+ * merely CAPPED here — high enough that no amount this service has ever sent is affected,
+ * low enough that the arithmetic stays inside `Number.MAX_SAFE_INTEGER` at the 10,000-request
+ * ceiling.
+ */
+const MOST_SUMMED_DECIMALS = 6;
+
+/** How many decimal places one amount actually carries, as the service wrote it. */
+const decimalsIn = (amount: number): number => {
+  const written = String(amount);
+  if (written.includes('e') || written.includes('E')) {
+    // An amount the runtime prints in exponential form: settle it at the cap rather than
+    // reading "no decimals" off a string that has none written in it.
+    return MOST_SUMMED_DECIMALS;
+  }
+  const [, decimals = ''] = written.split('.');
+  return Math.min(decimals.length, MOST_SUMMED_DECIMALS);
+};
+
+/**
+ * A set of amounts added up, settled at the precision the amounts themselves carry.
+ *
+ * ⚠ **This is arithmetic, NOT formatting** — the distinction this module's header draws.
+ * Adding binary floats leaves an error far below the last digit the data carries
+ * (`10.10 + 20.20 + 30.30` is `60.599999999999994` in IEEE-754), and `figureText` prints a
+ * figure verbatim, so a plain `+=` puts `26136.310000000005` in the control block: a total
+ * that cannot be reconciled against the rows above it, which is the one thing a control
+ * total exists to allow. Settling the sum at the scale of the widest amount in the set
+ * recovers the exact decimal total without grouping, padding, prefixing or otherwise
+ * touching how it prints — every input is summed in full and in the order it arrived, and
+ * only the accumulated binary noise is dropped.
+ */
+export const sumOfAmounts = (amounts: readonly number[]): number => {
+  const scale =
+    10 **
+    amounts.reduce((widest, amount) => Math.max(widest, decimalsIn(amount)), 0);
+  const summed = amounts.reduce((running, amount) => running + amount, 0);
+
+  return Math.round(summed * scale) / scale;
+};
+
 /** The four figures R11 names, over whichever set they are asked about. */
 export interface ControlTotals {
   /** How many requests the set holds. */
@@ -121,26 +166,28 @@ export interface ControlTotals {
  * module's header for why that matters more than it looks.
  *
  * The amounts are summed in the order they arrived, which is the order the rows are in
- * and the order a reader adding them up would use.
+ * and the order a reader adding them up would use — through {@link sumOfAmounts}, so the
+ * figure the block prints is the exact decimal total of the rows rather than the binary
+ * float that accumulating them leaves behind (see the ⚠ there).
  */
 export const controlTotalsOf = (
   requests: readonly TransactionRead[],
 ): ControlTotals => {
   let awaitingDecision = 0;
-  let totalValue = 0;
+  const amounts: number[] = [];
 
   requests.forEach((request) => {
     if (awaitsDecision(request)) {
       awaitingDecision += 1;
     }
-    totalValue += request.Amount;
+    amounts.push(request.Amount);
   });
 
   return {
     records: requests.length,
     awaitingDecision,
     decided: requests.length - awaitingDecision,
-    totalValue,
+    totalValue: sumOfAmounts(amounts),
   };
 };
 
@@ -273,15 +320,21 @@ export interface SelectionSubtotal {
  * different figures for one selection. The VALUE can only be summed over requests the
  * batch still holds; the two agree because a request that leaves the list leaves the
  * selection with it (`withDecidedRequestsDropped`).
+ *
+ * The value goes through {@link sumOfAmounts} for the same reason the batch total does, and
+ * it matters more here: this is the money the reader is about to commit, and it is read
+ * against the confirmation that commits it.
  */
 export const selectionSubtotalOf = (
   batch: readonly TransactionRead[],
   selectedIds: ReadonlySet<number>,
 ): SelectionSubtotal => ({
   count: selectedIds.size,
-  totalValue: batch
-    .filter((request) => selectedIds.has(request.Id))
-    .reduce((total, request) => total + request.Amount, 0),
+  totalValue: sumOfAmounts(
+    batch
+      .filter((request) => selectedIds.has(request.Id))
+      .map((request) => request.Amount),
+  ),
 });
 
 /**

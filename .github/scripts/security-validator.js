@@ -1864,17 +1864,40 @@ function parseGrepMatch(match) {
  * template literal or a string is NOT treated as a comment, so a real call built up
  * across lines still reports.
  *
+ * ⚠ **A block comment that CLOSES on this line only counts as prose when nothing follows
+ * the close.** Otherwise `{/* note *\/}<div dangerouslySetInnerHTML={{ __html: input }} />`
+ * — a real, unreviewed sink with a comment in front of it — would be skipped outright, and
+ * so would `/* ok *\/ el.innerHTML = untrusted;`. The whole line has to be comment for the
+ * scan to drop it; anything else goes on to the ignore lookups and reports as normal.
+ *
  * @param {string} line - The matched line's content
  * @returns {boolean} true when the match is prose, not a call
  */
 function isCommentLine(line) {
   const trimmed = line.trim();
-  return (
-    trimmed.startsWith('//') ||
+
+  // A line comment runs to the end of the line, so there is never code after it.
+  if (trimmed.startsWith('//')) {
+    return true;
+  }
+
+  // Otherwise this line has to be inside, or opening, a block comment.
+  const inBlockComment =
     trimmed.startsWith('*') ||
     trimmed.startsWith('/*') ||
-    trimmed.startsWith('{/*')
-  );
+    trimmed.startsWith('{/*');
+  if (!inBlockComment) {
+    return false;
+  }
+
+  // Still open at the end of the line: the whole line is prose.
+  const closesAt = trimmed.indexOf('*/');
+  if (closesAt === -1) {
+    return true;
+  }
+
+  // Closed here — prose only if nothing but JSX's own closing brace comes after it.
+  return !/[^\s}]/.test(trimmed.slice(closesAt + 2));
 }
 
 /**

@@ -70,6 +70,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import {
   FIELD_LABEL_CLASS,
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
   RULED_FIELD_CLASS,
 } from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
@@ -168,14 +170,7 @@ const PAGE_SIZE_FIELD_CLASS = `${RULED_FIELD_CLASS} h-8 w-auto min-w-14 justify-
  * these two apart is the word and the direction of the glyph, never weight or colour. The
  * primitive's own `disabled:opacity-50` is what makes an unusable control look unusable.
  */
-const PAGE_CONTROL_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto gap-1.5 rounded-none border-b px-1 py-1`;
-
-/**
- * Each control's glyph, sized down with its label — at 11px a 16px chevron would out-weigh
- * the word beside it. Set ON THE ICON rather than on the button: the primitive sizes any
- * icon that carries no size of its own, with a selector that beats a button-level override.
- */
-const PAGE_CONTROL_ICON_CLASS = 'size-3';
+const PAGE_CONTROL_CLASS = `${RULED_ACTION_CLASS} gap-1.5`;
 
 interface RequestListPaginationProps {
   /** How many requests the current search and filters left — what is being paged. */
@@ -277,7 +272,7 @@ export function RequestListPagination({
             >
               <ChevronLeft
                 aria-hidden="true"
-                className={PAGE_CONTROL_ICON_CLASS}
+                className={RULED_ACTION_ICON_CLASS}
               />
               {PREVIOUS_LABEL}
             </Button>
@@ -293,7 +288,7 @@ export function RequestListPagination({
               {NEXT_LABEL}
               <ChevronRight
                 aria-hidden="true"
-                className={PAGE_CONTROL_ICON_CLASS}
+                className={RULED_ACTION_ICON_CLASS}
               />
             </Button>
           </div>

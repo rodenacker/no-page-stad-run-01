@@ -93,6 +93,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { awaitsDecision } from '@/lib/transactions/deciding';
 import { REQUEST_COLUMNS } from '@/lib/transactions/ordering';
 import { selectRequestLabel } from '@/lib/transactions/selecting';
+import { cn } from '@/lib/utils';
 
 import type {
   StatusIntent,
@@ -286,9 +287,17 @@ const RequestLineGroup = memo(function RequestLineGroup({
 
   return (
     <li
-      className={`${GROUP_CLASS}${possibleDuplicate ? ` ${EXCEPTION_RULE_CLASS}` : ''}${
-        decided ? ` ${DECIDED_GROUP_CLASS}` : ''
-      }`}
+      // Composed through `cn` rather than by concatenation, because the exception rule and
+      // the always-drawn transparent one it replaces are the SAME Tailwind property. Two
+      // conflicting utilities left in one class attribute resolve by the order the
+      // stylesheet happens to emit them in, never by the order they are written — so a
+      // plain template string would leave a marked group's rule depending on how the two
+      // colour tokens sort against each other. `cn` drops the loser here instead.
+      className={cn(
+        GROUP_CLASS,
+        possibleDuplicate && EXCEPTION_RULE_CLASS,
+        decided && DECIDED_GROUP_CLASS,
+      )}
     >
       <div className="flex items-start gap-3">
         {/* THE RESERVED GUTTER (R15/BR5) — two characters, on every group, carrying at

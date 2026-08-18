@@ -431,7 +431,10 @@ import { ConfirmAction } from '@/components/common/ConfirmAction';
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
 import { BatchControlBlock } from '@/components/requests/BatchControlBlock';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  FIELD_LABEL_CLASS,
+  RULED_ACTION_CLASS,
+} from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
@@ -670,15 +673,6 @@ const FULL_BLEED_CLASS = `${PAGE_BLEED_CLASS} px-4`;
  * more row.
  */
 const RULED_BAND_CLASS = `${FULL_BLEED_CLASS} border-y`;
-
-/**
- * A control that is not a row's own: the empty state's next step, and the retry a failed
- * read offers. The strip's notation, exactly as the export and Clear all wear it
- * (`ExportRequestsAction`, `AppliedNarrowingSummary`) — a tracked micro-label on a rule,
- * because this screen has no boxed buttons left for one to match. The wording is
- * untouched: the capitals are `text-transform`, never a rewrite.
- */
-const RULED_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto rounded-none border-b px-1 py-1`;
 
 /**
  * The page padding, applied to the listing's own outer cells instead of to a box around

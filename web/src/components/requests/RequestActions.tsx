@@ -52,7 +52,10 @@
 import { Check, PanelRightOpen, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 import { DECISION_APPROVE } from '@/lib/api/decisions';
 import {
@@ -67,18 +70,12 @@ import type { DecisionOutcome } from '@/lib/api/decisions';
 const OPEN_LABEL = 'Open';
 
 /**
- * How every control on a request is drawn (see this file's header): the shared tracked
- * micro-label on a rule, one string so the three can never drift apart.
+ * How every control on a request is drawn (see this file's header): the screen's one ruled
+ * action notation (`fieldNotation.ts`), plus the gap a control with a glyph beside its words
+ * needs — so these three can never drift from the export, `Clear all` or the page controls,
+ * which are the same object.
  */
-const REQUEST_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto gap-1.5 rounded-none border-b px-1 py-1`;
-
-/**
- * Each control's glyph, sized down with the label — at 11px a 16px icon would out-weigh
- * the word beside it. It is set ON THE ICON rather than on the button: the primitive sizes
- * any icon that does not carry a size of its own, with a selector that beats a
- * button-level override, so this is the one place the size can actually be stated.
- */
-const ACTION_ICON_CLASS = 'size-3';
+const REQUEST_ACTION_CLASS = `${RULED_ACTION_CLASS} gap-1.5`;
 
 /** How each control names itself and the request it acts on (R15). */
 const openRequestName = (reference: string): string =>
@@ -184,9 +181,9 @@ export function RequestActions({
             }}
           >
             {outcome === DECISION_APPROVE ? (
-              <Check aria-hidden="true" className={ACTION_ICON_CLASS} />
+              <Check aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
             ) : (
-              <X aria-hidden="true" className={ACTION_ICON_CLASS} />
+              <X aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
             )}
             {decideActionLabel(outcome)}
           </Button>
@@ -203,7 +200,10 @@ export function RequestActions({
         aria-label={openName}
         onClick={onOpen}
       >
-        <PanelRightOpen aria-hidden="true" className={ACTION_ICON_CLASS} />
+        <PanelRightOpen
+          aria-hidden="true"
+          className={RULED_ACTION_ICON_CLASS}
+        />
         {OPEN_LABEL}
       </Button>
     </div>
