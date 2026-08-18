@@ -20,7 +20,10 @@
       "A range typed the wrong way round is now shown as a red message inside the strip plus a heavier red underline under the two fields of that range, replacing the old bordered warning box - confirm it reads clearly enough at a glance.",
       "Export requests to CSV and Clear all are now ruled text controls in the strip's notation rather than boxed buttons - confirm the export still reads as prominent enough to find.",
       "The status word is now set in the request list's tracked 11px mono UPPERCASE notation everywhere the shared mark appears - including the submitted-files list, a file's page, its import preview and its rejected rows, which this epic does not otherwise restyle. Worth a look at manual test to confirm 'a capitalised word' is meant as full caps rather than sentence case.",
-      "Two file statuses that share an intent (Uploaded and Validating, both informational) now share one shape, where before each had its own icon. They are still told apart by their words. Confirm the files list is no harder to scan for it."
+      "Two file statuses that share an intent (Uploaded and Validating, both informational) now share one shape, where before each had its own icon. They are still told apart by their words. Confirm the files list is no harder to scan for it.",
+      "'Full-bleed to the page padding' was read as: the hairline rules run to the very edge of the page while the values inside keep the page's own padding - the same convention the control block and the narrowing strip already use. The other reading (rules stopping where the padding starts) would leave the listing's rules 16px short of the strip's rule directly above them.",
+      "Every control on a row now reads with the same weight (no filled Approve): in this design the confirmation protects a decision, not the button's heaviness. Worth confirming by eye that Approve and Reject are still easy enough to pick out at a glance down a full page of rows.",
+      "The listing's bottom edge is closed with a hairline. Story 7 rebuilds the foot of the screen as a continuation line, so if that line brings a rule of its own the two will need to be reconciled to one."
     ],
     "manualTestResults": []
   },
@@ -55,11 +58,11 @@
       "completedAt": "2026-08-18T06:50:27.000Z"
     },
     "5": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-18T06:51:10.000Z",
+      "completedAt": "2026-08-18T07:20:02.000Z"
     },
     "6": {
       "status": "pending",
@@ -91,5 +94,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-18T06:50:27.000Z"
+  "lastUpdated": "2026-08-18T07:20:02.000Z"
 }

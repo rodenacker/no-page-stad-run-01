@@ -546,6 +546,76 @@ const NARROWED_EMPTY_HINT =
  */
 const ACTIONS_COLUMN_LABEL = 'Actions';
 
+/**
+ * FULL-BLEED TO THE PAGE PADDING, stated once for every part of this screen that runs
+ * edge to edge (`request-list-redesign` R13 — the same convention the control block and
+ * the narrowing strip already use).
+ *
+ * `-mx-4` cancels `<main>`'s own `px-4`, so the element's box — and therefore any rule
+ * drawn on it — reaches the edge of the page; `px-4` puts the padding back inside, so the
+ * content still lines up with the app's name in the header, with the control block's
+ * labels and with the strip's fields above it. If the layout's horizontal padding
+ * changes, this changes with it.
+ */
+const PAGE_BLEED_CLASS = '-mx-4';
+const FULL_BLEED_CLASS = `${PAGE_BLEED_CLASS} px-4`;
+
+/**
+ * A place in the listing that is not a row: the wait, an empty batch, a failed read, a
+ * narrowing that hid everything, and the notice saying the list has stopped keeping
+ * itself current.
+ *
+ * With the card gone (R13/AC-1) there is nothing framing any of these but the ruling
+ * itself, so each one is a full-bleed band closed by a hairline top and bottom — the same
+ * rule weight the rows carry, so an answer reads as part of the listing rather than as
+ * text stranded on a blank page. The vertical room is what keeps it from reading as one
+ * more row.
+ */
+const RULED_BAND_CLASS = `${FULL_BLEED_CLASS} border-y`;
+
+/**
+ * A control that is not a row's own: the empty state's next step, and the retry a failed
+ * read offers. The strip's notation, exactly as the export and Clear all wear it
+ * (`ExportRequestsAction`, `AppliedNarrowingSummary`) — a tracked micro-label on a rule,
+ * because this screen has no boxed buttons left for one to match. The wording is
+ * untouched: the capitals are `text-transform`, never a rewrite.
+ */
+const RULED_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto rounded-none border-b px-1 py-1`;
+
+/**
+ * The page padding, applied to the listing's own outer cells instead of to a box around
+ * it. The table itself is full-bleed so every hairline row rule reaches the edge of the
+ * page like the strip's rule above it; putting the padding on the first and last cell is
+ * what keeps the values inside those rules lined up with everything else on the screen.
+ */
+const LISTING_EDGE_PADDING_CLASS =
+  '[&_th:first-child]:pl-4 [&_td:first-child]:pl-4 [&_th:last-child]:pr-4 [&_td:last-child]:pr-4';
+
+/**
+ * A listed row (R13/AC-1): the hairline rule beneath it is the whole treatment. The
+ * primitive's hover fill is cancelled here rather than in the primitive itself — the files
+ * screens are not restyled by this epic (R28) — because a row that tints under the pointer
+ * is the striped-table treatment arriving one row at a time, and BR8 keeps this screen's
+ * one motion grammar for a decision resolving. Cancelling the transition with it also
+ * keeps a page of rows off the compositor at the 10,000-request volume (R8).
+ */
+const LISTING_ROW_CLASS =
+  'transition-none hover:bg-transparent has-aria-expanded:bg-transparent';
+
+/**
+ * A figure in the listing: Azeret Mono, tabular, and right-aligned so the digits line up
+ * column-perfect down the page (R13/AC-2).
+ */
+const FIGURE_CELL_CLASS = 'font-mono text-right tabular-nums';
+
+/**
+ * A fixed-field value that is not a figure to be added up — the reference, the masked
+ * account number, the transaction date as the service wrote it. Mono, because that is the
+ * notation this design reads them in (project.md §Styling & Branding), and left where the
+ * column starts.
+ */
+const NOTATION_CELL_CLASS = 'font-mono';
+
 /** A stable empty set, so narrowing is not recomputed while the list is not loaded. */
 const NO_REQUESTS: TransactionRead[] = [];
 
@@ -577,6 +647,13 @@ const duplicatesFoundMessage = (markedRequests: number): string =>
  */
 const PLACEHOLDER_AFTER_MS = 300;
 const STILL_LOADING_AFTER_MS = 3000;
+
+/**
+ * How many ruled placeholder rows stand in for the pending listing. Three: enough for the
+ * ruling to read as a listing rather than as one bar, and few enough that the placeholder
+ * never claims to know how many requests are on their way.
+ */
+const PLACEHOLDER_ROWS = [0, 1, 2];
 
 /**
  * How much of the wait the user is shown: nothing at all, a placeholder standing in
@@ -720,7 +797,7 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }) {
   return (
-    <TableRow>
+    <TableRow className={LISTING_ROW_CLASS}>
       {selectionOffered && (
         <TableCell className="w-10">
           {selectable && (
@@ -739,17 +816,23 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
         </TableCell>
       )}
       <TableCell>{request.FileName}</TableCell>
-      <TableCell className="font-medium">{request.Reference}</TableCell>
-      <TableCell className="whitespace-nowrap">
+      {/* The request's own identifier, in the notation this design reads a reference in
+          (R13/AC-2). Its weight is the notation's, not an added emphasis: down a ruled
+          column the fixed-width face is what makes one reference scannable against the
+          next. */}
+      <TableCell className={NOTATION_CELL_CLASS}>{request.Reference}</TableCell>
+      <TableCell className={`${NOTATION_CELL_CLASS} whitespace-nowrap`}>
         {request.TransactionDate}
       </TableCell>
-      <TableCell>
+      {/* Mono is set on the CELL, so the one masking surface stays untouched: the same
+          `MaskedAccountNumber` prints a failed file's rejected rows on a screen this epic
+          does not restyle (R28), and it inherits whatever face the surface around it is
+          set in. Masking has exactly one home and this is not it. */}
+      <TableCell className={NOTATION_CELL_CLASS}>
         <MaskedAccountNumber accountNumber={request.AccountNumber} />
       </TableCell>
       <TableCell>{request.Description}</TableCell>
-      <TableCell className="text-right tabular-nums">
-        {request.Amount}
-      </TableCell>
+      <TableCell className={FIGURE_CELL_CLASS}>{request.Amount}</TableCell>
       <TableCell>{transactionTypeLabel(request.TransactionType)}</TableCell>
       <TableCell>
         {/* Where the request stands, and — beside it, in words — whether another
@@ -764,7 +847,10 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
           {possibleDuplicate && <PossibleDuplicateMark />}
         </div>
       </TableCell>
-      <TableCell>
+      {/* The row's own controls, held to the right-hand edge of the page so they read as
+          one column of margin annotations down the listing rather than as a ragged band
+          in the middle of it — the heading above them has been right-aligned all along. */}
+      <TableCell className="text-right">
         <RequestActions
           reference={request.Reference}
           handOffFocus={handOffFocus}
@@ -800,6 +886,16 @@ const SORT_ICONS = {
  * unreachable by keyboard, and an arrow on its own would leave the direction to
  * eyesight alone. Only the column in force reports a direction — ordering is
  * single-field, so every other column says `none`.
+ *
+ * The heading is the screen's tracked micro-label notation (R13: 11px tracked mono column
+ * heads), imported from `fieldNotation.ts` rather than restated — a column head and a
+ * field label are the same object in this design. Two things about that are deliberate:
+ * the capitals are `text-transform`, so the wording a screen reader is given still reads
+ * as words and the sort control's accessible name is unchanged; and the head is set in
+ * `--muted-foreground` so the ink belongs to the values beneath it rather than to the
+ * words naming them. The primitive's hover fill is cancelled — a filled head is the panel
+ * treatment this story removes — leaving the ghost variant's own ink change as the
+ * pointer-and-keyboard state.
  */
 function SortableColumnHeading({
   column,
@@ -817,13 +913,13 @@ function SortableColumnHeading({
     <TableHead
       scope="col"
       aria-sort={direction}
-      className={column.numeric === true ? 'text-right' : undefined}
+      className={`text-muted-foreground${column.numeric === true ? ' text-right' : ''}`}
     >
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        className="-mx-2"
+        className={`${FIELD_LABEL_CLASS} -mx-2 hover:bg-transparent dark:hover:bg-transparent`}
         onClick={() => {
           onSort(column.key);
         }}
@@ -832,9 +928,11 @@ function SortableColumnHeading({
         {direction !== 'none' && (
           <span className="sr-only">, sorted {direction}</span>
         )}
+        {/* Sized down to the head's own scale: at 11px a 16px glyph would out-weigh the
+            word it belongs to. Still decoration — the direction is in the name. */}
         <SortIcon
           aria-hidden="true"
-          className={direction === 'none' ? 'opacity-50' : undefined}
+          className={direction === 'none' ? 'size-3 opacity-50' : 'size-3'}
         />
       </Button>
     </TableHead>
@@ -1922,7 +2020,7 @@ export function ExpenseRequestList({
       {cannotRefreshSince !== null && (
         <div
           role="status"
-          className="border-border bg-muted/50 grid gap-1 rounded-md border p-3 text-sm"
+          className={`${RULED_BAND_CLASS} grid gap-1 py-3 text-sm`}
         >
           <p className="font-medium">{CANNOT_REFRESH_MESSAGE}</p>
           <p>
@@ -1937,13 +2035,20 @@ export function ExpenseRequestList({
       )}
 
       {state.phase === 'loading' && state.wait !== 'brief' && (
-        <div role="status" className="grid gap-2">
+        <div role="status" className="grid gap-3">
           <span className="sr-only">{LOADING_MESSAGE}</span>
-          {/* Placeholders stand in for the rows that are on their way; the sentence
+          {/* Placeholders stand in for the rows that are on their way, ruled and
+              full-bleed exactly as those rows will be (R13/AC-6) — so the listing does
+              not jump from a stack of floating boxes into a ruled page when the answer
+              lands. Square, because nothing in this world has a radius. The sentence
               above is what a screen reader is given, since a shape says nothing. */}
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
+          <div aria-hidden="true" className={`${PAGE_BLEED_CLASS} border-y`}>
+            {PLACEHOLDER_ROWS.map((row) => (
+              <div key={row} className="border-b px-4 py-3.5 last:border-b-0">
+                <Skeleton className="h-4 w-full rounded-none" />
+              </div>
+            ))}
+          </div>
           {state.wait === 'prolonged' && (
             <p className="text-muted-foreground text-sm">
               {STILL_LOADING_MESSAGE}
@@ -1953,31 +2058,45 @@ export function ExpenseRequestList({
       )}
 
       {state.phase === 'failed' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{state.message}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={readAgain}
-            >
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
+        /* The read left the reader with nothing, so this band stands where the listing
+           would be, ruled and full-bleed like it (R13/AC-6). The `alert` itself is
+           stripped of the card the primitive ships with — no radius, no border of its
+           own, no surface — and the band's own hairlines frame it, so a failure reads as
+           this screen's own place rather than as a panel floating on the page. Its
+           wording, its role and its retry are untouched. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className="rounded-none border-0 bg-transparent p-0">
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p>{state.message}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                className={RULED_ACTION_CLASS}
+                onClick={readAgain}
+              >
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {state.phase === 'loaded' && state.requests.length === 0 && (
-        <div className="grid justify-items-start gap-4">
+        /* Nothing has ever been imported — an answer, and with no card to sit inside it
+           is composed as a band of its own (R13/AC-6): the same hairlines and the same
+           full bleed the rows would have had, so the reader is looking at an empty
+           listing rather than at a sentence on a blank page. The wording is unchanged. */
+        <div
+          className={`${RULED_BAND_CLASS} grid justify-items-start gap-5 py-10`}
+        >
           <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
           {/* The next step, as a real navigational link rather than a button that
               pushes a route. Offered ONLY here: nothing has ever been imported
               (R9/R17), which is a different answer from a narrowing that hid
               everything (R10/R18) — see this file's header. */}
-          <Button asChild variant="outline">
+          <Button asChild variant="ghost" className={RULED_ACTION_CLASS}>
             <Link href={UPLOAD_PATH}>{EMPTY_ACTION_LABEL}</Link>
           </Button>
         </div>
@@ -2125,7 +2244,12 @@ export function ExpenseRequestList({
           )}
 
           {visibleRequests.length === 0 ? (
-            <div className="grid gap-2">
+            /* The narrowing has hidden every request: the listing's own place, ruled and
+               full-bleed like the rows it is standing in for (R13/AC-6), so the reader can
+               see WHERE the requests went from rather than a message adrift under the
+               strip. Still not the never-imported state — no upload action, and the
+               wording is untouched (R10/R18). */
+            <div className={`${RULED_BAND_CLASS} grid gap-2 py-10`}>
               <p className="max-w-prose">{NARROWED_EMPTY_MESSAGE}</p>
               <p className="text-muted-foreground max-w-prose text-sm">
                 {NARROWED_EMPTY_HINT}
@@ -2150,66 +2274,81 @@ export function ExpenseRequestList({
                   onDecideRequest={askToDecide}
                 />
               ) : (
-                <Table>
-                  <TableCaption className="sr-only">
-                    Imported expense payment requests: the file each came from,
-                    its reference, transaction date, the last four digits of its
-                    account number, its description, amount, transaction type
-                    and status, and the controls each request offers — opening
-                    it, and, where one is still awaiting a decision and you may
-                    make it, selecting it to be approved with others, or
-                    approving or rejecting it on its own. Every value heading
-                    orders the list by its own column.
-                  </TableCaption>
-                  <TableHeader>
-                    {/* Drawn from the column definitions, so every displayed
-                        column has a sort control (R13) rather than most of them
-                        having one. */}
-                    <TableRow>
-                      {/* The selection column, for an Approver only: nothing to
-                          order by, and the ticks in it name themselves. */}
-                      {isApprover && (
-                        <TableHead scope="col" className="w-10">
+                /* The listing runs full-bleed to the page padding (R13/AC-1): the box is
+                   widened past `<main>`'s `px-4` so every hairline row rule reaches the
+                   edge of the page, exactly as the strip's rule above it does, while the
+                   values inside keep that padding through the outer cells. The closing
+                   hairline is drawn here rather than on the last row, which the primitive
+                   deliberately leaves unruled — a listing worked down a page needs a
+                   bottom edge as much as it needs the rules between its rows.
+                   There is no card, no panel and no striped-row treatment left around it;
+                   what frames the listing is the ruling. */
+                <div className={`${PAGE_BLEED_CLASS} border-b`}>
+                  <Table className={LISTING_EDGE_PADDING_CLASS}>
+                    <TableCaption className="sr-only">
+                      Imported expense payment requests: the file each came
+                      from, its reference, transaction date, the last four
+                      digits of its account number, its description, amount,
+                      transaction type and status, and the controls each request
+                      offers — opening it, and, where one is still awaiting a
+                      decision and you may make it, selecting it to be approved
+                      with others, or approving or rejecting it on its own.
+                      Every value heading orders the list by its own column.
+                    </TableCaption>
+                    <TableHeader>
+                      {/* Drawn from the column definitions, so every displayed
+                          column has a sort control (R13) rather than most of
+                          them having one. */}
+                      <TableRow className={LISTING_ROW_CLASS}>
+                        {/* The selection column, for an Approver only: nothing
+                            to order by, and the ticks in it name themselves. */}
+                        {isApprover && (
+                          <TableHead scope="col" className="w-10">
+                            <span className="sr-only">
+                              {SELECTION_COLUMN_LABEL}
+                            </span>
+                          </TableHead>
+                        )}
+                        {REQUEST_COLUMNS.map((column) => (
+                          <SortableColumnHeading
+                            key={column.key}
+                            column={column}
+                            sort={sort}
+                            onSort={sortBy}
+                          />
+                        ))}
+                        {/* The controls column: no value in it, so nothing to
+                            order by. */}
+                        <TableHead scope="col" className="text-right">
                           <span className="sr-only">
-                            {SELECTION_COLUMN_LABEL}
+                            {ACTIONS_COLUMN_LABEL}
                           </span>
                         </TableHead>
-                      )}
-                      {REQUEST_COLUMNS.map((column) => (
-                        <SortableColumnHeading
-                          key={column.key}
-                          column={column}
-                          sort={sort}
-                          onSort={sortBy}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {requestsOnPage.map((request) => (
+                        <ExpenseRequestRow
+                          key={request.Id}
+                          request={request}
+                          possibleDuplicate={possibleDuplicateIds.has(
+                            request.Id,
+                          )}
+                          selectionOffered={isApprover}
+                          selectable={isApprover && awaitsDecision(request)}
+                          selected={selectedIds.has(request.Id)}
+                          selectionLocked={bulkApprovalRunning}
+                          onToggleSelection={toggleSelectionOf}
+                          canDecide={isApprover && awaitsDecision(request)}
+                          handOffFocus={handOffFocusTo === request.Id}
+                          onFocusHandedOff={focusHandedOff}
+                          onOpen={openRequest}
+                          onDecide={askToDecide}
                         />
                       ))}
-                      {/* The controls column: no value in it, so nothing to
-                          order by. */}
-                      <TableHead scope="col" className="text-right">
-                        <span className="sr-only">{ACTIONS_COLUMN_LABEL}</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {requestsOnPage.map((request) => (
-                      <ExpenseRequestRow
-                        key={request.Id}
-                        request={request}
-                        possibleDuplicate={possibleDuplicateIds.has(request.Id)}
-                        selectionOffered={isApprover}
-                        selectable={isApprover && awaitsDecision(request)}
-                        selected={selectedIds.has(request.Id)}
-                        selectionLocked={bulkApprovalRunning}
-                        onToggleSelection={toggleSelectionOf}
-                        canDecide={isApprover && awaitsDecision(request)}
-                        handOffFocus={handOffFocusTo === request.Id}
-                        onFocusHandedOff={focusHandedOff}
-                        onOpen={openRequest}
-                        onDecide={askToDecide}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </>
           )}

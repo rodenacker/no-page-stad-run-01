@@ -23,3 +23,9 @@ the code, and the trade-offs taken along the way. One section per story.
 - A status the app has no wording for still comes through in the service's own words and is given no shape at all — a shape there would be the app pretending to know what the value means.
 - The pill component the old badge was built from has been removed from the project entirely, so a future screen cannot quietly bring the capsule back; anything that needs a short phrase with a colour uses the shared mark.
 - Two file statuses that mean the same kind of thing (Uploaded and Validating) now share one shape and are told apart by their words. They previously had different small icons.
+
+## Story 5: The listing itself, as a ruled batch listing
+
+- The three controls on every row — Approve, Reject and Open — now read in the same ruled style as the export and Clear all actions on the strip above them, instead of as filled and boxed buttons. The story only asked for the listing itself, but nothing else in this epic owns those controls, and a filled button repeated once on every row was the loudest thing left on the screen from before the redesign. Nothing about what they do, what they say, or how the keyboard moves between them has changed. Because the same controls are used on the phone-width cards, those change look too — the phone story will confirm that reads well at 360px.
+- The notice that appears when the list has stopped keeping itself current used to be a grey bordered panel. It is now the same ruled band the loading, empty, failed and narrowed-to-nothing states use, so the screen has no panels left on it at all. Its wording and its behaviour are exactly as they were.
+- Two API connection errors interrupted this story mid-build. The edits survived intact and were verified after the fact — the story's spec, the type check, and the whole suite against the pre-change baseline — rather than rebuilt.

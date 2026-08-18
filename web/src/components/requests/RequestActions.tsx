@@ -36,11 +36,21 @@
  *   page again after every decision. Open is the surviving control ON THE SAME REQUEST,
  *   so the user keeps their place. It is a real hand-off between two elements this
  *   component owns — never a search of the page for a button by its wording.
+ * - **All three controls wear the SAME ruled notation** (`request-list-redesign`
+ *   R13/R25): a tracked micro-label on a rule, the notation the narrowing strip's own
+ *   actions took (`ExportRequestsAction`, `AppliedNarrowingSummary`). A filled or boxed
+ *   control repeated once per row was the loudest thing on a screen whose one saturated
+ *   field is the control block, and this design has no boxes left for it to match. What
+ *   tells the three apart is the WORD and the glyph, never weight or colour: a decision is
+ *   protected by its confirmation, not by how heavy its button is. The capitals are
+ *   `text-transform`, so the visible wording — and therefore each accessible name — is
+ *   unchanged.
  */
 
 import { Check, PanelRightOpen, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
+import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 import { DECISION_APPROVE } from '@/lib/api/decisions';
 import {
@@ -53,6 +63,20 @@ import type { DecisionOutcome } from '@/lib/api/decisions';
 
 /** What the direct control reads as on screen, beside its icon. */
 const OPEN_LABEL = 'Open';
+
+/**
+ * How every control on a request is drawn (see this file's header): the shared tracked
+ * micro-label on a rule, one string so the three can never drift apart.
+ */
+const REQUEST_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto gap-1.5 rounded-none border-b px-1 py-1`;
+
+/**
+ * Each control's glyph, sized down with the label — at 11px a 16px icon would out-weigh
+ * the word beside it. It is set ON THE ICON rather than on the button: the primitive sizes
+ * any icon that does not carry a size of its own, with a selector that beats a
+ * button-level override, so this is the one place the size can actually be stated.
+ */
+const ACTION_ICON_CLASS = 'size-3';
 
 /** How each control names itself and the request it acts on (R15). */
 const openRequestName = (reference: string): string =>
@@ -139,7 +163,7 @@ export function RequestActions({
   return (
     <div
       ref={controls}
-      className="flex flex-wrap items-center justify-end gap-1"
+      className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1"
     >
       {/* The decisions, for a reader who is offered them on this request — reachable
           in ONE activation. They sit to the LEFT of Open so that Open, which every row
@@ -150,17 +174,17 @@ export function RequestActions({
           <Button
             key={outcome}
             type="button"
-            variant={outcome === DECISION_APPROVE ? 'default' : 'secondary'}
-            size="sm"
+            variant="ghost"
+            className={REQUEST_ACTION_CLASS}
             aria-label={decideActionName(outcome, reference)}
             onClick={() => {
               onDecide(outcome);
             }}
           >
             {outcome === DECISION_APPROVE ? (
-              <Check aria-hidden="true" />
+              <Check aria-hidden="true" className={ACTION_ICON_CLASS} />
             ) : (
-              <X aria-hidden="true" />
+              <X aria-hidden="true" className={ACTION_ICON_CLASS} />
             )}
             {decideActionLabel(outcome)}
           </Button>
@@ -173,11 +197,11 @@ export function RequestActions({
         ref={openControl}
         type="button"
         variant="ghost"
-        size="sm"
+        className={REQUEST_ACTION_CLASS}
         aria-label={openName}
         onClick={onOpen}
       >
-        <PanelRightOpen aria-hidden="true" />
+        <PanelRightOpen aria-hidden="true" className={ACTION_ICON_CLASS} />
         {OPEN_LABEL}
       </Button>
     </div>
