@@ -365,6 +365,7 @@ import { ConfirmAction } from '@/components/common/ConfirmAction';
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
 import { BatchControlBlock } from '@/components/requests/BatchControlBlock';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
+import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RejectionNoteStep } from '@/components/requests/RejectionNoteStep';
@@ -1991,106 +1992,116 @@ export function ExpenseRequestList({
 
       {state.phase === 'loaded' && state.requests.length > 0 && (
         <>
-          {/* The hand-over file for the payment system (csv-export R1/R3), offered to
-              both roles with no role check of any kind — see `ExportRequestsAction`.
-              What it exports is `orderedRequests`: every request the search and filters
-              LEFT, in the order the list is sorted, never the page on screen and never
-              the whole fetched set (BR1). It sits above the controls that decide that
-              set, so a keyboard user reaches it early. */}
-          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
-            {/* The selection controls, offered to an Approver and to nobody else —
-                absent from the markup for anyone else rather than disabled (R7/BR10),
-                which is what makes the exclusion structural. They sit AHEAD of the rows
-                so a keyboard user meets "take everything listed" before the requests
-                themselves, and beside the count, which is where the bulk action joins
-                them. */}
-            {isApprover && (
-              <div className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={selectEverythingId}
-                    checked={everythingListedSelected}
-                    disabled={bulkApprovalRunning}
-                    onCheckedChange={(takeEverything) => {
-                      changeEverythingListed(takeEverything === true);
-                    }}
-                    // Named here as well as beside itself, so what a screen reader is
-                    // given and what a sighted reader sees are one string.
-                    aria-label={SELECT_EVERYTHING_LISTED_LABEL}
-                  />
-                  <Label htmlFor={selectEverythingId} className="font-normal">
-                    {SELECT_EVERYTHING_LISTED_LABEL}
-                  </Label>
+          {/* The ruled field strip (`request-list-redesign` R12/BR6), and on its first
+              line the actions that belong WITH it: what the reader may do to the set the
+              strip decides. Both lines run full-bleed to the layout's padding — the same
+              `-mx-4 px-4` the control block above uses — so the strip's rules reach the
+              edge of the page while its labels line up with the rows beneath it. The
+              tighter gap is the strip's own; the screen's `gap-4` separates it from what
+              is above and below. */}
+          <div className="grid gap-3">
+            {/* The hand-over file for the payment system (csv-export R1/R3), offered to
+                both roles with no role check of any kind — see `ExportRequestsAction`.
+                What it exports is `orderedRequests`: every request the search and filters
+                LEFT, in the order the list is sorted, never the page on screen and never
+                the whole fetched set (BR1). It sits above the controls that decide that
+                set, so a keyboard user reaches it early. */}
+            <div className="border-input -mx-4 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-b px-4 pb-3">
+              {/* The selection controls, offered to an Approver and to nobody else —
+                  absent from the markup for anyone else rather than disabled (R7/BR10),
+                  which is what makes the exclusion structural. They sit AHEAD of the rows
+                  so a keyboard user meets "take everything listed" before the requests
+                  themselves, and beside the count, which is where the bulk action joins
+                  them. */}
+              {isApprover && (
+                <div className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={selectEverythingId}
+                      checked={everythingListedSelected}
+                      disabled={bulkApprovalRunning}
+                      onCheckedChange={(takeEverything) => {
+                        changeEverythingListed(takeEverything === true);
+                      }}
+                      // Named here as well as beside itself, so what a screen reader is
+                      // given and what a sighted reader sees are one string.
+                      aria-label={SELECT_EVERYTHING_LISTED_LABEL}
+                    />
+                    <Label
+                      htmlFor={selectEverythingId}
+                      className={`${FIELD_LABEL_CLASS} text-muted-foreground`}
+                    >
+                      {SELECT_EVERYTHING_LISTED_LABEL}
+                    </Label>
+                  </div>
+
+                  {/* R4: on screen the whole time a selection is live, and NOT on it at
+                      all once nothing is selected — an indicator reading "0 selected" is
+                      a permanent fixture rather than an answer. Announced politely
+                      (`status`), since the figure moves under a reader who is doing
+                      something else. */}
+                  {selectedCount > 0 && (
+                    <p
+                      role="status"
+                      aria-label={SELECTION_COUNT_LABEL}
+                      className="font-mono text-sm tabular-nums"
+                    >
+                      {selectionCountMessage(selectedCount)}
+                    </p>
+                  )}
+
+                  {/* The action the selection leads to (R1), beside the count it acts
+                      on and offered only while there IS a selection — an Approve with
+                      nothing selected has nothing to act on, and the count and the
+                      action belong on screen together. Named for the SELECTION, so it
+                      can never be confused with the "Approve request TXN-…" control
+                      every listed request carries. Disabled only while a batch of its
+                      own is running (AC-4): transient state, not a permission.
+
+                      It keeps its filled weight where the strip's other actions are
+                      ruled text: this is the one control on the line that COMMITS
+                      something irreversible. */}
+                  {selectedCount > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={bulkApprovalRunning}
+                      className={`${FIELD_LABEL_CLASS} rounded-none`}
+                      onClick={() => {
+                        setBulkApprovalAsked(true);
+                      }}
+                    >
+                      {BULK_APPROVE_ACTION_LABEL}
+                    </Button>
+                  )}
                 </div>
+              )}
 
-                {/* R4: on screen the whole time a selection is live, and NOT on it at
-                    all once nothing is selected — an indicator reading "0 selected" is
-                    a permanent fixture rather than an answer. Announced politely
-                    (`status`), since the figure moves under a reader who is doing
-                    something else. */}
-                {selectedCount > 0 && (
-                  <p
-                    role="status"
-                    aria-label={SELECTION_COUNT_LABEL}
-                    className="text-sm font-medium"
-                  >
-                    {selectionCountMessage(selectedCount)}
-                  </p>
-                )}
+              <ExportRequestsAction
+                listedRequests={orderedRequests}
+                exportedBy={exportedBy}
+              />
+            </div>
 
-                {/* The action the selection leads to (R1), beside the count it acts
-                    on and offered only while there IS a selection — an Approve with
-                    nothing selected has nothing to act on, and the count and the
-                    action belong on screen together. Named for the SELECTION, so it
-                    can never be confused with the "Approve request TXN-…" control
-                    every listed request carries. Disabled only while a batch of its
-                    own is running (AC-4): transient state, not a permission. */}
-                {selectedCount > 0 && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={bulkApprovalRunning}
-                    onClick={() => {
-                      setBulkApprovalAsked(true);
-                    }}
-                  >
-                    {BULK_APPROVE_ACTION_LABEL}
-                  </Button>
-                )}
-              </div>
-            )}
+            {/* The choices come from the WHOLE fetched set, so a filter always offers
+                its own way back out of what it narrowed to.
 
-            <ExportRequestsAction
-              listedRequests={orderedRequests}
-              exportedBy={exportedBy}
+                A range the wrong way round is reported INSIDE the strip and applied
+                nowhere: the list stays as it was, which is the whole point (R7 against
+                R10/R18). The report is handed to the strip rather than drawn here,
+                because the underline-only fields carry the error state in the notation
+                now that there is no border left to carry it — and it is read from the
+                SAME narrowing the rows and the summary are, so the screen can never
+                report a range it is quietly applying. */}
+            <RequestNarrowingControls
+              requests={state.requests}
+              searchInput={searchInput}
+              onSearchInputChange={changeSearchInput}
+              narrowing={narrowing}
+              onFilterChange={changeFilter}
+              rangeReports={reports}
             />
           </div>
-
-          {/* The choices come from the WHOLE fetched set, so a filter always offers
-              its own way back out of what it narrowed to. */}
-          <RequestNarrowingControls
-            requests={state.requests}
-            searchInput={searchInput}
-            onSearchInputChange={changeSearchInput}
-            narrowing={narrowing}
-            onFilterChange={changeFilter}
-          />
-
-          {/* A range the wrong way round is reported here and applied nowhere: the list
-              stays as it was, which is the whole point (R7 against R10/R18). The report
-              is announced as it appears, so it is not something only a sighted user
-              notices when the list fails to change. */}
-          {reports.map((report) => (
-            <Alert key={report.id}>
-              <TriangleAlert aria-hidden="true" />
-              <AlertTitle className="line-clamp-none">
-                {report.field}
-              </AlertTitle>
-              <AlertDescription className="text-foreground">
-                <p>{report.message}</p>
-              </AlertDescription>
-            </Alert>
-          ))}
 
           {applied.length > 0 && (
             <AppliedNarrowingSummary

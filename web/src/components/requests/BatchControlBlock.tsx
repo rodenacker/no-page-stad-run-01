@@ -49,6 +49,7 @@
  */
 import { useId, useMemo } from 'react';
 
+import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
 import {
   AWAITING_DECISION_LABEL,
   BATCH_LABEL,
@@ -77,13 +78,15 @@ import type { TransactionRead } from '@/types/transactions';
 export const CONTROL_BLOCK_LABEL = 'Batch control totals';
 
 /**
- * A field's label: 11px, tracked, upper-cased in CSS rather than in the DOM — so the
- * words a screen reader is given read as words, and the notation is the presentation's.
- * The full foreground colour, never a dimmed one: at this size an opacity would drop the
- * label below AA on the saturated field.
+ * A field's label: the screen's one label notation, shared with the narrowing strip and
+ * everything else on it (`components/requests/fieldNotation.ts`) — 11px, tracked,
+ * upper-cased in CSS rather than in the DOM.
+ *
+ * It carries no colour, so here it inherits the band's own: the full foreground, never a
+ * dimmed one, because at this size an opacity would drop the label below AA on the
+ * saturated field.
  */
-const LABEL_CLASS =
-  'font-mono text-[11px] font-medium tracking-[0.18em] uppercase';
+const LABEL_CLASS = FIELD_LABEL_CLASS;
 
 /** A field's figure: mono and tabular, so columns of them line up digit for digit. */
 const FIGURE_CLASS = 'font-mono text-base tabular-nums';

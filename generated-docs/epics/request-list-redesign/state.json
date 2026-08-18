@@ -15,7 +15,10 @@
       "Verify the awaiting/decided split against a real batch: the app treats a request as decided whenever its status is anything other than Imported. If the service ever sends a third status that does not mean 'decided', those requests will be counted as decided and the outstanding count — the number the whole screen is built around — will read low.",
       "R23 asks for the direction contract to be the FIRST child of <body>. What shipped is a real HTML comment at the top of <body>, ahead of every piece of the app's own content, with only Next.js's own streaming-metadata element in front of it. The one position ahead of that empties every screen on router.refresh() (which this app runs on sign-in, sign-out and session timeout) - verified in a browser. R23's purpose is met in full; please confirm you are content with 'top of the body' rather than literally 'first'.",
       "The blue band is on screen only once there are requests to describe. While the list is still loading, when the read failed, and when nothing has ever been imported, the screen keeps the answer it gives today - a band of zeroes with no run date over a 'nothing imported yet' message would be a fixture rather than a figure. AC-1 says the screen opens with the band; this reads that as 'opens with the band whenever there is a batch'.",
-      "BATCH and RUN DATE follow the originating-file filter only, as the brief settles them - so typing in the search box re-states the four totals (and brings in the struck-through whole-batch count) while BATCH still reads ALL FILES and RUN DATE still shows the whole queue's newest transaction date. Worth an eye at manual test, since it is the one place the band deliberately does not move with a narrowing."
+      "BATCH and RUN DATE follow the originating-file filter only, as the brief settles them - so typing in the search box re-states the four totals (and brings in the struck-through whole-batch count) while BATCH still reads ALL FILES and RUN DATE still shows the whole queue's newest transaction date. Worth an eye at manual test, since it is the one place the band deliberately does not move with a narrowing.",
+      "The narrowing strip's visible heading reads 'NARROW THE BATCH'. The wording is the developer's choice (the requirement only said the fields must read as one named strip) - confirm that is what you want above the fields.",
+      "A range typed the wrong way round is now shown as a red message inside the strip plus a heavier red underline under the two fields of that range, replacing the old bordered warning box - confirm it reads clearly enough at a glance.",
+      "Export requests to CSV and Clear all are now ruled text controls in the strip's notation rather than boxed buttons - confirm the export still reads as prominent enough to find."
     ],
     "manualTestResults": []
   },
@@ -36,11 +39,11 @@
       "completedAt": "2026-08-18T06:09:37.000Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-18T06:10:30.000Z",
+      "completedAt": "2026-08-18T06:31:48.000Z"
     },
     "4": {
       "status": "pending",
@@ -86,5 +89,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-18T06:09:37.000Z"
+  "lastUpdated": "2026-08-18T06:31:48.000Z"
 }

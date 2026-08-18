@@ -10,7 +10,7 @@
  *   set of chips. That is how the amount and transaction-date ranges appear here at all:
  *   `appliedNarrowings()` states them as entries like "100 to 200", and nothing in this
  *   component knows a range from a pick-one filter. A range entered the wrong way round
- *   is not applied, so it contributes no entry — it is reported beside the controls
+ *   is not applied, so it contributes no entry — it is reported inside the narrowing strip
  *   instead.
  * - **Clear all is offered whenever anything is applied**, not only once the narrowing
  *   has emptied the list: R18 is about restoring the whole set from an ordinary narrowed
@@ -18,9 +18,13 @@
  *   never a second one to disagree with it.
  * - **The `<ul>` keeps its list role explicitly.** The stylesheet removes the bullets,
  *   and a list with `list-style: none` stops being announced as a list in some browsers.
+ *
+ * It reads in the narrowing strip's own notation (`request-list-redesign` R12): a ruled
+ * line of tracked micro-labels over the values they name, in place of the boxed panel of
+ * pills it used to be — the strip it belongs to has no boxes left for it to match.
  */
 
-import { Badge } from '@/components/ui/badge';
+import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 
 import type { AppliedNarrowing } from '@/lib/transactions/narrowing';
@@ -45,23 +49,37 @@ export function AppliedNarrowingSummary({
   return (
     <section
       aria-labelledby={HEADING_ID}
-      className="bg-muted/40 grid gap-3 rounded-md border p-3"
+      className="border-input -mx-4 grid gap-2 border-b px-4 pb-3"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={HEADING_ID} className="text-sm font-medium">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <h2
+          id={HEADING_ID}
+          className={`${FIELD_LABEL_CLASS} text-muted-foreground`}
+        >
           {HEADING}
         </h2>
-        <Button type="button" variant="outline" size="sm" onClick={onClearAll}>
+        {/* The way out of all of it, in the strip's notation rather than as a boxed
+            button: ruled text, so it reads as part of the same document. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={`${FIELD_LABEL_CLASS} border-input h-auto rounded-none border-b px-1 py-0.5`}
+          onClick={onClearAll}
+        >
           {CLEAR_ALL_LABEL}
         </Button>
       </div>
-      <ul role="list" className="flex flex-wrap gap-2">
+      <ul role="list" className="flex flex-wrap gap-x-8 gap-y-1">
         {applied.map((narrowing) => (
-          <li key={narrowing.id}>
-            <Badge variant="secondary" className="whitespace-normal">
-              <span className="text-muted-foreground">{narrowing.field}:</span>
-              <span>{narrowing.value}</span>
-            </Badge>
+          <li
+            key={narrowing.id}
+            className="flex flex-wrap items-baseline gap-x-2 text-sm"
+          >
+            <span className={`${FIELD_LABEL_CLASS} text-muted-foreground`}>
+              {narrowing.field}
+            </span>
+            <span className="font-mono">{narrowing.value}</span>
           </li>
         ))}
       </ul>
