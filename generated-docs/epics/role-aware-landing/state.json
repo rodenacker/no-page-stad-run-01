@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "role-aware-landing",
+    "name": "Land on the screen your role uses",
+    "createdAt": "2026-08-18T14:22:21.243Z",
+    "dependsOn": [
+      "sign-in-and-app-shell",
+      "expense-file-upload",
+      "expense-request-list"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [],
+    "manualTestResults": []
+  },
+  "phase": "PLAN",
+  "stories": {},
+  "halt": null,
+  "lastUpdated": "2026-08-18T14:22:21.243Z"
+}
