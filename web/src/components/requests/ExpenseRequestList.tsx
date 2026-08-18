@@ -398,7 +398,12 @@
  *   BR8) — see `BatchControlBlock` and the `figureRoll` keyframes in `globals.css`. It follows
  *   the count the batch ACTUALLY has, so a decision produces one settle rather than three
  *   (into the projection, back out of it, then down), and it is the reason this screen has no
- *   hover fills or row transitions to compete with it.
+ *   hover fills or row transitions to compete with it. It also belongs to the BATCH moving
+ *   rather than to the block's figures moving: those figures describe the narrowed set (R21),
+ *   so a keystroke in the search box re-states them — silently and instantly, with no roll
+ *   and nothing announced, because narrowing what is described is not a decision. The block
+ *   is handed the whole fetched set as well as the narrowed one and works the difference out
+ *   itself; nothing here has to tell it which just happened.
  *
  * The continuation line at the foot (`request-list-redesign` R14):
  *

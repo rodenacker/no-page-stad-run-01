@@ -46,6 +46,17 @@
  *   `<legend>` names its `<fieldset>` NATIVELY, which resolves both: one element points at
  *   the label, one element carries the count. `aria-label` on the live region is
  *   specifically wrong — it would freeze the region's name over its changing contents.
+ * - **⚠ It is live for every movement of the figure EXCEPT a narrowing.** The figures
+ *   follow the narrowed set (bullet 2), so a search term moves this count as it is typed —
+ *   and a count derived from the narrowed set left permanently live would queue a
+ *   screen-reader announcement PER KEYSTROKE. That is the exact failure
+ *   `RequestListPagination` cites for deliberately not making the page counter a live
+ *   region, and it would talk over a reader the whole time they were narrowing the list. So
+ *   a narrowing re-states the figure with `aria-live="off"` — the attribute overrides the
+ *   politeness `role="status"` implies, and the role is left in place so the figure is still
+ *   the same addressable element it always was. Everything else the count does is announced:
+ *   a decision recorded, a colleague's decision arriving on a refresh, a projection
+ *   appearing. See {@link OutstandingFigure} for how the two are told apart.
  *
  * And two more that arrived with the pre-commit state and the roll (R17/R22, BR7/BR8):
  *
@@ -60,6 +71,16 @@
  *   motion at all. The one orchestrated motion on this screen is the count settling onto a
  *   decision that has actually been recorded — one per resolution, so a decision confirmed
  *   does not roll three times on its way (into the projection, back out of it, then down).
+ * - **⚠ And it follows the BATCH moving, never the narrowing.** Those figures describe the
+ *   narrowed set, so a keystroke in the search box moves this count too — but a reader
+ *   changing what is DESCRIBED has not decided anything, and R22/BR8 give this screen one
+ *   motion, for a decision that has been recorded. So a narrowing re-states the figure
+ *   silently and instantly: no roll (and, above, nothing announced). What tells the two
+ *   apart is whether the WHOLE BATCH's own outstanding count moved with the narrowed one: a
+ *   decision — the reader's own, or a colleague's arriving on a refresh — moves both, while
+ *   a search term or a filter moves only what is left. That is why this component derives
+ *   the outstanding count over the batch as well as over the narrowed set: neither figure
+ *   on its own can say which of the two just happened.
  */
 import { useId, useMemo, useState } from 'react';
 
@@ -207,36 +228,75 @@ function WholeBatchRecords({ records }: { records: number }) {
 function OutstandingFigure({
   stated,
   settled,
+  settledInBatch,
 }: {
   /**
    * What the figure SAYS: the projection while decisions are awaiting confirmation, and
-   * otherwise the batch's own count.
+   * otherwise the narrowed set's own count.
    */
   stated: number;
   /**
-   * What the batch actually IS. The roll follows this and only this, so committing a
-   * decision produces one settle rather than three, and a projection appearing or being
-   * backed out of swaps the digits with no motion at all (BR8).
+   * What the set the block is describing actually IS. The roll follows this and only this,
+   * so committing a decision produces one settle rather than three, and a projection
+   * appearing or being backed out of swaps the digits with no motion at all (BR8).
    */
   settled: number;
+  /**
+   * The same count over the WHOLE BATCH — the tell for whether the underlying data moved.
+   * Nothing is drawn from it: it exists so this component can tell a decision from a
+   * narrowing (see below, and the last ⚠ in this file's header).
+   */
+  settledInBatch: number;
 }) {
   const labelId = useId();
 
   /**
-   * Which roll the figure is on. React's documented way to adjust state when a value
-   * changes: the comparison happens during the render that first sees the new count, so the
-   * generation below is already correct in the commit that paints it — no effect, therefore
-   * no frame of the old count sitting on screen before the roll starts.
+   * The reading currently on screen, and what the movement that produced it WAS.
    *
-   * It is a COUNTER rather than the value itself because that is what has to change for the
-   * element to be re-created and the animation to run again: two decisions that happen to
-   * land on the same count in a row are still two resolutions.
+   * React's documented way to adjust state when a value changes: the comparison happens
+   * during the render that first sees the new counts, so both answers below are already
+   * correct in the commit that paints them — no effect, therefore no frame of the old count
+   * sitting on screen before the roll starts and no announcement of a figure the reader is
+   * about to be given a different one for.
+   *
+   * Two things come out of it, and they are the two halves of the ⚠s in the header:
+   *
+   * - `rolls` is a COUNTER rather than the value itself, because that is what has to change
+   *   for the element to be re-created and the animation to run again: two decisions that
+   *   happen to land on the same count in a row are still two resolutions. It moves only
+   *   when the batch's own outstanding count moved AND the figure moved with it — a
+   *   recorded decision, the reader's own or a colleague's.
+   * - `narrowing` is true for exactly the other case: the described set changed while the
+   *   batch held still. That silences the live region for that one commit, so a search term
+   *   does not queue an announcement per keystroke.
+   *
+   * A change in `stated` alone is neither: a projection appearing or being backed out of
+   * moves no set at all, so it is announced (it is the reader's own action, once) and does
+   * not roll.
    */
-  const [settledBefore, setSettledBefore] = useState(settled);
-  const [roll, setRoll] = useState(0);
-  if (settledBefore !== settled) {
-    setSettledBefore(settled);
-    setRoll((rolls) => rolls + 1);
+  const [reading, setReading] = useState({
+    stated,
+    settled,
+    settledInBatch,
+    rolls: 0,
+    narrowing: false,
+  });
+
+  if (
+    reading.stated !== stated ||
+    reading.settled !== settled ||
+    reading.settledInBatch !== settledInBatch
+  ) {
+    const batchMoved = reading.settledInBatch !== settledInBatch;
+    const figureMoved = reading.settled !== settled;
+
+    setReading({
+      stated,
+      settled,
+      settledInBatch,
+      rolls: batchMoved && figureMoved ? reading.rolls + 1 : reading.rolls,
+      narrowing: figureMoved && !batchMoved,
+    });
   }
 
   return (
@@ -244,23 +304,32 @@ function OutstandingFigure({
       <legend id={labelId} className={`${LABEL_CLASS} mb-1.5 p-0`}>
         {AWAITING_DECISION_LABEL}
       </legend>
-      {/* Polite, and named by the legend above rather than by an `aria-label` that would
-          override its own changing contents. Its text is the count and nothing else — which
-          is also why the roll animates ONE element holding the whole figure rather than a
-          strip of digits: a strip left in the markup would be read out as "0 1 2 3 4 5 6 7
-          8 9" by a screen reader, and this element is the app's statement of the count. */}
+      {/* Named by the legend above rather than by an `aria-label` that would override its
+          own changing contents. Its text is the count and nothing else — which is also why
+          the roll animates ONE element holding the whole figure rather than a strip of
+          digits: a strip left in the markup would be read out as "0 1 2 3 4 5 6 7 8 9" by a
+          screen reader, and this element is the app's statement of the count.
+
+          Polite for everything the batch does, and OFF for the one commit in which a
+          narrowing re-states it — the figure describes the narrowed set, so otherwise every
+          keystroke in the search box would be announced (see the ⚠ in the header). The role
+          stays either way: it is what makes this the figure a reader and a test address. */}
       <p
         role="status"
+        aria-live={reading.narrowing ? 'off' : 'polite'}
         aria-labelledby={labelId}
         className={OUTSTANDING_FIGURE_CLASS}
       >
         {/* Re-created on each resolution, which is what restarts the roll (a CSS animation
-            runs when the element carrying it is inserted). The first paint carries no
-            animation class at all — see `ROLL_CLASS`. */}
+            runs when the element carrying it is inserted) — and therefore NOT re-created by
+            a narrowing, which is what leaves the digits to swap in place with no motion at
+            all. The first paint carries no animation class at all — see `ROLL_CLASS`. */}
         <span
-          key={roll}
+          key={reading.rolls}
           className={
-            roll === 0 ? ROLL_BOX_CLASS : `${ROLL_BOX_CLASS} ${ROLL_CLASS}`
+            reading.rolls === 0
+              ? ROLL_BOX_CLASS
+              : `${ROLL_BOX_CLASS} ${ROLL_CLASS}`
           }
         >
           {figureText(stated)}
@@ -318,6 +387,17 @@ export function BatchControlBlock({
    * counts a set that can run to the 10,000-request ceiling.
    */
   const totals = useMemo(() => controlTotalsOf(listed), [listed]);
+  /**
+   * The same derivation over the WHOLE batch. It is not stated anywhere on the band — it is
+   * how the outstanding figure tells a decision from a narrowing (the last ⚠ in this file's
+   * header) — and it goes through `controlTotalsOf` rather than counting for itself, because
+   * a count that answered "still awaiting a decision" differently from the figure it is
+   * being compared against would tell the difference wrong.
+   *
+   * Memoised on the fetched set, so it is re-derived when the list is READ (a first load, a
+   * decision's re-read, a refresh poll) and never while the reader narrows.
+   */
+  const batchTotals = useMemo(() => controlTotalsOf(batch), [batch]);
   const runDate = useMemo(
     () => runDateOf(batch, narrowedToFile),
     [batch, narrowedToFile],
@@ -362,6 +442,7 @@ export function BatchControlBlock({
         <OutstandingFigure
           stated={preCommit.awaitingDecision}
           settled={totals.awaitingDecision}
+          settledInBatch={batchTotals.awaitingDecision}
         />
 
         {/* The gap, NAMED — how many decisions are waiting to be confirmed, in the same

@@ -23,6 +23,17 @@
  * one layer" and § Time-dependent behaviour). Asserting them here under fake timers
  * would prove nothing about the shipped transition.
  *
+ * The last test in this file covers the one half of AC-4 that IS observable here, and
+ * that the browser spec cannot reach: WHICH movements of the count are a resolution at
+ * all. The block's figures describe the narrowed set (R21), so a keystroke in the search
+ * box moves the outstanding count too — and R22/BR8 give this screen exactly one
+ * orchestrated motion, for a decision that has been RECORDED. So a narrowing must
+ * re-state the figure silently and instantly: nothing announced (a count derived from the
+ * narrowed set inside a permanently polite live region would queue an announcement per
+ * keystroke — the same failure `RequestListPagination` cites for deliberately not making
+ * the page counter a live region) and no roll. A decision, and a colleague's decision
+ * arriving on a refresh, must still do both.
+ *
  * ---------------------------------------------------------------------------
  * WHY THIS FILE IS THE DANGEROUS ONE (read before implementing)
  * ---------------------------------------------------------------------------
@@ -465,6 +476,108 @@ const referencesOf = (requests: TransactionRead[]): string[] =>
 const expectNothingAwaitingConfirmation = (): void => {
   expect(rowsMarkedNotYetConfirmed()).toEqual([]);
   expect(screen.queryByLabelText(NOT_YET_CONFIRMED)).not.toBeInTheDocument();
+};
+
+/* -------------------------------------------------------------------------- */
+/* Which movements of the outstanding count are a resolution                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How insistently the outstanding count is announcing itself right now: the explicit
+ * `aria-live` it carries, or — carrying none — the politeness its role implies
+ * (`status` is polite). Read as the accessibility layer reads it, so an
+ * implementation may say "silent" either by turning the region off or by not being
+ * one, and cannot say it by removing the role a reader addresses the figure by.
+ */
+const politenessOfTheOutstandingCount = (): string => {
+  const figure = screen.getByLabelText(AWAITING_DECISION);
+  const declared = figure.getAttribute('aria-live');
+  if (declared !== null) {
+    return declared;
+  }
+  return figure.getAttribute('role') === 'status' ? 'polite' : 'off';
+};
+
+/**
+ * The count moved because the BATCH moved, so a screen-reader user is told — the
+ * whole reason this figure is a live region (it moves with no user action at all when
+ * a colleague's decision arrives, contract item 3).
+ */
+const expectTheCountAnnounced = (): void => {
+  expect(
+    politenessOfTheOutstandingCount(),
+    'the outstanding count must be a POLITE live region when the batch itself has ' +
+      'moved — a decision recorded, or a colleague’s decision arriving on a ' +
+      'refresh, is exactly what this figure exists to announce',
+  ).toBe('polite');
+};
+
+/**
+ * The count moved only because the reader changed what is being DESCRIBED, so
+ * nothing is announced: the figure follows the narrowed set, and a live region over
+ * it would queue an announcement per keystroke in the search box.
+ */
+const expectTheCountNotAnnounced = (): void => {
+  expect(
+    politenessOfTheOutstandingCount(),
+    'narrowing the listing must re-state the outstanding count SILENTLY: the figure ' +
+      'follows the narrowed set, so a region left live over it announces every ' +
+      'keystroke in the search box',
+  ).toBe('off');
+};
+
+/**
+ * The element the outstanding count's digits are drawn in — the box the roll runs on.
+ *
+ * A CSS animation runs when the element carrying it is INSERTED, so this being the
+ * very same node it was is what "the figure did not roll" means in a DOM with no
+ * layout engine and no animation frames; a new node in its place is a roll. The roll
+ * as a user experiences it — stepped, in place, at zero layout shift — is AC-4's, in
+ * a real browser (`web/e2e/epic-request-list-redesign-story-9-*.spec.ts`).
+ *
+ * The figure's text is the count and nothing else (contract item 3), so the region
+ * holds exactly one element and that element is the box.
+ */
+const digitsOfTheOutstandingCount = (): Element => {
+  const figure = screen.getByLabelText(AWAITING_DECISION);
+  const [box, ...spare] = Array.from(figure.children);
+  if (box === undefined || spare.length > 0) {
+    throw new Error(
+      `The outstanding count holds ${String(figure.children.length)} elements. It ` +
+        'must hold exactly one — the box its digits are drawn in, which the roll ' +
+        'animates: a strip of digits left in the markup would be read out as ' +
+        '"0 1 2 3 4 5 6 7 8 9" by a screen reader.',
+    );
+  }
+  return box;
+};
+
+/** The search field in the narrowing strip (`RequestNarrowingControls`). */
+const SEARCH_FIELD = /^search requests$/i;
+
+/** Narrows the listing by typing, and waits for the block to describe what is left. */
+const narrowBySearching = async (
+  user: User,
+  term: string,
+  figures: BatchFigures,
+): Promise<void> => {
+  await user.type(screen.getByLabelText(SEARCH_FIELD), term);
+  await settle();
+  await waitFor(() => {
+    expectControlBlock(figures);
+  });
+};
+
+/** Takes the search term away again, widening the set back to the whole batch. */
+const clearTheSearch = async (
+  user: User,
+  figures: BatchFigures,
+): Promise<void> => {
+  await user.clear(screen.getByLabelText(SEARCH_FIELD));
+  await settle();
+  await waitFor(() => {
+    expectControlBlock(figures);
+  });
 };
 
 /* -------------------------------------------------------------------------- */
@@ -932,5 +1045,105 @@ describe('Epic request-list-redesign, Story 9: watching the batch balance', () =
     // itself).
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // AC-4, the half of it jsdom can see (R21 against R22/BR8 — see this file's header)
+  // One journey, four movements of the same figure, and the difference between them is
+  // the whole subject: narrowing the listing, widening it back, a colleague's decision
+  // arriving on a refresh, and the reader's own decision confirmed. The first two are
+  // the reader changing WHAT IS DESCRIBED and must be silent and still; the last two are
+  // the BATCH moving and must be announced and rolled.
+  it('re-states the outstanding count silently as the reader narrows the listing, and rolls and announces it only when the batch itself moves', async () => {
+    const user = setupUser();
+
+    const requests = transactionsForBulkSelection(6);
+    const [searchedFor, decidedByColleague, decidedByUs] =
+      awaitingDecisionIn(requests);
+    serve(requests);
+
+    await renderList();
+    expectControlBlock({ records: 8, awaitingDecision: 6, decided: 2 });
+
+    /* --- 1. narrowing: the figures follow it (R21) and nothing else about them does -- */
+    const digitsAtRest = digitsOfTheOutstandingCount();
+
+    // One request's own reference, so what is left is unambiguous: one record, and it is
+    // still awaiting a decision.
+    await narrowBySearching(user, searchedFor.Reference, {
+      records: 1,
+      awaitingDecision: 1,
+      decided: 0,
+    });
+
+    // The count went from 6 to 1 with nobody deciding anything — so nothing was
+    // announced...
+    expectTheCountNotAnnounced();
+    // ...and the digits were swapped inside the very box they were already in, which is
+    // what leaves the screen's one orchestrated motion for a decision (R22/BR8). A
+    // narrowing that re-created the box would roll the figure on every keystroke.
+    expect(
+      digitsOfTheOutstandingCount(),
+      'a narrowing must re-state the outstanding count IN PLACE — the box its digits ' +
+        'are drawn in was re-created, which is what starts the roll',
+    ).toBe(digitsAtRest);
+    // Nothing was decided by narrowing, either (R21 is a reading, not an action).
+    expect(decisionsSent()).toEqual([]);
+
+    /* --- 2. and widening back is the same kind of movement, not a decision undone --- */
+    await clearTheSearch(user, { records: 8, awaitingDecision: 6, decided: 2 });
+
+    expectTheCountNotAnnounced();
+    expect(digitsOfTheOutstandingCount()).toBe(digitsAtRest);
+
+    /* --- 3. a colleague's decision, arriving on its own: what the live region is FOR - */
+    serve(transactionsAfterColleagueDecided(served, [decidedByColleague.Id]));
+
+    await waitForStatusOn(
+      decidedByColleague.Reference,
+      TRANSACTION_STATUS_APPROVED,
+    );
+    await waitFor(() => {
+      expectControlBlock({ records: 8, awaitingDecision: 5, decided: 3 });
+    });
+
+    // The batch really moved, so this one is spoken and this one rolls.
+    expectTheCountAnnounced();
+    const digitsAfterTheColleague = digitsOfTheOutstandingCount();
+    expect(
+      digitsAfterTheColleague,
+      'a decision arriving on a refresh must roll the count — the batch moved under ' +
+        'the reader, which is the case this figure exists for',
+    ).not.toBe(digitsAtRest);
+
+    /* --- 4. and the reader's own decision: ONE roll, on the resolution ------------- */
+    const confirmation = await chooseApproveOn(user, decidedByUs.Reference);
+
+    // The projection is a state change, not a resolution: the figure states 4 while
+    // RECORDS and DECIDED go on stating what the batch is (R17), and it does so with no
+    // motion — otherwise a confirmed decision would roll on its way into the projection
+    // and again on its way down (BR8).
+    expectControlBlock({ records: 8, awaitingDecision: 4, decided: 3 });
+    expect(
+      digitsOfTheOutstandingCount(),
+      'a projection appearing must swap the digits with no motion at all: the count ' +
+        'settles onto a decision that has been RECORDED, once (BR8)',
+    ).toBe(digitsAfterTheColleague);
+
+    await accept(user, confirmation);
+
+    await waitForStatusOn(decidedByUs.Reference, TRANSACTION_STATUS_APPROVED);
+    await waitFor(() => {
+      expectControlBlock({ records: 8, awaitingDecision: 4, decided: 4 });
+    });
+    expectNothingAwaitingConfirmation();
+
+    // The decision was recorded, so the batch balances again around it — announced, and
+    // rolled exactly once, on the resolution rather than on the projection before it.
+    expectTheCountAnnounced();
+    expect(
+      digitsOfTheOutstandingCount(),
+      'a recorded decision must roll the count as it settles (R22/BR8)',
+    ).not.toBe(digitsAfterTheColleague);
+    expect(decisionsSent()).toEqual([decidedByUs.Id]);
   });
 });

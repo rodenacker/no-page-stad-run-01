@@ -31,7 +31,8 @@
       "A request's group on a phone shows its reference and amount, then its status and date, then its controls - three key values and no account number. Confirm that is the set you want at that width, and that nothing you rely on is missing.",
       "The pre-commit row mark uses the same warning ink and doubled-bar shape as the possible-duplicate mark, told apart only by its wording - worth an eye check on a row that is both a possible duplicate and pending.",
       "The roll is a four-step ~240ms mechanical settle, the digits dropping into place from just above; the projected figure swaps without motion so a confirmed decision produces exactly one movement.",
-      "While a rejection's note is being written the pre-commit state is deliberately NOT shown - it appears when the confirmation itself opens. Confirm that reads right; the note step is a dialog over the list, so the batch behind it is not what the reader is looking at."
+      "While a rejection's note is being written the pre-commit state is deliberately NOT shown - it appears when the confirmation itself opens. Confirm that reads right; the note step is a dialog over the list, so the batch behind it is not what the reader is looking at.",
+      "The outstanding count is silenced while you narrow and announced when the batch moves, by switching the live region off in the same update that changes the number. This assumes the browser decides how urgently to speak AFTER applying the change, which Chrome and Firefox both do - but it can only be confirmed with a real screen reader. With NVDA or VoiceOver running: search the request list and check nothing is announced per keystroke, then approve a request and check the new count IS announced."
     ],
     "manualTestResults": []
   },

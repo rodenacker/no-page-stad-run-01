@@ -167,6 +167,17 @@ R17/BR7 require the batch to show what it will look like before a decision commi
 - **The wording is `NOT YET CONFIRMED`**, used in exactly two places so the band and the rows cannot come to say two different things: a label-over-figure pair in the control block stating how many decisions are waiting (**absent** while nothing is pending, this project's rule for an indicator whose only other reading is a permanent `0`), and the mark every affected row carries in the shared `StatusBadge` grammar — **words** on the row, because per BR3 a gutter shape alone would not satisfy R3.
 - Nothing about it is stored or optimistic: it is a reading of the confirmation currently open, which is what makes backing out an exact revert that decides nothing.
 
+### Resolved spec gap — R21 against R22/BR8: the roll and the announcement belong to the batch, not to the narrowing (user-decided at epic end, 2026-08-18)
+
+R21 has the control block describe the **narrowed** set, so a keystroke in the search box legitimately moves `AWAITING DECISION`. R22/BR8 give the screen **one** orchestrated motion, for a decision that has resolved. Read together, the shipped block was rolling the 88px figure — and, as a polite live region, announcing it to a screen reader — on every keystroke. Settled as follows:
+
+- **The figures keep following the narrowing** (R21 is unchanged). What changed is that motion and announcement belong to the **batch moving**, not to the described set changing.
+- **A decision recorded — single, bulk, or a colleague's arriving on a refresh — rolls the figure and announces it.** That is the case the live region exists for (the count moves with no user action at all).
+- **Narrowing or widening what is described re-states the figure silently and instantly**: no roll, and nothing announced. A live region over a narrowed figure otherwise queues one announcement per keystroke — the same failure the pagination line already cites for deliberately not being a live region.
+- **Told apart by derivation, not by a flag:** the block derives the outstanding count over the whole batch as well as over the narrowed set. Both moving is a decision; only the narrowed one moving is a narrowing. No call site has to say which happened.
+
+The pre-commit reading (above) is untouched: a projection appearing or reverting still swaps the digits with no motion, so a confirmed decision produces exactly one movement.
+
 ### Resolved spec gap — what `BATCH` and `RUN DATE` show (user-decided at the stories approval, 2026-08-17)
 
 R11 requires the control block to carry `BATCH` and `RUN DATE`, but neither is derivable: `GET /v1/transactions` returns requests drawn from **many** originating files (hence the `FileName` column and the originating-file filter), and `TransactionRead` carries `FileName` / `FileLogId` / `TransactionDate` / `LastChangedDate` but nothing naming a single batch or a single run. A developer must not invent one.
