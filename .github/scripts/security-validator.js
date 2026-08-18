@@ -1851,6 +1851,33 @@ function parseGrepMatch(match) {
 }
 
 /**
+ * Is this matched line a comment rather than code?
+ *
+ * The scans below are plain token greps, so a file that DOCUMENTS a dangerous API in
+ * its own comments — explaining why a use is safe, or warning a future reader off one —
+ * gets reported as if it called it. That is a false positive the author cannot clear:
+ * a `security-ignore` marker above a comment is meaningless, and rewording prose to
+ * dodge a grep makes the code worse to read.
+ *
+ * Recognises the line-comment and block-comment forms that carry prose in this codebase,
+ * including JSX's `{/* ... *\/}`. Deliberately line-local: a token inside a multi-line
+ * template literal or a string is NOT treated as a comment, so a real call built up
+ * across lines still reports.
+ *
+ * @param {string} line - The matched line's content
+ * @returns {boolean} true when the match is prose, not a call
+ */
+function isCommentLine(line) {
+  const trimmed = line.trim();
+  return (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('*') ||
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('{/*')
+  );
+}
+
+/**
  * 3. XSS Protection: Check for dangerous HTML injection
  */
 function checkXSSProtection() {
@@ -1867,6 +1894,12 @@ function checkXSSProtection() {
 
   [...dangerousHTML, ...dangerousHTMLComponents].forEach((match) => {
     const { file, lineNum, line } = parseGrepMatch(match);
+
+    // A comment that merely NAMES the API is not a use of it. Skipped before the ignore
+    // lookups, because a `security-ignore` marker above a comment could never clear it.
+    if (isCommentLine(line)) {
+      return;
+    }
 
     // Check for file-level security ignore
     const fileIgnore = hasFileLevelSecurityIgnore(file, 'xss');
