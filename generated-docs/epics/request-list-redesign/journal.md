@@ -66,3 +66,9 @@ the code, and the trade-offs taken along the way. One section per story.
 - The code review then found a real fault in that fix: it skipped any line that *started* like a comment, so a genuine unreviewed use hidden behind a comment on the same line would have been dropped silently. Tightened so a comment only counts as prose when nothing follows it. The check is now stricter than it was before either change.
 - The review also found the headline total was being added up in a way that prints long decimal tails on ordinary money — the sort of figure that cannot be reconciled against the rows above it. Every test passed because the sample data happens to add up cleanly; real data would not have. This is the clearest example in the build of a fault that only appears outside the fixtures.
 - Two findings needed a decision rather than a fix, and both came from the same place: the big outstanding count was animating and speaking up whenever the reader merely searched or filtered. The requirements pull in two directions — the band must describe what you have narrowed to, but the one piece of movement on the screen belongs to a decision being recorded. Resolved by separating the two: the figure still follows the narrowing, silently and instantly, while the roll and the announcement are kept for the batch actually moving. Before this, one letter typed in the search box rolled the largest figure on the screen and queued an announcement per keystroke.
+
+## Manual test
+
+Walked at the manual-test approval and confirmed all good. 74 checks were on the page: the 22-item check-these-first ledger plus 52 per-story tests, ordered so the tester signs out once (everything as Approver, three Importer absence-checks at the end).
+
+Worth recording as a planning signal: 74 items is well past the ~30 the workflow treats as healthy for one epic. Nine stories in one epic is what produced it — this epic would have been better as two.
