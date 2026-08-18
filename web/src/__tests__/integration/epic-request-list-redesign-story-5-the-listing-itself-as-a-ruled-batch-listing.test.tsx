@@ -1038,7 +1038,14 @@ describe('Epic request-list-redesign, Story 5: the listing itself, as a ruled ba
     expect(
       within(requestsTable()).getByText(arriving[0].Reference),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // The wait's announcement is gone — asserted as "nothing on screen says loading"
+    // rather than "no live region at all" (BR1: markup, not behaviour). Story 2's control
+    // block states the outstanding count in a PERMANENT polite live region, because that
+    // figure moves with no user action when a colleague's decision arrives on a refresh
+    // (R11/R22, story 9 AC-6), so a blanket "no role=status on screen" would now assert
+    // the absence of a figure this epic requires. The announced placeholder always
+    // carries this wording, so its absence is the same fact at the same strength.
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
     expect(screen.queryByText(STILL_LOADING)).not.toBeInTheDocument();
 
     waiting.unmount();

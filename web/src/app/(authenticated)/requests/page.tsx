@@ -47,15 +47,15 @@ export default async function ExpenseRequestsPage() {
     return <PermissionDeniedMessage deniedPath={REQUESTS_PATH} />;
   }
 
+  // No page title above the list: the screen opens with the batch's own control block
+  // instead (`request-list-redesign` R11) — a reader arriving here is looking for how much
+  // is still outstanding, not for the name of the screen they just navigated to. The
+  // `metadata.title` above is a different thing entirely (the browser tab's name) and
+  // stays exactly as it is.
   return (
-    <div className="grid gap-8">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Expense requests
-      </h1>
-      <ExpenseRequestList
-        roles={rolesOf(session)}
-        exportedBy={displayNameOf(session)}
-      />
-    </div>
+    <ExpenseRequestList
+      roles={rolesOf(session)}
+      exportedBy={displayNameOf(session)}
+    />
   );
 }

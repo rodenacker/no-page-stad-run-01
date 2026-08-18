@@ -323,6 +323,20 @@
  *   is nothing to restart.
  * - **It is polite, and one of it** (NFR2, inherited from the announcement above): a
  *   single `role="status"` region, never an alert, however many further polls fail.
+ *
+ * The batch's control block (`request-list-redesign` R11/R19/R21, BR4):
+ *
+ * - **This screen has no page title any more.** It opens with the control block instead —
+ *   the batch's record count, what is still awaiting a decision, what has been decided and
+ *   what it all adds up to. See `BatchControlBlock`, which owns the presentation, and
+ *   `lib/transactions/controlTotals.ts`, which owns the derivation.
+ * - **The block is handed the same arrays the rows are drawn from.** The whole fetched set,
+ *   the narrowed set the pipeline already holds, and the selection — so the figures can
+ *   never describe a set the listing below them is not showing, and the band costs no
+ *   second derivation of anything. Nothing is re-fetched for it: there is no aggregate
+ *   endpoint, and there does not need to be (brief §Data Model).
+ * - **It reads the DEFERRED narrowing**, like the rows and the summary do, which is why it
+ *   moves with them rather than a render ahead of them.
  */
 
 import {
@@ -349,6 +363,7 @@ import {
 
 import { ConfirmAction } from '@/components/common/ConfirmAction';
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
+import { BatchControlBlock } from '@/components/requests/BatchControlBlock';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
@@ -1865,6 +1880,25 @@ export function ExpenseRequestList({
 
   return (
     <div className="grid gap-4">
+      {/* Where this batch stands, before a row is read (R11) — the full-bleed control
+          block that replaced this screen's page title. It is FIRST, in the markup as well
+          as on the page, because it is what the reader came for.
+
+          It is on screen only once there is a batch to describe: while the read is in
+          flight, when it failed, and when nothing has ever been imported, this screen's
+          existing answers stand on their own — a band of zeroes over a "nothing imported
+          yet" message would be a fixture rather than a figure, and `RUN DATE` would have
+          no value the data supports. */}
+      {fetchedRequests.length > 0 && (
+        <BatchControlBlock
+          batch={fetchedRequests}
+          listed={visibleRequests}
+          narrowed={applied.length > 0}
+          narrowedToFile={appliedNarrowing.fileName}
+          selectedIds={selectedIds}
+        />
+      )}
+
       {/* What a refresh brought in, said quietly and to assistive technology only
           (NFR2): the rows changing is what a sighted reader sees, and nothing here may
           interrupt, steal the keyboard or need dismissing.
@@ -1872,12 +1906,11 @@ export function ExpenseRequestList({
           It is in the markup from the start, empty, because a live region announces its
           CONTENTS changing — one added to the page at the moment it has something to
           say may never be read out at all. It carries `aria-live` rather than
-          `role="status"` for the same reason it is here at all: an idle screen has no
-          announcement to make, and this project's screens are asserted to be saying
-          NOTHING while they wait, while they are empty and once they have simply
-          answered (`expense-request-list` story 1). A permanently present `status` would
-          be a permanent announcement region on a screen that is not announcing
-          anything. */}
+          `role="status"` for the same reason it is here at all: this line has NOTHING to
+          say until a refresh brings something in, and a `status` region would be a named,
+          empty announcement region sitting on the screen the whole time. (The control
+          block's outstanding count is the opposite case and is a `role="status"`: it
+          always states a figure, and that figure moves under the reader.) */}
       <p aria-live="polite" aria-atomic="true" className="sr-only">
         {refreshNote}
       </p>

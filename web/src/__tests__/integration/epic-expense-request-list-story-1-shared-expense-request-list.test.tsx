@@ -487,7 +487,15 @@ describe('Epic expense-request-list, Story 1: the shared expense request list', 
     expect(
       within(requestsTable()).getByText(request.Reference),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // The wait's announcement is gone — asserted as "nothing on screen says loading"
+    // rather than "no live region at all". The `request-list-redesign` epic opens this
+    // screen with a control block whose outstanding count is a PERMANENT polite live
+    // region, because that figure moves with no user action when a colleague's decision
+    // arrives on a refresh, so a blanket "no role=status on screen" would now assert the
+    // absence of a required figure. The announced placeholder always carries this
+    // wording, so its absence is the same fact at the same strength (that epic's BR1:
+    // a spec may follow changed markup, never lose an assertion).
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
     expect(screen.queryByText(STILL_LOADING)).not.toBeInTheDocument();
   });
 
