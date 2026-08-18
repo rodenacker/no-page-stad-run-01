@@ -29,6 +29,16 @@
  * person back here (BR4) — and it changes no `allowedRoles`: both screens stay open
  * to both roles, and a directly-typed address for either one is unaffected (BR2/R8).
  *
+ * BEING SENT ON MUST NOT COST A BACK PRESS (R9). This address is on the way to
+ * somewhere, never a place anyone stays, so it must not keep a history entry of its
+ * own — hence the explicit REPLACE below. Two journeys depend on it: pressing Back
+ * after arriving, and the app's own name in the header, which points here from every
+ * screen (`components/layout/AppHeader.tsx`) and so brings a single-role person
+ * straight through to their own screen. Leave a landing entry behind and both turn
+ * into a trap: Back returns here, the decision runs again, and the person is thrown
+ * forward onto the screen they were trying to leave, with whatever they visited
+ * before it now unreachable.
+ *
  * The decision also sits BEHIND the session gate, never in front of it (R7): the
  * layout has already resolved the session by the time this runs, so a signed-out
  * visitor is answered by the gate and no destination is worked out for them.
@@ -91,7 +101,17 @@ export default async function SignedInHomePage() {
   if (destination !== undefined) {
     // Never returns — the chooser below is not rendered, and no markup is produced
     // for this navigation at all.
-    redirect(destination);
+    //
+    // 'replace' is stated rather than left to the default, because the default is
+    // not one value: `redirect()` replaces when a page resolves it and PUSHES when a
+    // server action does. Both readings are plausible for a landing decision, and
+    // pushing is precisely the trap R9/BR4 forbid — the landing entry would survive
+    // in history and re-fire the moment someone pressed Back. Saying which one this
+    // is keeps it a decision rather than an inherited default. (Written as the
+    // literal the parameter's own type is made of, not as `RedirectType.replace`:
+    // the value is the same, and this way the only thing this page needs from
+    // `next/navigation` remains `redirect` itself.)
+    redirect(destination, 'replace');
   }
 
   return (

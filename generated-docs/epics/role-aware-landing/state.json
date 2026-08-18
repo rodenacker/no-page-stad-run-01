@@ -25,11 +25,11 @@
       "completedAt": "2026-08-18T14:57:00Z"
     },
     "2": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-18T14:58:00Z",
+      "completedAt": "2026-08-18T15:11:00Z"
     }
   },
   "halt": null,
