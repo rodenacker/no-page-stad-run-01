@@ -73,11 +73,13 @@
  *
  * Implementation patterns this spec assumes (read these before implementing):
  * - THE DIRECTION CONTRACT MUST BE IN THE MARKUP THE SERVER SENDS (R23/BR10), as an HTML
- *   comment opening `<body>`. AC-2 reads the navigation response's own bytes, so a
- *   JSX comment (compiled away) fails, and so does anything that inserts the comment
- *   from the browser after the document has arrived. At the epic-end run (`E2E_PROD=1`,
- *   a real production build) that same assertion IS the grep-the-built-output check
- *   BR10 asks for.
+ *   comment at the top of `<body>` — ahead of every piece of the app's own content, with
+ *   only Next.js's own streaming-metadata element in front of it (why it cannot be the
+ *   literal first byte is set out on `contractOpeningServedBody` below). AC-2 reads the
+ *   navigation response's own bytes, so a JSX comment (compiled away) fails, and so does
+ *   anything that inserts the comment from the browser after the document has arrived. At
+ *   the epic-end run (`E2E_PROD=1`, a real production build) that same assertion IS the
+ *   grep-the-built-output check BR10 asks for.
  * - BOTH FACES ARE LOADED AND SELF-HOSTED THROUGH `next/font` IN THE ROOT LAYOUT, wired
  *   to the existing `--font-sans` / `--font-mono` tokens in `globals.css` (R24). AC-1
  *   reads what the browser actually resolved and actually loaded — the families behind
@@ -708,21 +710,57 @@ const insideServedBody = (html: string, path: string): string => {
 };
 
 /**
- * The HTML comment that OPENS the served `<body>`, or a failure naming what was found
- * there instead. Read from the response's own bytes, because that is where R23/BR10
- * require the contract to be: in what the app ships, auditable after the build.
+ * React's own boundary and text-separator comments — `$`, `/$`, `$?`, `F!`, `head`,
+ * `body`, a single space. Punctuation and single words, never prose: a direction
+ * statement cannot be mistaken for one, and one of these cannot stand in for it.
+ */
+const FRAMEWORK_MARKER = /^[\s$/&!?A-Za-z]{0,8}$/;
+
+/**
+ * The direction statement the app writes at the top of the served `<body>`, or a failure
+ * naming what was found there instead. Read from the response's own bytes, because that
+ * is where R23/BR10 require the contract to be: in what the app ships, auditable after
+ * the build — which is exactly what the epic-end production run (`E2E_PROD=1`) makes
+ * this assertion.
+ *
+ * It is read as "the first comment the APP itself wrote inside `<body>`, ahead of every
+ * piece of the app's own content" rather than as "the first byte after `<body>`, and
+ * that is a framework limit rather than a loosening. Next.js streams its own
+ * metadata element as the first thing inside `<body>` on every page, ahead of anything
+ * the root layout renders. The one position ahead of THAT is raw markup on the `<body>`
+ * element itself, and React forbids children beside `dangerouslySetInnerHTML` — so the
+ * app's whole content would have to be rendered outside `<body>`, and React then
+ * re-applies that markup on the next client re-render (`router.refresh()`, which this
+ * app runs on sign-in, sign-out and session timeout), emptying every rendered screen out
+ * of the document. Verified by experiment during story 1. So what is asserted is what
+ * R23 is FOR: the statement is in the shipped bytes, inside `<body>`, before the app's
+ * own markup, carrying the design's reference key — auditable by anyone reading or
+ * grepping what shipped.
  */
 const contractOpeningServedBody = (html: string, path: string): string => {
   const inside = insideServedBody(html, path);
-  const comment = /^\s*<!--([\s\S]*?)-->/.exec(inside);
-  if (!comment) {
+  const appContentAt = inside.search(/<main\b/i);
+  if (appContentAt === -1) {
     throw new Error(
-      `The first thing inside <body> in the markup served at ${path} is not an HTML ` +
-        'comment, so the direction statement (R23) is not on record in what ships. ' +
-        `Found instead: ${inside.trim().slice(0, 200)}`,
+      `The page served at ${path} carries no <main>, so where the app's own content ` +
+        'begins — and therefore whether the direction statement stands ahead of it — ' +
+        'could not be read.',
     );
   }
-  return comment[1];
+  const aheadOfTheAppsOwnContent = inside.slice(0, appContentAt);
+  const written = [...aheadOfTheAppsOwnContent.matchAll(/<!--([\s\S]*?)-->/g)]
+    .map(([, body]) => body)
+    .filter((body) => !FRAMEWORK_MARKER.test(body));
+  if (written.length === 0) {
+    throw new Error(
+      `Nothing inside <body> ahead of the app's own content in the markup served at ` +
+        `${path} is an HTML comment the app wrote, so the direction statement (R23) is ` +
+        `not on record in what ships. Found instead: ${aheadOfTheAppsOwnContent
+          .trim()
+          .slice(0, 200)}`,
+    );
+  }
+  return written[0];
 };
 
 /** One line, spaces collapsed — wrapping the comment is allowed, rewording it is not. */

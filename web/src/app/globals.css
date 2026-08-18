@@ -21,13 +21,18 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   /*
-   * Cabin (loaded and self-hosted by next/font in the root layout) is the whole
-   * app's face, headings and body alike. The design system records the brand face as
-   * proprietary self-hosted "Barclays Effra", which is not loadable; Cabin is its own
-   * documented substitute (project.md §Styling & Branding).
+   * The app's two faces, both loaded and self-hosted by next/font in the root layout
+   * (project.md §Styling & Branding). Each is read here as a variable rather than named
+   * as a family, so the face stays a token: no component may name one, and swapping a
+   * face is a change to the root layout alone.
+   *
+   * Public Sans sets every word in the app. Azeret Mono sets the fixed-field notation —
+   * figures, references, masked account numbers, control totals and field labels — and
+   * is reached by the screens that show those things through `font-mono`.
    */
-  --font-sans: var(--font-cabin), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-azeret-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   /*
    * Status intents (UI-21: a status is colour plus an icon or text label). Shadcn
    * ships no success/warning/info token, so these three are declared here — with a

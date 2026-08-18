@@ -12,22 +12,77 @@
     "introducesSharedSurface": true,
     "unverifiedAssumptions": [
       "Verify the total value figure against a real batch: the app adds every request's amount into one total, treating them all as the same currency and the same direction of money. If a real batch mixes currencies, or mixes money-in with money-out rows, the headline total will be a number that does not mean anything — and it will look perfectly plausible.",
-      "Verify the awaiting/decided split against a real batch: the app treats a request as decided whenever its status is anything other than Imported. If the service ever sends a third status that does not mean 'decided', those requests will be counted as decided and the outstanding count — the number the whole screen is built around — will read low."
+      "Verify the awaiting/decided split against a real batch: the app treats a request as decided whenever its status is anything other than Imported. If the service ever sends a third status that does not mean 'decided', those requests will be counted as decided and the outstanding count — the number the whole screen is built around — will read low.",
+      "R23 asks for the direction contract to be the FIRST child of <body>. What shipped is a real HTML comment at the top of <body>, ahead of every piece of the app's own content, with only Next.js's own streaming-metadata element in front of it. The one position ahead of that empties every screen on router.refresh() (which this app runs on sign-in, sign-out and session timeout) - verified in a browser. R23's purpose is met in full; please confirm you are content with 'top of the body' rather than literally 'first'."
     ],
     "manualTestResults": []
   },
   "phase": "BUILD",
   "stories": {
-    "1": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "2": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "3": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "4": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "5": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "6": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "7": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "8": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "9": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null }
+    "1": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": "2026-08-17T18:26:01.000Z",
+      "completedAt": "2026-08-18T05:13:14.000Z"
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "4": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "5": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "6": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "7": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "8": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "9": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
   },
   "halt": null,
-  "lastUpdated": "2026-08-17T15:28:18.884Z"
+  "lastUpdated": "2026-08-18T05:13:14.000Z"
 }
