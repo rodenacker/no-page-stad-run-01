@@ -57,7 +57,7 @@
  *   see everything here (FR8, §Access control).
  */
 
-import { CircleCheck, CircleX, Eye, EyeOff, TriangleAlert } from 'lucide-react';
+import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { CorrectionRowsDownload } from '@/components/files/CorrectionRowsDownload';
@@ -122,10 +122,12 @@ const WILL_IMPORT_LABEL = 'Will import';
 const REJECTED_LABEL = 'Rejected';
 
 /** What each verdict MEANS, in the project's shared status vocabulary (UI-21 / NFR-4:
- * an intent colour paired with an icon AND the words, never colour alone). */
+ * an intent colour paired with a shape AND the words, never colour alone). The shapes
+ * themselves belong to the shared mark, so a verdict here and a status on any other
+ * screen cannot be drawn two different ways. */
 const VERDICT_PRESENTATION: Record<ImportPreviewVerdict, StatusPresentation> = {
-  'will-import': { intent: 'positive', icon: CircleCheck },
-  rejected: { intent: 'negative', icon: CircleX },
+  'will-import': { intent: 'positive' },
+  rejected: { intent: 'negative' },
 };
 
 const VERDICT_LABEL: Record<ImportPreviewVerdict, string> = {

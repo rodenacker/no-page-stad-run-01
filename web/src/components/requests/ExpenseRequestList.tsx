@@ -89,13 +89,18 @@
  *   request is open (by id); the panel holds the reveal, so closing it returns the
  *   reader to their place, ordering and page untouched. See `RequestDetailPanel`.
  * - **Still nothing changes a request** (BR1/R5). The only per-request control is
- *   "open it", a direct control on the row and on the card alike — see `RequestActions`
+ *   "open it", a direct control on the row and on the narrow line-group alike — see `RequestActions`
  *   for why there is no ⋯ overflow behind it.
- * - **At phone width the requests are CARDS, not a table.** Which presentation is
- *   rendered is decided by the browser's own media query, watched as external state, so
- *   only one of the two is ever in the markup: a table hidden by CSS would still be read
- *   by assistive technology and would still be the thing a test finds. A wide table in a
- *   sideways-scrolling wrapper does not satisfy R16 either way.
+ * - **At phone width the requests are RULED LINE-GROUPS, not a table — and not cards
+ *   either** (`request-list-redesign` R4/R10). Which presentation is rendered is decided
+ *   by the browser's own media query, watched as external state, so only one of the two is
+ *   ever in the markup: a table hidden by CSS would still be read by assistive technology
+ *   and would still be the thing a test finds. A wide table in a sideways-scrolling
+ *   wrapper does not satisfy R4 either way. The narrow presentation is `RequestCards`
+ *   (the file name is historical — the Shadcn `Card` per request it once composed is a
+ *   named anti-goal of this design and is gone), and it is handed the same readings this
+ *   file settles for the wide listing: how a status reads, and which shape a request's own
+ *   state puts in the gutter.
  *
  * Possible duplicates, and who is told about them (R4/R8/R21, BR2/BR3):
  *
@@ -148,13 +153,13 @@
  *
  * Deciding one request (`expense-decisions` R1/R10/R11/R12/R14/R15, BR3/BR6/BR7):
  *
- * - **This component owns the decide flow; the row, the card and the panel only ask.**
+ * - **This component owns the decide flow; the row, the line-group and the panel only ask.**
  *   `RequestActions` and `RequestDetailPanel` are handed `onDecide` — and handed it
  *   ONLY for an Approver looking at a request that is still `Imported` — so a reader who
  *   may not decide, or a request that has already been decided, has no decide control in
  *   its markup at all. Absent, never disabled: the project's rule everywhere, and the
  *   thing a greyed-out Approve would quietly break.
- * - **The two decisions are DIRECT controls on the row and on the card** (user decision
+ * - **The two decisions are DIRECT controls on the row and on the narrow line-group** (user decision
  *   at manual test), and there is no ⋯ overflow anywhere on a request — so deciding one
  *   costs one activation rather than two. They are therefore on
  *   screen once per listed request, which is why each one's accessible name carries the
@@ -212,12 +217,13 @@
  *   were. The deliberate consequence, accepted at the stories approval, is that a bulk
  *   action may cover requests that are not on screen — which is why the count is always
  *   visible and why the action that uses it names an exact figure.
- * - **Each row and card gets a plain `selected` boolean, never the set.** Handing the
+ * - **Each row and line-group gets a plain `selected` boolean, never the set.** Handing the
  *   set down would defeat the memo on every row on every tick — and, once this list
  *   refreshes itself, on every poll. Same shape as `possibleDuplicate` and `canDecide`.
- * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick, no
- *   selection column, no "select everything listed" and no count. Absent from the
- *   markup, never disabled — the rule this project applies everywhere.
+ * - **Only an Approver is offered any of it** (R7/BR10): no per-request tick in the
+ *   gutter, no "select everything listed" and no count. Absent from the markup, never
+ *   disabled — the rule this project applies everywhere. The gutter itself stays, for
+ *   both roles: it is where the marks they scan for live (see below).
  * - **"Select everything currently listed" means the NARROWED set**, not the page on
  *   screen and not the whole fetched set, and it covers only requests still awaiting a
  *   decision (BR1). Unticking it is this screen's clear-the-selection action.
@@ -323,17 +329,96 @@
  *   is nothing to restart.
  * - **It is polite, and one of it** (NFR2, inherited from the announcement above): a
  *   single `role="status"` region, never an alert, however many further polls fail.
+ *
+ * The batch's control block (`request-list-redesign` R11/R19/R21, BR4):
+ *
+ * - **This screen has no page title any more.** It opens with the control block instead —
+ *   the batch's record count, what is still awaiting a decision, what has been decided and
+ *   what it all adds up to. See `BatchControlBlock`, which owns the presentation, and
+ *   `lib/transactions/controlTotals.ts`, which owns the derivation.
+ * - **The block is handed the same arrays the rows are drawn from.** The whole fetched set,
+ *   the narrowed set the pipeline already holds, and the selection — so the figures can
+ *   never describe a set the listing below them is not showing, and the band costs no
+ *   second derivation of anything. Nothing is re-fetched for it: there is no aggregate
+ *   endpoint, and there does not need to be (brief §Data Model).
+ * - **It reads the DEFERRED narrowing**, like the rows and the summary do, which is why it
+ *   moves with them rather than a render ahead of them.
+ *
+ * The exception gutter down the left (`request-list-redesign` R15/R18/R20, BR5):
+ *
+ * - **The gutter is a real, permanently reserved first column** — two characters wide, on
+ *   every row, for every reader, whether or not anything on the page needs marking. An
+ *   empty gutter is the design and not wasted space: it is what makes a marked row
+ *   findable by scanning one narrow column instead of reading nine. It is never dropped,
+ *   hidden or collapsed, and an ordinary row's gutter carries NOTHING — no placeholder
+ *   glyph, no dash (brief §Data Model settles R18 against R15/BR5).
+ * - **Selection lives IN it, and the column it used to have of its own is gone** — removed,
+ *   not hidden. What moved is only where the control sits: it is still the Shadcn
+ *   `checkbox`, still named for the request it selects, still carrying its checked state
+ *   and still disabled while a batch is in flight, so every selection semantic above holds
+ *   unchanged and `lib/transactions/selecting.ts` is reused untouched. Restyled as one of
+ *   the gutter's marks — square and unshadowed, so an unticked request reads as the
+ *   taxonomy's hollow rule-box and a ticked one as the inked box — and never rebuilt as a
+ *   `div` with a click handler, which would take no focus, answer no Space key and report
+ *   no state.
+ * - **The shapes are the shared mark's, not a second set** (`StatusMark` from
+ *   `components/status/StatusBadge`, sized to the column). A decided request's decision is
+ *   what its gutter carries, in the intent's own ink — named explicitly, because the row
+ *   around it has receded and `currentColor` would mute the one thing still marking it.
+ * - **A row that needs attention is marked by a rule down its outer edge** rather than by
+ *   a shape in the two characters, because those two characters may already be carrying an
+ *   offer to select the request — and a possible duplicate still awaiting a decision is
+ *   exactly the row an Approver most needs to find. The wording stays beside the status
+ *   (`PossibleDuplicateMark`), so the mark supplements words and never replaces them (BR3).
+ * - **A decided row recedes, it does not disappear** (R20). It stays listed, keeps every
+ *   value on it and keeps its controls working — the audit trail, and what a second
+ *   Approver needs to see — and simply drops to ink-on-ground so only the requests still
+ *   awaiting a decision hold full contrast. Not `aria-hidden`, not `aria-disabled`, not a
+ *   dim: a relative contrast move, and one that stays comfortably readable.
+ *
+ * Watching the batch balance (`request-list-redesign` R17/R22, BR7/BR8):
+ *
+ * - **Before an irreversible decision commits, the screen ITSELF shows what the batch will
+ *   look like afterwards** (R17/BR7) — not the confirmation's wording, which describes an
+ *   outcome rather than showing one. Two things say it together: the control block states the
+ *   OUTSTANDING count the batch will have while `RECORDS` and `DECIDED` go on stating what it
+ *   is, so the three visibly do not add up; and every affected row carries the words `Not yet
+ *   confirmed` beside its status. Both readings come from ONE derived set of ids
+ *   (`awaitingConfirmationIds`), which is why they can never disagree.
+ * - **Nothing about it is stored, and nothing about it is optimistic.** The set is a reading
+ *   of the two confirmations this component already owned, so backing out of either restores
+ *   every figure and every row exactly and decides nothing (AC-3) — there is no second state
+ *   to unwind. What actually happened still arrives only by RE-READING, exactly as before.
+ * - **The machinery underneath is untouched** (R1/BR2). `lib/transactions/deciding.ts`,
+ *   `bulkApproval.ts` and `refreshing.ts` are reused as they shipped: the re-read before
+ *   anything is sent, the already-decided refusal in its own words, the three-bucket outcome
+ *   with its scoped retry, and the self-refresh with its pausing rules all behave identically.
+ *   This is a presentation layer OVER them, never inside them.
+ * - **The one orchestrated motion on this screen is the outstanding count settling** (R22/
+ *   BR8) — see `BatchControlBlock` and the `figureRoll` keyframes in `globals.css`. It follows
+ *   the count the batch ACTUALLY has, so a decision produces one settle rather than three
+ *   (into the projection, back out of it, then down), and it is the reason this screen has no
+ *   hover fills or row transitions to compete with it. It also belongs to the BATCH moving
+ *   rather than to the block's figures moving: those figures describe the narrowed set (R21),
+ *   so a keystroke in the search box re-states them — silently and instantly, with no roll
+ *   and nothing announced, because narrowing what is described is not a decision. The block
+ *   is handed the whole fetched set as well as the narrowed one and works the difference out
+ *   itself; nothing here has to tell it which just happened.
+ *
+ * The continuation line at the foot (`request-list-redesign` R14):
+ *
+ * - **The listing states its own continuation** — `RECORDS 1–20 OF 428 · PAGE 1 OF 22` —
+ *   instead of scattering those figures through a row of controls. It is
+ *   `RequestListPagination`'s, derived from the same page slice the rows are drawn from,
+ *   and it is the screen's ONLY statement of the records range and the page counter: a
+ *   second copy anywhere (a narrow-width duplicate, a screen-reader-only one) would leave
+ *   the reader with two answers to "where am I".
+ * - **The rule between the listing and that line is ONE rule.** The full-bleed listing box
+ *   below draws the closing hairline, and the foot deliberately draws none — see the
+ *   comment at the `RequestListPagination` call.
  */
 
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  CircleCheck,
-  CircleX,
-  Inbox,
-  TriangleAlert,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import {
   memo,
@@ -349,8 +434,14 @@ import {
 
 import { ConfirmAction } from '@/components/common/ConfirmAction';
 import { AppliedNarrowingSummary } from '@/components/requests/AppliedNarrowingSummary';
+import { BatchControlBlock } from '@/components/requests/BatchControlBlock';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
+import {
+  FIELD_LABEL_CLASS,
+  RULED_ACTION_CLASS,
+} from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
+import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RejectionNoteStep } from '@/components/requests/RejectionNoteStep';
 import { RequestActions } from '@/components/requests/RequestActions';
@@ -358,7 +449,11 @@ import { RequestCards } from '@/components/requests/RequestCards';
 import { RequestDetailPanel } from '@/components/requests/RequestDetailPanel';
 import { RequestListPagination } from '@/components/requests/RequestListPagination';
 import { RequestNarrowingControls } from '@/components/requests/RequestNarrowingControls';
-import { StatusBadge } from '@/components/status/StatusBadge';
+import {
+  StatusBadge,
+  StatusMark,
+  statusInkFor,
+} from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -453,7 +548,6 @@ import {
 } from '@/lib/transactions/refreshing';
 import {
   NOTHING_SELECTED,
-  SELECTION_COLUMN_LABEL,
   SELECTION_COUNT_LABEL,
   SELECT_EVERYTHING_LISTED_LABEL,
   selectRequestLabel,
@@ -479,7 +573,10 @@ import {
   isKnownTransactionStatus,
 } from '@/types/transactions';
 
-import type { StatusPresentation } from '@/components/status/StatusBadge';
+import type {
+  StatusIntent,
+  StatusPresentation,
+} from '@/components/status/StatusBadge';
 import type { DecisionOutcome } from '@/lib/api/decisions';
 import type {
   NarrowingField,
@@ -538,6 +635,157 @@ const NARROWED_EMPTY_HINT =
  */
 const ACTIONS_COLUMN_LABEL = 'Actions';
 
+/**
+ * Heads the reserved gutter (`request-list-redesign` R15/BR5), read by a screen reader
+ * only: what a sighted reader scans is the marks in the column, and a visible heading
+ * over two characters would be wider than the column it names.
+ *
+ * The wording is pinned from two directions at once, and both are real:
+ *
+ * - it must SAY "exceptions", because a leftmost column of shapes is otherwise unnamed
+ *   to anyone reading by name — the marks in it are the whole reason the column exists;
+ * - it must NOT contain any word another column's heading contains (`status`, `amount`,
+ *   `reference`, `file`, `date`, `account`, `description`, `type`). A heading of "Status
+ *   mark" — the obvious choice — would make "the column headed status" ambiguous, and
+ *   every surface that addresses a column by its own distinctive word (this screen's
+ *   sort controls are addressed that way throughout) would then match two columns.
+ */
+const GUTTER_COLUMN_LABEL = 'Exceptions and selection';
+
+/**
+ * FULL-BLEED TO THE PAGE PADDING, stated once for every part of this screen that runs
+ * edge to edge (`request-list-redesign` R13 — the same convention the control block and
+ * the narrowing strip already use).
+ *
+ * `-mx-4` cancels `<main>`'s own `px-4`, so the element's box — and therefore any rule
+ * drawn on it — reaches the edge of the page; `px-4` puts the padding back inside, so the
+ * content still lines up with the app's name in the header, with the control block's
+ * labels and with the strip's fields above it. If the layout's horizontal padding
+ * changes, this changes with it.
+ */
+const PAGE_BLEED_CLASS = '-mx-4';
+const FULL_BLEED_CLASS = `${PAGE_BLEED_CLASS} px-4`;
+
+/**
+ * A place in the listing that is not a row: the wait, an empty batch, a failed read, a
+ * narrowing that hid everything, and the notice saying the list has stopped keeping
+ * itself current.
+ *
+ * With the card gone (R13/AC-1) there is nothing framing any of these but the ruling
+ * itself, so each one is a full-bleed band closed by a hairline top and bottom — the same
+ * rule weight the rows carry, so an answer reads as part of the listing rather than as
+ * text stranded on a blank page. The vertical room is what keeps it from reading as one
+ * more row.
+ */
+const RULED_BAND_CLASS = `${FULL_BLEED_CLASS} border-y`;
+
+/**
+ * The page padding, applied to the listing's own outer cells instead of to a box around
+ * it. The table itself is full-bleed so every hairline row rule reaches the edge of the
+ * page like the strip's rule above it; putting the padding on the first and last cell is
+ * what keeps the values inside those rules lined up with everything else on the screen.
+ */
+const LISTING_EDGE_PADDING_CLASS =
+  '[&_th:first-child]:pl-4 [&_td:first-child]:pl-4 [&_th:last-child]:pr-4 [&_td:last-child]:pr-4';
+
+/**
+ * A listed row (R13/AC-1): the hairline rule beneath it is the whole treatment. The
+ * primitive's hover fill is cancelled here rather than in the primitive itself — the files
+ * screens are not restyled by this epic (R28) — because a row that tints under the pointer
+ * is the striped-table treatment arriving one row at a time, and BR8 keeps this screen's
+ * one motion grammar for a decision resolving. Cancelling the transition with it also
+ * keeps a page of rows off the compositor at the 10,000-request volume (R8).
+ */
+const LISTING_ROW_CLASS =
+  'transition-none hover:bg-transparent has-aria-expanded:bg-transparent';
+
+/**
+ * The reserved gutter's own cell, for the heading row and for every listed row alike
+ * (R15/BR5).
+ *
+ * Three things about it are the requirement rather than styling:
+ *
+ * - **`font-mono` and `w-[2ch]` together are the two-character width.** The width is
+ *   stated in the notation this design measures a character in (Azeret Mono, the same
+ *   face the references and figures beside it are set in), so "two characters" is
+ *   literally two characters and not a rounded pixel value that drifts with the face.
+ * - **It is on EVERY row and for EVERY reader**, which is what makes the column
+ *   permanently reserved: an empty gutter is the design, because it is what leaves a
+ *   marked row findable by scanning one narrow column instead of reading nine.
+ * - **The left rule is always drawn**, transparent unless the row is an exception, so a
+ *   marked row and an ordinary one line up to the pixel down the column.
+ */
+const GUTTER_CELL_CLASS = 'w-[2ch] border-l-2 border-l-transparent font-mono';
+
+/**
+ * The mark's own field inside that cell: exactly two characters wide whether or not it
+ * holds anything, which is what reserves the column when nothing on the page needs
+ * marking (BR5). Reserved by CSS rather than by a placeholder character — an ordinary
+ * row's gutter carries no glyph and no dash (brief §Data Model).
+ */
+const GUTTER_MARK_BOX_CLASS = 'flex w-[2ch] items-center justify-center';
+
+/** A mark in the gutter, drawn at the gutter's own width — the shape sized to the column. */
+const GUTTER_MARK_CLASS = 'size-[2ch]';
+
+/**
+ * The selection control AS ONE OF THE GUTTER'S MARKS (R15/BR5/AC-3).
+ *
+ * It is still the Shadcn `checkbox` primitive underneath — a real, focusable control
+ * that reports its own checked state and answers the Space key — restyled to the
+ * gutter's notation and never replaced by a `div` with a click handler. Squared off
+ * (nothing in this world has a radius) and stripped of the primitive's drop shadow, it
+ * becomes the taxonomy's own hollow rule-box while a request is unticked and the inked
+ * box once it is: the same two shapes the status marks beside it are drawn as, which is
+ * what lets one narrow column carry both an exception and an offer to act.
+ *
+ * The focus ring is deliberately left exactly as the primitive draws it: a two-character
+ * column is precisely where a focus indicator gets styled away, and a keyboard user has
+ * to be able to see where they are (R5, WCAG 2.2 AA).
+ */
+const SELECTION_MARK_CLASS = `${GUTTER_MARK_CLASS} rounded-none shadow-none`;
+
+/**
+ * A row that needs attention, marked in the gutter as a rule down its outer edge — the
+ * editorial change-bar a reader scans a margin for (R15: the gutter marks a row that
+ * needs attention as well as one that has been decided).
+ *
+ * It is a RULE rather than a shape (R18's marks are a shape-and-rule taxonomy) because
+ * the two characters themselves may already be carrying an offer to select the request:
+ * a possible duplicate awaiting a decision is exactly the row an Approver most needs to
+ * find, so the exception cannot be the thing that loses the gutter. The wording stays
+ * beside the status where it always was (`PossibleDuplicateMark`), so the mark
+ * supplements words and never replaces them (BR3).
+ */
+const EXCEPTION_RULE_CLASS = 'border-l-warning';
+
+/**
+ * A request somebody has already decided: still listed, still readable, but dropped to
+ * ink-on-ground so only the requests still awaiting a decision hold full contrast
+ * (R20). The batch visibly works itself towards zero.
+ *
+ * A relative contrast move, NOT a disabled state and not a dim: the row keeps every
+ * value on it, its controls keep working, and the ink it drops to is the token the whole
+ * app reads secondary text in — which stays well clear of the contrast bar in both
+ * themes. What keeps its full ink is the decision itself: the gutter's mark, and the
+ * status beside it.
+ */
+const DECIDED_ROW_CLASS = 'text-muted-foreground';
+
+/**
+ * A figure in the listing: Azeret Mono, tabular, and right-aligned so the digits line up
+ * column-perfect down the page (R13/AC-2).
+ */
+const FIGURE_CELL_CLASS = 'font-mono text-right tabular-nums';
+
+/**
+ * A fixed-field value that is not a figure to be added up — the reference, the masked
+ * account number, the transaction date as the service wrote it. Mono, because that is the
+ * notation this design reads them in (project.md §Styling & Branding), and left where the
+ * column starts.
+ */
+const NOTATION_CELL_CLASS = 'font-mono';
+
 /** A stable empty set, so narrowing is not recomputed while the list is not loaded. */
 const NO_REQUESTS: TransactionRead[] = [];
 
@@ -569,6 +817,13 @@ const duplicatesFoundMessage = (markedRequests: number): string =>
  */
 const PLACEHOLDER_AFTER_MS = 300;
 const STILL_LOADING_AFTER_MS = 3000;
+
+/**
+ * How many ruled placeholder rows stand in for the pending listing. Three: enough for the
+ * ruling to read as a listing rather than as one bar, and few enough that the placeholder
+ * never claims to know how many requests are on their way.
+ */
+const PLACEHOLDER_ROWS = [0, 1, 2];
 
 /**
  * How much of the wait the user is shown: nothing at all, a placeholder standing in
@@ -611,16 +866,17 @@ const LOADING: ListState = { phase: 'loading', wait: 'brief' };
 /**
  * What each recognised status MEANS (brief §Data Model, R14): an imported request is
  * simply where it stands, an approved one finished well, a rejected one was refused.
- * The colours those intents wear belong to the shared badge.
+ * The colours and the shapes those intents wear belong to the shared mark.
  *
  * "Cancelled" is not here on purpose: it is a FILE state, and a cancelled file's
- * requests never reach this list. The shared badge keeps a neutral intent available
- * for it, so its absence from this map is expected rather than an omission.
+ * requests never reach this list (BR11). The shared mark keeps a neutral intent and its
+ * ruled shape available for it, so its absence from this map is expected rather than an
+ * omission.
  */
 const STATUS_PRESENTATION: Record<TransactionStatus, StatusPresentation> = {
-  [TRANSACTION_STATUS_IMPORTED]: { intent: 'informational', icon: Inbox },
-  [TRANSACTION_STATUS_APPROVED]: { intent: 'positive', icon: CircleCheck },
-  [TRANSACTION_STATUS_REJECTED]: { intent: 'negative', icon: CircleX },
+  [TRANSACTION_STATUS_IMPORTED]: { intent: 'informational' },
+  [TRANSACTION_STATUS_APPROVED]: { intent: 'positive' },
+  [TRANSACTION_STATUS_REJECTED]: { intent: 'negative' },
 };
 
 /**
@@ -644,6 +900,26 @@ const presentationOf = (
     : undefined;
 
 /**
+ * Which of the shared shapes a request's own state puts in the gutter, and `undefined`
+ * for the rows that carry none (R15/R18/BR5). Stated once and handed to BOTH
+ * presentations — the wide row below and the narrow line-group (`RequestCards`) — so the
+ * gutter cannot mark the same request two ways at two widths.
+ *
+ * Two readings are settled here, and both are deliberate:
+ *
+ * - **A request still awaiting a decision has an EMPTY gutter.** R18 reads as though
+ *   every status should carry a shape, which would contradict R15/BR5's "empty on an
+ *   ordinary row"; the brief's §Data Model settles it — the mark for "ordinary,
+ *   undecided, no exception" is *empty*. That empty column is what makes the marked rows
+ *   findable, so nothing stands in for it: no placeholder glyph, no dash.
+ * - **A status this app has never heard of draws NO shape**, exactly as the shared mark
+ *   treats it beside the word: a shape would claim a meaning the app does not have. The
+ *   row still recedes, because it is no longer awaiting a decision.
+ */
+const gutterIntentOf = (request: TransactionRead): StatusIntent | undefined =>
+  awaitsDecision(request) ? undefined : presentationOf(request)?.intent;
+
+/**
  * One request's row: the service's values, its type in plain language, its status, and
  * the controls that open it.
  *
@@ -662,7 +938,7 @@ const presentationOf = (
 const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request,
   possibleDuplicate,
-  selectionOffered,
+  awaitingConfirmation,
   selectable,
   selected,
   selectionLocked,
@@ -676,15 +952,18 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   request: TransactionRead;
   possibleDuplicate: boolean;
   /**
-   * Whether the list is offering selection at all — i.e. whether there IS a selection
-   * column. Separate from `selectable` so a request nobody may select still keeps the
-   * column's cell and the rows stay aligned with the heading row.
+   * Whether a decision on this request is waiting to be confirmed — the reader's own,
+   * single or as part of a selection (R17/BR7). A plain boolean, so the memo still holds,
+   * and the list's answer rather than this row's: the same value reaches the phone-width
+   * line-group, so the mark cannot appear at one width and not the other.
    */
-  selectionOffered: boolean;
+  awaitingConfirmation: boolean;
   /**
    * Whether THIS request may be selected: an Approver, and a request still awaiting a
-   * decision (BR1). False means no control at all in the cell — absent, never a
-   * disabled tick (BR10).
+   * decision (BR1). False means no control at all in the gutter — absent, never a
+   * disabled tick (BR10). The gutter's cell is there either way: it is reserved for
+   * every row and every reader (BR5), so the rows stay aligned with the heading row
+   * whoever is signed in.
    */
   selectable: boolean;
   /** Whether this request is in the selection. A plain boolean, so the memo holds. */
@@ -710,12 +989,38 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
   onOpen: (request: TransactionRead) => void;
   onDecide: (request: TransactionRead, outcome: DecisionOutcome) => void;
 }) {
+  /**
+   * Whether this request has stopped awaiting a decision, which is what makes its row
+   * recede (R20). Taken as "not awaiting one" rather than as a list of decided statuses,
+   * so it agrees with the control totals above the listing — where DECIDED is likewise
+   * the remainder — however the service's status vocabulary grows.
+   */
+  const decided = !awaitsDecision(request);
+  const gutterIntent = gutterIntentOf(request);
+
   return (
-    <TableRow>
-      {selectionOffered && (
-        <TableCell className="w-10">
-          {selectable && (
+    <TableRow
+      className={`${LISTING_ROW_CLASS}${decided ? ` ${DECIDED_ROW_CLASS}` : ''}`}
+    >
+      {/* THE RESERVED GUTTER (R15/BR5) — this listing's first column, two characters
+          wide, present and empty on an ordinary row and never collapsed away when
+          nothing on the page needs marking.
+
+          It carries at most one mark, because two characters hold one:
+          - the request's own selection control, for an Approver looking at a request
+            still awaiting a decision — selection lives IN the gutter, composed as one
+            of its marks, and the column it used to have of its own is gone (AC-3);
+          - otherwise the shape the shared mark draws for a decision already recorded,
+            which is what carries that decision on a row that has receded (R20).
+          An exception is the rule down the cell's outer edge, so it is never the thing
+          the tick displaces. */}
+      <TableCell
+        className={`${GUTTER_CELL_CLASS}${possibleDuplicate ? ` ${EXCEPTION_RULE_CLASS}` : ''}`}
+      >
+        <span className={GUTTER_MARK_BOX_CLASS}>
+          {selectable ? (
             <Checkbox
+              className={SELECTION_MARK_CLASS}
               checked={selected}
               disabled={selectionLocked}
               onCheckedChange={() => {
@@ -726,36 +1031,63 @@ const ExpenseRequestRow = memo(function ExpenseRequestRow({
               // column of identical "Select"s.
               aria-label={selectRequestLabel(request.Reference)}
             />
+          ) : (
+            gutterIntent !== undefined && (
+              // The SAME shape the mark beside the status is drawn as — the shared
+              // component's, sized to the column, never a second drawing of it. Ink
+              // named here because the row around it has receded and the mark carrying
+              // the decision must not recede with it.
+              <StatusMark
+                intent={gutterIntent}
+                className={`${GUTTER_MARK_CLASS} ${statusInkFor(gutterIntent)}`}
+              />
+            )
           )}
-        </TableCell>
-      )}
+        </span>
+      </TableCell>
       <TableCell>{request.FileName}</TableCell>
-      <TableCell className="font-medium">{request.Reference}</TableCell>
-      <TableCell className="whitespace-nowrap">
+      {/* The request's own identifier, in the notation this design reads a reference in
+          (R13/AC-2). Its weight is the notation's, not an added emphasis: down a ruled
+          column the fixed-width face is what makes one reference scannable against the
+          next. */}
+      <TableCell className={NOTATION_CELL_CLASS}>{request.Reference}</TableCell>
+      <TableCell className={`${NOTATION_CELL_CLASS} whitespace-nowrap`}>
         {request.TransactionDate}
       </TableCell>
-      <TableCell>
+      {/* Mono is set on the CELL, so the one masking surface stays untouched: the same
+          `MaskedAccountNumber` prints a failed file's rejected rows on a screen this epic
+          does not restyle (R28), and it inherits whatever face the surface around it is
+          set in. Masking has exactly one home and this is not it. */}
+      <TableCell className={NOTATION_CELL_CLASS}>
         <MaskedAccountNumber accountNumber={request.AccountNumber} />
       </TableCell>
       <TableCell>{request.Description}</TableCell>
-      <TableCell className="text-right tabular-nums">
-        {request.Amount}
-      </TableCell>
+      <TableCell className={FIGURE_CELL_CLASS}>{request.Amount}</TableCell>
       <TableCell>{transactionTypeLabel(request.TransactionType)}</TableCell>
       <TableCell>
-        {/* Where the request stands, and — beside it, in words — whether another
-            request in the same load repeats it (R8). The mark sits in the row itself
-            so it is readable without opening anything, and it is one element carrying
-            one phrase. */}
+        {/* Where the request stands, and — beside it, in words — whether a decision on it
+            is waiting to be confirmed (R17/BR7) and whether another request in the same
+            load repeats it (R8). Each mark sits in the row itself so it is readable
+            without opening anything, and each is one element carrying one phrase.
+
+            The pre-commit mark comes FIRST because it is the most immediate thing about
+            the row: the reader is being asked about this request right now. It is words
+            rather than a shape in the gutter for two reasons — those two characters are
+            usually already carrying the tick that put the decision in flight, and a mark
+            with no accompanying text anywhere on the row would not satisfy R3 (BR3). */}
         <div className="flex flex-wrap items-center gap-1">
           <StatusBadge
             status={request.Status}
             presentation={presentationOf(request)}
           />
+          {awaitingConfirmation && <NotYetConfirmedMark />}
           {possibleDuplicate && <PossibleDuplicateMark />}
         </div>
       </TableCell>
-      <TableCell>
+      {/* The row's own controls, held to the right-hand edge of the page so they read as
+          one column of margin annotations down the listing rather than as a ragged band
+          in the middle of it — the heading above them has been right-aligned all along. */}
+      <TableCell className="text-right">
         <RequestActions
           reference={request.Reference}
           handOffFocus={handOffFocus}
@@ -791,6 +1123,16 @@ const SORT_ICONS = {
  * unreachable by keyboard, and an arrow on its own would leave the direction to
  * eyesight alone. Only the column in force reports a direction — ordering is
  * single-field, so every other column says `none`.
+ *
+ * The heading is the screen's tracked micro-label notation (R13: 11px tracked mono column
+ * heads), imported from `fieldNotation.ts` rather than restated — a column head and a
+ * field label are the same object in this design. Two things about that are deliberate:
+ * the capitals are `text-transform`, so the wording a screen reader is given still reads
+ * as words and the sort control's accessible name is unchanged; and the head is set in
+ * `--muted-foreground` so the ink belongs to the values beneath it rather than to the
+ * words naming them. The primitive's hover fill is cancelled — a filled head is the panel
+ * treatment this story removes — leaving the ghost variant's own ink change as the
+ * pointer-and-keyboard state.
  */
 function SortableColumnHeading({
   column,
@@ -808,13 +1150,13 @@ function SortableColumnHeading({
     <TableHead
       scope="col"
       aria-sort={direction}
-      className={column.numeric === true ? 'text-right' : undefined}
+      className={`text-muted-foreground${column.numeric === true ? ' text-right' : ''}`}
     >
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        className="-mx-2"
+        className={`${FIELD_LABEL_CLASS} -mx-2 hover:bg-transparent dark:hover:bg-transparent`}
         onClick={() => {
           onSort(column.key);
         }}
@@ -823,9 +1165,11 @@ function SortableColumnHeading({
         {direction !== 'none' && (
           <span className="sr-only">, sorted {direction}</span>
         )}
+        {/* Sized down to the head's own scale: at 11px a 16px glyph would out-weigh the
+            word it belongs to. Still decoration — the direction is in the name. */}
         <SortIcon
           aria-hidden="true"
-          className={direction === 'none' ? 'opacity-50' : undefined}
+          className={direction === 'none' ? 'size-3 opacity-50' : 'size-3'}
         />
       </Button>
     </TableHead>
@@ -908,7 +1252,7 @@ export function ExpenseRequestList({
     useState<ReadonlySet<number>>(NOTHING_SELECTED);
 
   /**
-   * One request ticked or unticked. Stable, because every row and card holds it — and
+   * One request ticked or unticked. Stable, because every row and line-group holds it — and
    * it takes the REQUEST rather than being rebuilt per row, which is what keeps them
    * memoised through a selection change (see `ExpenseRequestRow`).
    */
@@ -1273,7 +1617,7 @@ export function ExpenseRequestList({
    * Choosing a decision asks for it — it does not record it (R10/BR6). A rejection is
    * asked WHY first (R7/R9): the note step comes before the confirmation, and an
    * approval goes straight to it with nothing to write. Stable, because every row and
-   * card holds it.
+   * line-group holds it.
    */
   const askToDecide = useCallback(
     (request: TransactionRead, outcome: DecisionOutcome): void => {
@@ -1850,6 +2194,36 @@ export function ExpenseRequestList({
   };
 
   /**
+   * The requests a decision is waiting to be confirmed on, by id (R17/BR7) — the pre-commit
+   * state, and the ONE thing this story adds to the screen's state.
+   *
+   * Four things about it are deliberate:
+   *
+   * - **It is DERIVED, never stored.** It is a reading of the two confirmations this
+   *   component already owns, so backing out of either one — the way out, Escape, or a
+   *   selection emptying underneath it — restores every figure and takes every mark off by
+   *   construction (AC-3). There is no second piece of state to forget to clear, and nothing
+   *   optimistic anywhere: the machinery underneath is untouched and still learns what
+   *   happened by re-reading (`lib/transactions/{deciding,bulkApproval,refreshing}.ts`).
+   * - **The single decision takes precedence**, because `pendingDecision` is the more
+   *   specific ask; the two confirmations are modal, so they cannot honestly be open at once.
+   * - **The bulk half reads the SELECTION and the `bulkApprovalAsked` gate**, and the gate
+   *   is what keeps the marks off the rows once the batch is under way: a request whose call
+   *   was refused stays selected so it can be tried again (bulk-approval BR11), and it must
+   *   not go on claiming a decision is awaiting confirmation on it.
+   * - **The rejection note step is deliberately NOT in it.** The pre-commit state is the
+   *   answer to "you are being asked to commit this"; while the note is being written nothing
+   *   has been confirmed and nothing has been asked yet, and the reader is looking at the
+   *   note step rather than at the batch behind it.
+   */
+  const awaitingConfirmationIds = useMemo<ReadonlySet<number>>(() => {
+    if (pendingDecision !== null) {
+      return new Set([pendingDecision.request.Id]);
+    }
+    return bulkApprovalAsked ? selectedIds : NOTHING_SELECTED;
+  }, [pendingDecision, bulkApprovalAsked, selectedIds]);
+
+  /**
    * The request the panel is showing, resolved from the fetched set rather than kept as
    * a copy — so the panel can never show a value the list no longer holds. A request
    * that is no longer there closes the panel rather than freezing an old version of it.
@@ -1865,6 +2239,26 @@ export function ExpenseRequestList({
 
   return (
     <div className="grid gap-4">
+      {/* Where this batch stands, before a row is read (R11) — the full-bleed control
+          block that replaced this screen's page title. It is FIRST, in the markup as well
+          as on the page, because it is what the reader came for.
+
+          It is on screen only once there is a batch to describe: while the read is in
+          flight, when it failed, and when nothing has ever been imported, this screen's
+          existing answers stand on their own — a band of zeroes over a "nothing imported
+          yet" message would be a fixture rather than a figure, and `RUN DATE` would have
+          no value the data supports. */}
+      {fetchedRequests.length > 0 && (
+        <BatchControlBlock
+          batch={fetchedRequests}
+          listed={visibleRequests}
+          narrowed={applied.length > 0}
+          narrowedToFile={appliedNarrowing.fileName}
+          selectedIds={selectedIds}
+          awaitingConfirmationIds={awaitingConfirmationIds}
+        />
+      )}
+
       {/* What a refresh brought in, said quietly and to assistive technology only
           (NFR2): the rows changing is what a sighted reader sees, and nothing here may
           interrupt, steal the keyboard or need dismissing.
@@ -1872,12 +2266,11 @@ export function ExpenseRequestList({
           It is in the markup from the start, empty, because a live region announces its
           CONTENTS changing — one added to the page at the moment it has something to
           say may never be read out at all. It carries `aria-live` rather than
-          `role="status"` for the same reason it is here at all: an idle screen has no
-          announcement to make, and this project's screens are asserted to be saying
-          NOTHING while they wait, while they are empty and once they have simply
-          answered (`expense-request-list` story 1). A permanently present `status` would
-          be a permanent announcement region on a screen that is not announcing
-          anything. */}
+          `role="status"` for the same reason it is here at all: this line has NOTHING to
+          say until a refresh brings something in, and a `status` region would be a named,
+          empty announcement region sitting on the screen the whole time. (The control
+          block's outstanding count is the opposite case and is a `role="status"`: it
+          always states a figure, and that figure moves under the reader.) */}
       <p aria-live="polite" aria-atomic="true" className="sr-only">
         {refreshNote}
       </p>
@@ -1895,7 +2288,7 @@ export function ExpenseRequestList({
       {cannotRefreshSince !== null && (
         <div
           role="status"
-          className="border-border bg-muted/50 grid gap-1 rounded-md border p-3 text-sm"
+          className={`${RULED_BAND_CLASS} grid gap-1 py-3 text-sm`}
         >
           <p className="font-medium">{CANNOT_REFRESH_MESSAGE}</p>
           <p>
@@ -1910,13 +2303,20 @@ export function ExpenseRequestList({
       )}
 
       {state.phase === 'loading' && state.wait !== 'brief' && (
-        <div role="status" className="grid gap-2">
+        <div role="status" className="grid gap-3">
           <span className="sr-only">{LOADING_MESSAGE}</span>
-          {/* Placeholders stand in for the rows that are on their way; the sentence
+          {/* Placeholders stand in for the rows that are on their way, ruled and
+              full-bleed exactly as those rows will be (R13/AC-6) — so the listing does
+              not jump from a stack of floating boxes into a ruled page when the answer
+              lands. Square, because nothing in this world has a radius. The sentence
               above is what a screen reader is given, since a shape says nothing. */}
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
+          <div aria-hidden="true" className={`${PAGE_BLEED_CLASS} border-y`}>
+            {PLACEHOLDER_ROWS.map((row) => (
+              <div key={row} className="border-b px-4 py-3.5 last:border-b-0">
+                <Skeleton className="h-4 w-full rounded-none" />
+              </div>
+            ))}
+          </div>
           {state.wait === 'prolonged' && (
             <p className="text-muted-foreground text-sm">
               {STILL_LOADING_MESSAGE}
@@ -1926,31 +2326,45 @@ export function ExpenseRequestList({
       )}
 
       {state.phase === 'failed' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{state.message}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={readAgain}
-            >
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
+        /* The read left the reader with nothing, so this band stands where the listing
+           would be, ruled and full-bleed like it (R13/AC-6). The `alert` itself is
+           stripped of the card the primitive ships with — no radius, no border of its
+           own, no surface — and the band's own hairlines frame it, so a failure reads as
+           this screen's own place rather than as a panel floating on the page. Its
+           wording, its role and its retry are untouched. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className="rounded-none border-0 bg-transparent p-0">
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p>{state.message}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                className={RULED_ACTION_CLASS}
+                onClick={readAgain}
+              >
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {state.phase === 'loaded' && state.requests.length === 0 && (
-        <div className="grid justify-items-start gap-4">
+        /* Nothing has ever been imported — an answer, and with no card to sit inside it
+           is composed as a band of its own (R13/AC-6): the same hairlines and the same
+           full bleed the rows would have had, so the reader is looking at an empty
+           listing rather than at a sentence on a blank page. The wording is unchanged. */
+        <div
+          className={`${RULED_BAND_CLASS} grid justify-items-start gap-5 py-10`}
+        >
           <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
           {/* The next step, as a real navigational link rather than a button that
               pushes a route. Offered ONLY here: nothing has ever been imported
               (R9/R17), which is a different answer from a narrowing that hid
               everything (R10/R18) — see this file's header. */}
-          <Button asChild variant="outline">
+          <Button asChild variant="ghost" className={RULED_ACTION_CLASS}>
             <Link href={UPLOAD_PATH}>{EMPTY_ACTION_LABEL}</Link>
           </Button>
         </div>
@@ -1958,106 +2372,116 @@ export function ExpenseRequestList({
 
       {state.phase === 'loaded' && state.requests.length > 0 && (
         <>
-          {/* The hand-over file for the payment system (csv-export R1/R3), offered to
-              both roles with no role check of any kind — see `ExportRequestsAction`.
-              What it exports is `orderedRequests`: every request the search and filters
-              LEFT, in the order the list is sorted, never the page on screen and never
-              the whole fetched set (BR1). It sits above the controls that decide that
-              set, so a keyboard user reaches it early. */}
-          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
-            {/* The selection controls, offered to an Approver and to nobody else —
-                absent from the markup for anyone else rather than disabled (R7/BR10),
-                which is what makes the exclusion structural. They sit AHEAD of the rows
-                so a keyboard user meets "take everything listed" before the requests
-                themselves, and beside the count, which is where the bulk action joins
-                them. */}
-            {isApprover && (
-              <div className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={selectEverythingId}
-                    checked={everythingListedSelected}
-                    disabled={bulkApprovalRunning}
-                    onCheckedChange={(takeEverything) => {
-                      changeEverythingListed(takeEverything === true);
-                    }}
-                    // Named here as well as beside itself, so what a screen reader is
-                    // given and what a sighted reader sees are one string.
-                    aria-label={SELECT_EVERYTHING_LISTED_LABEL}
-                  />
-                  <Label htmlFor={selectEverythingId} className="font-normal">
-                    {SELECT_EVERYTHING_LISTED_LABEL}
-                  </Label>
+          {/* The ruled field strip (`request-list-redesign` R12/BR6), and on its first
+              line the actions that belong WITH it: what the reader may do to the set the
+              strip decides. Both lines run full-bleed to the layout's padding — the same
+              `-mx-4 px-4` the control block above uses — so the strip's rules reach the
+              edge of the page while its labels line up with the rows beneath it. The
+              tighter gap is the strip's own; the screen's `gap-4` separates it from what
+              is above and below. */}
+          <div className="grid gap-3">
+            {/* The hand-over file for the payment system (csv-export R1/R3), offered to
+                both roles with no role check of any kind — see `ExportRequestsAction`.
+                What it exports is `orderedRequests`: every request the search and filters
+                LEFT, in the order the list is sorted, never the page on screen and never
+                the whole fetched set (BR1). It sits above the controls that decide that
+                set, so a keyboard user reaches it early. */}
+            <div className="border-input -mx-4 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-b px-4 pb-3">
+              {/* The selection controls, offered to an Approver and to nobody else —
+                  absent from the markup for anyone else rather than disabled (R7/BR10),
+                  which is what makes the exclusion structural. They sit AHEAD of the rows
+                  so a keyboard user meets "take everything listed" before the requests
+                  themselves, and beside the count, which is where the bulk action joins
+                  them. */}
+              {isApprover && (
+                <div className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={selectEverythingId}
+                      checked={everythingListedSelected}
+                      disabled={bulkApprovalRunning}
+                      onCheckedChange={(takeEverything) => {
+                        changeEverythingListed(takeEverything === true);
+                      }}
+                      // Named here as well as beside itself, so what a screen reader is
+                      // given and what a sighted reader sees are one string.
+                      aria-label={SELECT_EVERYTHING_LISTED_LABEL}
+                    />
+                    <Label
+                      htmlFor={selectEverythingId}
+                      className={`${FIELD_LABEL_CLASS} text-muted-foreground`}
+                    >
+                      {SELECT_EVERYTHING_LISTED_LABEL}
+                    </Label>
+                  </div>
+
+                  {/* R4: on screen the whole time a selection is live, and NOT on it at
+                      all once nothing is selected — an indicator reading "0 selected" is
+                      a permanent fixture rather than an answer. Announced politely
+                      (`status`), since the figure moves under a reader who is doing
+                      something else. */}
+                  {selectedCount > 0 && (
+                    <p
+                      role="status"
+                      aria-label={SELECTION_COUNT_LABEL}
+                      className="font-mono text-sm tabular-nums"
+                    >
+                      {selectionCountMessage(selectedCount)}
+                    </p>
+                  )}
+
+                  {/* The action the selection leads to (R1), beside the count it acts
+                      on and offered only while there IS a selection — an Approve with
+                      nothing selected has nothing to act on, and the count and the
+                      action belong on screen together. Named for the SELECTION, so it
+                      can never be confused with the "Approve request TXN-…" control
+                      every listed request carries. Disabled only while a batch of its
+                      own is running (AC-4): transient state, not a permission.
+
+                      It keeps its filled weight where the strip's other actions are
+                      ruled text: this is the one control on the line that COMMITS
+                      something irreversible. */}
+                  {selectedCount > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={bulkApprovalRunning}
+                      className={`${FIELD_LABEL_CLASS} rounded-none`}
+                      onClick={() => {
+                        setBulkApprovalAsked(true);
+                      }}
+                    >
+                      {BULK_APPROVE_ACTION_LABEL}
+                    </Button>
+                  )}
                 </div>
+              )}
 
-                {/* R4: on screen the whole time a selection is live, and NOT on it at
-                    all once nothing is selected — an indicator reading "0 selected" is
-                    a permanent fixture rather than an answer. Announced politely
-                    (`status`), since the figure moves under a reader who is doing
-                    something else. */}
-                {selectedCount > 0 && (
-                  <p
-                    role="status"
-                    aria-label={SELECTION_COUNT_LABEL}
-                    className="text-sm font-medium"
-                  >
-                    {selectionCountMessage(selectedCount)}
-                  </p>
-                )}
+              <ExportRequestsAction
+                listedRequests={orderedRequests}
+                exportedBy={exportedBy}
+              />
+            </div>
 
-                {/* The action the selection leads to (R1), beside the count it acts
-                    on and offered only while there IS a selection — an Approve with
-                    nothing selected has nothing to act on, and the count and the
-                    action belong on screen together. Named for the SELECTION, so it
-                    can never be confused with the "Approve request TXN-…" control
-                    every listed request carries. Disabled only while a batch of its
-                    own is running (AC-4): transient state, not a permission. */}
-                {selectedCount > 0 && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={bulkApprovalRunning}
-                    onClick={() => {
-                      setBulkApprovalAsked(true);
-                    }}
-                  >
-                    {BULK_APPROVE_ACTION_LABEL}
-                  </Button>
-                )}
-              </div>
-            )}
+            {/* The choices come from the WHOLE fetched set, so a filter always offers
+                its own way back out of what it narrowed to.
 
-            <ExportRequestsAction
-              listedRequests={orderedRequests}
-              exportedBy={exportedBy}
+                A range the wrong way round is reported INSIDE the strip and applied
+                nowhere: the list stays as it was, which is the whole point (R7 against
+                R10/R18). The report is handed to the strip rather than drawn here,
+                because the underline-only fields carry the error state in the notation
+                now that there is no border left to carry it — and it is read from the
+                SAME narrowing the rows and the summary are, so the screen can never
+                report a range it is quietly applying. */}
+            <RequestNarrowingControls
+              requests={state.requests}
+              searchInput={searchInput}
+              onSearchInputChange={changeSearchInput}
+              narrowing={narrowing}
+              onFilterChange={changeFilter}
+              rangeReports={reports}
             />
           </div>
-
-          {/* The choices come from the WHOLE fetched set, so a filter always offers
-              its own way back out of what it narrowed to. */}
-          <RequestNarrowingControls
-            requests={state.requests}
-            searchInput={searchInput}
-            onSearchInputChange={changeSearchInput}
-            narrowing={narrowing}
-            onFilterChange={changeFilter}
-          />
-
-          {/* A range the wrong way round is reported here and applied nowhere: the list
-              stays as it was, which is the whole point (R7 against R10/R18). The report
-              is announced as it appears, so it is not something only a sighted user
-              notices when the list fails to change. */}
-          {reports.map((report) => (
-            <Alert key={report.id}>
-              <TriangleAlert aria-hidden="true" />
-              <AlertTitle className="line-clamp-none">
-                {report.field}
-              </AlertTitle>
-              <AlertDescription className="text-foreground">
-                <p>{report.message}</p>
-              </AlertDescription>
-            </Alert>
-          ))}
 
           {applied.length > 0 && (
             <AppliedNarrowingSummary
@@ -2088,7 +2512,12 @@ export function ExpenseRequestList({
           )}
 
           {visibleRequests.length === 0 ? (
-            <div className="grid gap-2">
+            /* The narrowing has hidden every request: the listing's own place, ruled and
+               full-bleed like the rows it is standing in for (R13/AC-6), so the reader can
+               see WHERE the requests went from rather than a message adrift under the
+               strip. Still not the never-imported state — no upload action, and the
+               wording is untouched (R10/R18). */
+            <div className={`${RULED_BAND_CLASS} grid gap-2 py-10`}>
               <p className="max-w-prose">{NARROWED_EMPTY_MESSAGE}</p>
               <p className="text-muted-foreground max-w-prose text-sm">
                 {NARROWED_EMPTY_HINT}
@@ -2101,7 +2530,9 @@ export function ExpenseRequestList({
                 <RequestCards
                   requests={requestsOnPage}
                   presentationOf={presentationOf}
+                  gutterIntentOf={gutterIntentOf}
                   possibleDuplicateIds={possibleDuplicateIds}
+                  awaitingConfirmationIds={awaitingConfirmationIds}
                   maySelect={isApprover}
                   selectedIds={selectedIds}
                   selectionLocked={bulkApprovalRunning}
@@ -2113,72 +2544,109 @@ export function ExpenseRequestList({
                   onDecideRequest={askToDecide}
                 />
               ) : (
-                <Table>
-                  <TableCaption className="sr-only">
-                    Imported expense payment requests: the file each came from,
-                    its reference, transaction date, the last four digits of its
-                    account number, its description, amount, transaction type
-                    and status, and the controls each request offers — opening
-                    it, and, where one is still awaiting a decision and you may
-                    make it, selecting it to be approved with others, or
-                    approving or rejecting it on its own. Every value heading
-                    orders the list by its own column.
-                  </TableCaption>
-                  <TableHeader>
-                    {/* Drawn from the column definitions, so every displayed
-                        column has a sort control (R13) rather than most of them
-                        having one. */}
-                    <TableRow>
-                      {/* The selection column, for an Approver only: nothing to
-                          order by, and the ticks in it name themselves. */}
-                      {isApprover && (
-                        <TableHead scope="col" className="w-10">
+                /* The listing runs full-bleed to the page padding (R13/AC-1): the box is
+                   widened past `<main>`'s `px-4` so every hairline row rule reaches the
+                   edge of the page, exactly as the strip's rule above it does, while the
+                   values inside keep that padding through the outer cells. The closing
+                   hairline is drawn here rather than on the last row, which the primitive
+                   deliberately leaves unruled — a listing worked down a page needs a
+                   bottom edge as much as it needs the rules between its rows. That one
+                   rule is also the continuation line's top edge (R14), which is why the
+                   foot beneath it draws none of its own.
+                   There is no card, no panel and no striped-row treatment left around it;
+                   what frames the listing is the ruling. */
+                <div className={`${PAGE_BLEED_CLASS} border-b`}>
+                  <Table className={LISTING_EDGE_PADDING_CLASS}>
+                    {/* The caption names the columns in the order they are
+                        read, the reserved gutter included. It stays SHORT on
+                        what the gutter's marks mean: the states themselves are
+                        named in words in the row's own status column, and a
+                        caption that restated them would put this screen's
+                        phrases on the page twice over. */}
+                    <TableCaption className="sr-only">
+                      Imported expense payment requests: a narrow reserved
+                      column down the left carrying each request&apos;s mark,
+                      and the control that selects it where you may select one;
+                      then the file each came from, its reference, transaction
+                      date, the last four digits of its account number, its
+                      description, amount, transaction type and status, and the
+                      controls each request offers — opening it, and, where one
+                      is still awaiting a decision and you may make it,
+                      approving or rejecting it on its own. Every value heading
+                      orders the list by its own column.
+                    </TableCaption>
+                    <TableHeader>
+                      {/* Drawn from the column definitions, so every displayed
+                          column has a sort control (R13) rather than most of
+                          them having one. */}
+                      <TableRow className={LISTING_ROW_CLASS}>
+                        {/* The reserved gutter's own heading (R15/BR5). It is
+                            here for EVERY reader — the column is permanently
+                            reserved, so the listing has the same columns
+                            whoever is signed in — and it is not sortable:
+                            there is no value in the column to order by, and
+                            the marks in it belong to the row's other columns
+                            anyway. */}
+                        <TableHead scope="col" className={GUTTER_CELL_CLASS}>
+                          <span className="sr-only">{GUTTER_COLUMN_LABEL}</span>
+                        </TableHead>
+                        {REQUEST_COLUMNS.map((column) => (
+                          <SortableColumnHeading
+                            key={column.key}
+                            column={column}
+                            sort={sort}
+                            onSort={sortBy}
+                          />
+                        ))}
+                        {/* The controls column: no value in it, so nothing to
+                            order by. */}
+                        <TableHead scope="col" className="text-right">
                           <span className="sr-only">
-                            {SELECTION_COLUMN_LABEL}
+                            {ACTIONS_COLUMN_LABEL}
                           </span>
                         </TableHead>
-                      )}
-                      {REQUEST_COLUMNS.map((column) => (
-                        <SortableColumnHeading
-                          key={column.key}
-                          column={column}
-                          sort={sort}
-                          onSort={sortBy}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {requestsOnPage.map((request) => (
+                        <ExpenseRequestRow
+                          key={request.Id}
+                          request={request}
+                          possibleDuplicate={possibleDuplicateIds.has(
+                            request.Id,
+                          )}
+                          awaitingConfirmation={awaitingConfirmationIds.has(
+                            request.Id,
+                          )}
+                          selectable={isApprover && awaitsDecision(request)}
+                          selected={selectedIds.has(request.Id)}
+                          selectionLocked={bulkApprovalRunning}
+                          onToggleSelection={toggleSelectionOf}
+                          canDecide={isApprover && awaitsDecision(request)}
+                          handOffFocus={handOffFocusTo === request.Id}
+                          onFocusHandedOff={focusHandedOff}
+                          onOpen={openRequest}
+                          onDecide={askToDecide}
                         />
                       ))}
-                      {/* The controls column: no value in it, so nothing to
-                          order by. */}
-                      <TableHead scope="col" className="text-right">
-                        <span className="sr-only">{ACTIONS_COLUMN_LABEL}</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {requestsOnPage.map((request) => (
-                      <ExpenseRequestRow
-                        key={request.Id}
-                        request={request}
-                        possibleDuplicate={possibleDuplicateIds.has(request.Id)}
-                        selectionOffered={isApprover}
-                        selectable={isApprover && awaitsDecision(request)}
-                        selected={selectedIds.has(request.Id)}
-                        selectionLocked={bulkApprovalRunning}
-                        onToggleSelection={toggleSelectionOf}
-                        canDecide={isApprover && awaitsDecision(request)}
-                        handOffFocus={handOffFocusTo === request.Id}
-                        onFocusHandedOff={focusHandedOff}
-                        onOpen={openRequest}
-                        onDecide={askToDecide}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </>
           )}
 
-          {/* Always on the screen, whether or not there is anywhere to page to
-              (R12) — including when the narrowing has left nothing listed. */}
+          {/* The listing's continuation line — `RECORDS 1–20 OF 428 · PAGE 1 OF 22`
+              — and the controls that move through it (R14). Always on the screen,
+              whether or not there is anywhere to page to (R12), including when the
+              narrowing has left nothing listed.
+
+              It deliberately brings NO rule of its own: the hairline closing the
+              listing above it (drawn on the full-bleed box below) is the single rule
+              between the last row and this line, and is therefore the line's own top
+              edge as well. Two hairlines a `gap-4` apart with nothing between them
+              read as an empty band rather than as a closed listing — so if either
+              side ever changes, the rule stays ONE. */}
           <RequestListPagination
             total={orderedRequests.length}
             pageSize={pageSize}

@@ -156,4 +156,38 @@ The redesign itself, from the design brief's §3 sequence and its named raises:
 - **Cross-surface reach is informational for this epic, not a requirement of it.** The design brief's §3 table (Cross-surface reach) sketches how import preview, upload, files list, landing, and sign-in would eventually take on this world — useful context for not accidentally boxing in a later epic, but none of those rows are requirements here.
 - **The UI-16 density tension is explicitly resolved by design, not exception** (design brief §7, point 1) — do not read the 428-row/22-page volume test (R10) as an invitation to relax the page-size cap; the control block is what lets a batch-level truth coexist with a 20-row page.
 - **`StatusBadge` is in scope; nothing else in `components/status/`** beyond it is implicated by this brief unless a later requirement above names it.
+- **R4/UI-23's "action overflow" is met by DIRECT controls, not by a menu** — a user decision taken at an earlier epic's manual test and recorded in `generated-docs/architecture.md` and in `web/src/components/requests/RequestActions.tsx`. Every per-request action (open, select, approve, reject) is one activation away at narrow width as well as wide, and the page does not scroll sideways at 360px, so UI-23's *purpose* holds in full; only its stated *mechanism* is superseded. There is no ⋯ menu anywhere on a request, and it must not be reinstated as a missing feature.
+- **R23's "first child of `<body>`" is as literal as the framework allows** (recorded at story 1, verified by experiment). Next.js streams its own metadata element as the first thing inside `<body>` on every page, ahead of anything the root layout renders, so no application markup can be first. The one position ahead of it — raw markup on the `<body>` element itself — makes React re-apply that markup on the next client re-render (`router.refresh()`, which this app runs on sign-in, sign-out and session timeout), emptying every rendered screen out of the document. **What shipped:** the contract is a real HTML comment in the served bytes, at the top of `<body>`, ahead of every piece of the app's own content, and it survives the production build (BR10's grep is non-empty). R23's purpose — an auditable contract in what ships — is met in full; only "first" is one framework element short of literal.
+
+### Resolved spec gap — what "does not balance" says, and in whose words (settled at story 9)
+
+R17/BR7 require the batch to show what it will look like before a decision commits, but neither brief said which figures move or what the pre-commit state is called. Settled and built as follows, so nothing here is left to a reader's guess:
+
+- **Only `AWAITING DECISION` states the projection.** `RECORDS` and `DECIDED` go on stating what the batch actually is, so while a decision waits to be confirmed the three visibly do not add up — which is the whole of R17. Moving `DECIDED` with it would re-balance the block and leave nothing for the reader to see.
+- **The wording is `NOT YET CONFIRMED`**, used in exactly two places so the band and the rows cannot come to say two different things: a label-over-figure pair in the control block stating how many decisions are waiting (**absent** while nothing is pending, this project's rule for an indicator whose only other reading is a permanent `0`), and the mark every affected row carries in the shared `StatusBadge` grammar — **words** on the row, because per BR3 a gutter shape alone would not satisfy R3.
+- Nothing about it is stored or optimistic: it is a reading of the confirmation currently open, which is what makes backing out an exact revert that decides nothing.
+
+### Resolved spec gap — R21 against R22/BR8: the roll and the announcement belong to the batch, not to the narrowing (user-decided at epic end, 2026-08-18)
+
+R21 has the control block describe the **narrowed** set, so a keystroke in the search box legitimately moves `AWAITING DECISION`. R22/BR8 give the screen **one** orchestrated motion, for a decision that has resolved. Read together, the shipped block was rolling the 88px figure — and, as a polite live region, announcing it to a screen reader — on every keystroke. Settled as follows:
+
+- **The figures keep following the narrowing** (R21 is unchanged). What changed is that motion and announcement belong to the **batch moving**, not to the described set changing.
+- **A decision recorded — single, bulk, or a colleague's arriving on a refresh — rolls the figure and announces it.** That is the case the live region exists for (the count moves with no user action at all).
+- **Narrowing or widening what is described re-states the figure silently and instantly**: no roll, and nothing announced. A live region over a narrowed figure otherwise queues one announcement per keystroke — the same failure the pagination line already cites for deliberately not being a live region.
+- **Told apart by derivation, not by a flag:** the block derives the outstanding count over the whole batch as well as over the narrowed set. Both moving is a decision; only the narrowed one moving is a narrowing. No call site has to say which happened.
+
+The pre-commit reading (above) is untouched: a projection appearing or reverting still swaps the digits with no motion, so a confirmed decision produces exactly one movement.
+
+### Resolved spec gap — what `BATCH` and `RUN DATE` show (user-decided at the stories approval, 2026-08-17)
+
+R11 requires the control block to carry `BATCH` and `RUN DATE`, but neither is derivable: `GET /v1/transactions` returns requests drawn from **many** originating files (hence the `FileName` column and the originating-file filter), and `TransactionRead` carries `FileName` / `FileLogId` / `TransactionDate` / `LastChangedDate` but nothing naming a single batch or a single run. A developer must not invent one.
+
+**Decided:** the screen is a **whole-queue listing**, and the control block says so.
+
+- With no originating-file narrowing active, `BATCH` reads `ALL FILES` and `RUN DATE` shows the newest `TransactionDate` present in the fetched set.
+- When the originating-file filter narrows to one file, `BATCH` sharpens to that file's name and `RUN DATE` to that file's newest `TransactionDate`.
+
+Chosen because it is the only reading that is true at every moment — the band never implies a batch identity the data cannot support. Both values remain derived, client-side, presentation-only (consistent with §Data Model); neither adds a field, a fetch, or a contract.
+
+Naming one batch per row belongs to the **files-list** redesign epic, where one row genuinely is one batch. Do not pre-empt it here.
 

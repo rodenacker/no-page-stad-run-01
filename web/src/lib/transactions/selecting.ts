@@ -29,13 +29,6 @@ import { awaitsDecision } from '@/lib/transactions/deciding';
 import type { TransactionRead } from '@/types/transactions';
 
 /**
- * Heads the column holding each row's selection control. Read by a screen reader
- * only — the controls in it name themselves, and a visible heading over a column of
- * ticks says nothing the ticks do not.
- */
-export const SELECTION_COLUMN_LABEL = 'Select';
-
-/**
  * The control that takes every still-`Imported` request the active search and
  * filters LEFT — not only the page on screen, and not the whole fetched set.
  *

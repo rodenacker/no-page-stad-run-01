@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "request-list-redesign",
+    "name": "Redesign the request list as a batch listing",
+    "createdAt": "2026-08-17T15:28:18.884Z",
+    "dependsOn": [
+      "sign-in-and-app-shell",
+      "bulk-approval-and-live-refresh",
+      "csv-export"
+    ],
+    "introducesSharedSurface": true,
+    "unverifiedAssumptions": [
+      "Verify the total value figure against a real batch: the app adds every request's amount into one total, treating them all as the same currency and the same direction of money. If a real batch mixes currencies, or mixes money-in with money-out rows, the headline total will be a number that does not mean anything — and it will look perfectly plausible.",
+      "Verify the awaiting/decided split against a real batch: the app treats a request as decided whenever its status is anything other than Imported. If the service ever sends a third status that does not mean 'decided', those requests will be counted as decided and the outstanding count — the number the whole screen is built around — will read low.",
+      "R23 asks for the direction contract to be the FIRST child of <body>. What shipped is a real HTML comment at the top of <body>, ahead of every piece of the app's own content, with only Next.js's own streaming-metadata element in front of it. The one position ahead of that empties every screen on router.refresh() (which this app runs on sign-in, sign-out and session timeout) - verified in a browser. R23's purpose is met in full; please confirm you are content with 'top of the body' rather than literally 'first'.",
+      "The blue band is on screen only once there are requests to describe. While the list is still loading, when the read failed, and when nothing has ever been imported, the screen keeps the answer it gives today - a band of zeroes with no run date over a 'nothing imported yet' message would be a fixture rather than a figure. AC-1 says the screen opens with the band; this reads that as 'opens with the band whenever there is a batch'.",
+      "BATCH and RUN DATE follow the originating-file filter only, as the brief settles them - so typing in the search box re-states the four totals (and brings in the struck-through whole-batch count) while BATCH still reads ALL FILES and RUN DATE still shows the whole queue's newest transaction date. Worth an eye at manual test, since it is the one place the band deliberately does not move with a narrowing.",
+      "The narrowing strip's visible heading reads 'NARROW THE BATCH'. The wording is the developer's choice (the requirement only said the fields must read as one named strip) - confirm that is what you want above the fields.",
+      "A range typed the wrong way round is now shown as a red message inside the strip plus a heavier red underline under the two fields of that range, replacing the old bordered warning box - confirm it reads clearly enough at a glance.",
+      "Export requests to CSV and Clear all are now ruled text controls in the strip's notation rather than boxed buttons - confirm the export still reads as prominent enough to find.",
+      "The status word is now set in the request list's tracked 11px mono UPPERCASE notation everywhere the shared mark appears - including the submitted-files list, a file's page, its import preview and its rejected rows, which this epic does not otherwise restyle. Worth a look at manual test to confirm 'a capitalised word' is meant as full caps rather than sentence case.",
+      "Two file statuses that share an intent (Uploaded and Validating, both informational) now share one shape, where before each had its own icon. They are still told apart by their words. Confirm the files list is no harder to scan for it.",
+      "'Full-bleed to the page padding' was read as: the hairline rules run to the very edge of the page while the values inside keep the page's own padding - the same convention the control block and the narrowing strip already use. The other reading (rules stopping where the padding starts) would leave the listing's rules 16px short of the strip's rule directly above them.",
+      "Every control on a row now reads with the same weight (no filled Approve): in this design the confirmation protects a decision, not the button's heaviness. Worth confirming by eye that Approve and Reject are still easy enough to pick out at a glance down a full page of rows.",
+      "The listing's bottom edge is closed with a hairline. Story 7 rebuilds the foot of the screen as a continuation line, so if that line brings a rule of its own the two will need to be reconciled to one.",
+      "A request that repeats another is marked in the gutter as a rule down the row's outer edge rather than as one of the shapes in the two characters - the two characters can only hold one thing and an Approver's tick has to win on a request still awaiting a decision. Worth a look: is the edge bar findable enough when scanning the column for duplicates?",
+      "On a decided row the row's values recede but the decision keeps full colour in two places - the gutter mark and the status word beside it. That is R20's own 'with its gutter mark carrying the decision', but it does mean an approved row still has one saturated green element on it. Worth confirming by eye that it reads as 'quieter' rather than as 'still shouting'.",
+      "When a search or filter has hidden every request, the foot reads 'RECORDS 0 OF 0 - PAGE 1 OF 1'. R14 fixes the notation for a page of records and nothing pins the empty case, so this is a chosen wording - confirm '0 of 0' reads as intended there rather than something like 'NO RECORDS'.",
+      "At phone width the left-hand marks (and the tick that selects a request) are drawn larger than on the desktop listing - still two characters wide, but at a bigger type scale, so a thumb can hit the tick. Worth a look on a real phone to confirm the bigger marks read as deliberate rather than oversized.",
+      "A request's group on a phone shows its reference and amount, then its status and date, then its controls - three key values and no account number. Confirm that is the set you want at that width, and that nothing you rely on is missing.",
+      "The pre-commit row mark uses the same warning ink and doubled-bar shape as the possible-duplicate mark, told apart only by its wording - worth an eye check on a row that is both a possible duplicate and pending.",
+      "The roll is a four-step ~240ms mechanical settle, the digits dropping into place from just above; the projected figure swaps without motion so a confirmed decision produces exactly one movement.",
+      "While a rejection's note is being written the pre-commit state is deliberately NOT shown - it appears when the confirmation itself opens. Confirm that reads right; the note step is a dialog over the list, so the batch behind it is not what the reader is looking at.",
+      "The outstanding count is silenced while you narrow and announced when the batch moves, by switching the live region off in the same update that changes the number. This assumes the browser decides how urgently to speak AFTER applying the change, which Chrome and Firefox both do - but it can only be confirmed with a real screen reader. With NVDA or VoiceOver running: search the request list and check nothing is announced per keystroke, then approve a request and check the new count IS announced."
+    ],
+    "manualTestResults": [
+      {
+        "story": "all",
+        "test": "All manual checks confirmed passed at the manual-test approval (in-chat, 2026-08-18)",
+        "passed": true
+      }
+    ]
+  },
+  "phase": "COMPLETE-ON-BRANCH",
+  "stories": {
+    "1": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-17T18:26:01.000Z",
+      "completedAt": "2026-08-18T05:13:14.000Z"
+    },
+    "2": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T05:34:22.000Z",
+      "completedAt": "2026-08-18T06:09:37.000Z"
+    },
+    "3": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T06:10:30.000Z",
+      "completedAt": "2026-08-18T06:31:48.000Z"
+    },
+    "4": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T06:32:30.000Z",
+      "completedAt": "2026-08-18T06:50:27.000Z"
+    },
+    "5": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T06:51:10.000Z",
+      "completedAt": "2026-08-18T07:20:02.000Z"
+    },
+    "6": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T07:21:00.000Z",
+      "completedAt": "2026-08-18T07:45:55.000Z"
+    },
+    "7": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T07:46:40.000Z",
+      "completedAt": "2026-08-18T08:04:48.000Z"
+    },
+    "8": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T08:05:30.000Z",
+      "completedAt": "2026-08-18T08:46:08.000Z"
+    },
+    "9": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "passed",
+      "startedAt": "2026-08-18T08:47:00.000Z",
+      "completedAt": "2026-08-18T09:55:34.000Z"
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-08-18T11:11:06.389Z"
+}

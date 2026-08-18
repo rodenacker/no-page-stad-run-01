@@ -3,8 +3,10 @@
  * digits, and nothing else in the markup.
  *
  * This is POPIA (project.md §Compliance), not formatting — so it lives in one place and
- * every surface that prints an account number uses it: the table row, the phone-width
- * card, and the opened request's panel before its reveal control is used. The digits
+ * every surface that prints an account number uses it: the table row, a failed file's
+ * rejected rows, and the opened request's panel before its reveal control is used. (The
+ * phone-width listing prints no account number at all — a reader gets it by opening the
+ * request, which is the strongest form this requirement can take.) The digits
  * themselves come from story 1's one masking helper (`lastFourDigitsOf`); nothing here
  * re-implements it.
  *

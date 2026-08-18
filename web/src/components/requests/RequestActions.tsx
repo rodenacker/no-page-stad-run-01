@@ -3,8 +3,9 @@
 /**
  * What a reader may DO with one expense payment request: open it, and — for an Approver
  * looking at a request that is still awaiting a decision — approve or reject it. One
- * component for both presentations, so a table row and a phone-width card offer the
- * same controls under the same wording.
+ * component for both presentations, so a table row and a phone-width line-group offer
+ * the same controls under the same wording — which is what makes "nothing is reachable
+ * only on a wide screen" true by construction rather than by inspection.
  *
  * Four things here are deliberate and easy to break:
  *
@@ -15,8 +16,9 @@
  *   sitting on the row — so the user had it removed outright at a later manual test.
  *   That supersedes the MECHANISM `expense-request-list` R16 named (an action overflow
  *   at phone width) while still serving its purpose: this one component renders both
- *   the table row and the phone-width card, so every per-request action is reachable at
- *   every width, now in one activation. Do not restore the menu as a missing feature.
+ *   the table row and the phone-width line-group, so every per-request action is
+ *   reachable at every width, now in one activation. Do not restore the menu as a
+ *   missing feature.
  * - **The decide actions are OFFERED OR ABSENT, never disabled.** `onDecide` arriving
  *   is the whole condition: the list hands it over only for an Approver
  *   (`expense-decisions` R14/BR7) looking at a request that is still `Imported`
@@ -36,11 +38,24 @@
  *   page again after every decision. Open is the surviving control ON THE SAME REQUEST,
  *   so the user keeps their place. It is a real hand-off between two elements this
  *   component owns — never a search of the page for a button by its wording.
+ * - **All three controls wear the SAME ruled notation** (`request-list-redesign`
+ *   R13/R25): a tracked micro-label on a rule, the notation the narrowing strip's own
+ *   actions took (`ExportRequestsAction`, `AppliedNarrowingSummary`). A filled or boxed
+ *   control repeated once per row was the loudest thing on a screen whose one saturated
+ *   field is the control block, and this design has no boxes left for it to match. What
+ *   tells the three apart is the WORD and the glyph, never weight or colour: a decision is
+ *   protected by its confirmation, not by how heavy its button is. The capitals are
+ *   `text-transform`, so the visible wording — and therefore each accessible name — is
+ *   unchanged.
  */
 
 import { Check, PanelRightOpen, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
+import {
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 import { DECISION_APPROVE } from '@/lib/api/decisions';
 import {
@@ -53,6 +68,14 @@ import type { DecisionOutcome } from '@/lib/api/decisions';
 
 /** What the direct control reads as on screen, beside its icon. */
 const OPEN_LABEL = 'Open';
+
+/**
+ * How every control on a request is drawn (see this file's header): the screen's one ruled
+ * action notation (`fieldNotation.ts`), plus the gap a control with a glyph beside its words
+ * needs — so these three can never drift from the export, `Clear all` or the page controls,
+ * which are the same object.
+ */
+const REQUEST_ACTION_CLASS = `${RULED_ACTION_CLASS} gap-1.5`;
 
 /** How each control names itself and the request it acts on (R15). */
 const openRequestName = (reference: string): string =>
@@ -139,7 +162,7 @@ export function RequestActions({
   return (
     <div
       ref={controls}
-      className="flex flex-wrap items-center justify-end gap-1"
+      className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1"
     >
       {/* The decisions, for a reader who is offered them on this request — reachable
           in ONE activation. They sit to the LEFT of Open so that Open, which every row
@@ -150,17 +173,17 @@ export function RequestActions({
           <Button
             key={outcome}
             type="button"
-            variant={outcome === DECISION_APPROVE ? 'default' : 'secondary'}
-            size="sm"
+            variant="ghost"
+            className={REQUEST_ACTION_CLASS}
             aria-label={decideActionName(outcome, reference)}
             onClick={() => {
               onDecide(outcome);
             }}
           >
             {outcome === DECISION_APPROVE ? (
-              <Check aria-hidden="true" />
+              <Check aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
             ) : (
-              <X aria-hidden="true" />
+              <X aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
             )}
             {decideActionLabel(outcome)}
           </Button>
@@ -173,11 +196,14 @@ export function RequestActions({
         ref={openControl}
         type="button"
         variant="ghost"
-        size="sm"
+        className={REQUEST_ACTION_CLASS}
         aria-label={openName}
         onClick={onOpen}
       >
-        <PanelRightOpen aria-hidden="true" />
+        <PanelRightOpen
+          aria-hidden="true"
+          className={RULED_ACTION_ICON_CLASS}
+        />
         {OPEN_LABEL}
       </Button>
     </div>

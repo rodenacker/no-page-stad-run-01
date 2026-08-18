@@ -1851,6 +1851,56 @@ function parseGrepMatch(match) {
 }
 
 /**
+ * Is this matched line a comment rather than code?
+ *
+ * The scans below are plain token greps, so a file that DOCUMENTS a dangerous API in
+ * its own comments — explaining why a use is safe, or warning a future reader off one —
+ * gets reported as if it called it. That is a false positive the author cannot clear:
+ * a `security-ignore` marker above a comment is meaningless, and rewording prose to
+ * dodge a grep makes the code worse to read.
+ *
+ * Recognises the line-comment and block-comment forms that carry prose in this codebase,
+ * including JSX's `{/* ... *\/}`. Deliberately line-local: a token inside a multi-line
+ * template literal or a string is NOT treated as a comment, so a real call built up
+ * across lines still reports.
+ *
+ * ⚠ **A block comment that CLOSES on this line only counts as prose when nothing follows
+ * the close.** Otherwise `{/* note *\/}<div dangerouslySetInnerHTML={{ __html: input }} />`
+ * — a real, unreviewed sink with a comment in front of it — would be skipped outright, and
+ * so would `/* ok *\/ el.innerHTML = untrusted;`. The whole line has to be comment for the
+ * scan to drop it; anything else goes on to the ignore lookups and reports as normal.
+ *
+ * @param {string} line - The matched line's content
+ * @returns {boolean} true when the match is prose, not a call
+ */
+function isCommentLine(line) {
+  const trimmed = line.trim();
+
+  // A line comment runs to the end of the line, so there is never code after it.
+  if (trimmed.startsWith('//')) {
+    return true;
+  }
+
+  // Otherwise this line has to be inside, or opening, a block comment.
+  const inBlockComment =
+    trimmed.startsWith('*') ||
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('{/*');
+  if (!inBlockComment) {
+    return false;
+  }
+
+  // Still open at the end of the line: the whole line is prose.
+  const closesAt = trimmed.indexOf('*/');
+  if (closesAt === -1) {
+    return true;
+  }
+
+  // Closed here — prose only if nothing but JSX's own closing brace comes after it.
+  return !/[^\s}]/.test(trimmed.slice(closesAt + 2));
+}
+
+/**
  * 3. XSS Protection: Check for dangerous HTML injection
  */
 function checkXSSProtection() {
@@ -1867,6 +1917,12 @@ function checkXSSProtection() {
 
   [...dangerousHTML, ...dangerousHTMLComponents].forEach((match) => {
     const { file, lineNum, line } = parseGrepMatch(match);
+
+    // A comment that merely NAMES the API is not a use of it. Skipped before the ignore
+    // lookups, because a `security-ignore` marker above a comment could never clear it.
+    if (isCommentLine(line)) {
+      return;
+    }
 
     // Check for file-level security ignore
     const fileIgnore = hasFileLevelSecurityIgnore(file, 'xss');

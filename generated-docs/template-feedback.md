@@ -136,3 +136,67 @@ const list = sel => [...card.querySelectorAll(sel + " .txt")].map(n => n.innerTe
 **Suggested fix.** Ship `configure({ asyncUtilTimeout: … })` in the template’s `web/vitest.setup.ts` alongside the raised `testTimeout`, as one decision rather than two — the two ceilings only make sense set together, and a project that raises one and not the other has moved the flake rather than removed it. Worth a line in `testing-policy.md` too: a budget is a ceiling and changes no expectation, but a test should still hang its wait off an observable "the screen has settled" signal rather than betting one query against a whole asynchronous chain.
 
 **Affected.** `web/vitest.setup.ts`, `web/vitest.config.ts`, `.claude/policies/testing-policy.md`. Observed on epic `import-preview` story 4, found at the `file-deletion` epic-end gate, 2026-08-17.
+
+---
+
+## The `rtk` output wrapper reports a FALSE PASS on a failing gate
+
+**Severity.** High — it silently inverts a gate verdict, which is precisely what CLAUDE.md §5 ("Quality Gates Are Binary — report actual exit codes truthfully") exists to prevent.
+
+**What happened.** During epic `request-list-redesign` B0.2, `npx prettier --check "src/**/*.tsx"` exited **1** with 6 genuinely unformatted files, while the wrapped output printed:
+
+```
+Prettier: All files formatted correctly
+```
+
+Re-running the identical command through `rtk proxy` showed the truth (`Code style issues found in 6 files`). The **exit code was correct in both cases** — only the human-readable summary lied. `npx playwright test --list` is affected too: it renders as `PASS (0) FAIL (0) skipped (110)`, which reads like a broken suite rather than a successful collection of 110 tests.
+
+**Why it matters here.** An agent or orchestrator that reads the summary line instead of the exit code will report a passing gate over a failing one. Two of this epic's own test-generation agents were misled and had to re-run everything through `rtk proxy` to obtain true output; one initially reported "prettier clean" on a tree that was not.
+
+**Suggested fix.** Either (a) make the wrapper's summary line derive from the child's exit code so it can never contradict it, or (b) add a line to the workflow's gate guidance: **judge every gate by its exit code or its JSON, never by wrapped prose**, and re-run through `rtk proxy` when the two disagree. `quality-gates.js` is unaffected because it returns structured JSON with `overallStatus` — that is the pattern to prefer.
+
+**Affected.** The `rtk` hook's output filter; `.claude/shared/orchestrator-rules.md` gate guidance; the `test-generator` and `developer` agent verification steps. Observed on epic `request-list-redesign` during B0.2 batch test generation, 2026-08-17.
+
+---
+
+## Parallel B0.2 test-generation agents collide when probing production files
+
+**Severity.** Low — self-correcting, but it produces alarming false signals.
+
+**What happened.** B0.2 launches one `test-generator` per story per mode as a single parallel batch (18 agents for a 9-story epic). Several independently used a sound technique: temporarily modify a production file to prove their assertions would pass *after* implementation, then revert with `git checkout --`. Story 3's agent added a `<fieldset>` to `RequestNarrowingControls.tsx`; story 5's agent ran four separate mutations of `ExpenseRequestList.tsx`; story 9's Vitest agent wrote a scratch test file.
+
+Because these overlap in time, siblings observed the intermediate states: story 2's agent reported `RequestNarrowingControls.tsx` as **syntactically broken (unclosed `<fieldset>`, TS17002)**, and two agents reported a stray `zz-scratch-story-9.test.tsx` as an uncommitted file that should not be committed. Every agent behaved correctly and every file was reverted or deleted; the tree ended clean. But a `tsc` run that happens to land inside another agent's probe window fails for a reason unrelated to the file under test.
+
+**Why it's worth fixing.** The probe technique is genuinely valuable — story 5's mutation testing is what proved its green regression net had teeth (4 mutations, 4 caught), and it is far stronger evidence than a red run. The problem is only that B0.2's parallelism doesn't anticipate it.
+
+**Suggested fix.** Give the probe technique an explicit, collision-free home in `test-generator`: require probes to run in a **git worktree or a scratch copy** rather than the shared tree, and require scratch test files to be written to a gitignored path. Alternatively, note in B0.2 that a `tsc`/lint failure naming a file outside the agent's own story is likely a sibling's probe and should be re-run before being believed.
+
+**Affected.** `.claude/agents/test-generator.md`, `.claude/commands/continue.md` § Step B0.2. Observed on epic `request-list-redesign`, 2026-08-17.
+
+## [template] The direction contract's "first child of `<body>`" placement is not achievable in the Next.js App Router, and the one technique that achieves it destroys the app
+
+**Symptom.** Epic `request-list-redesign` story 1 (R23/BR10, from the `impeccable` skill's `new-work.md` §5 via `documentation/design-brief-batch-listing.md` §7) requires the direction contract to be "an HTML comment placed as the first child of `<body>` in the root layout", and the generated Playwright spec asserted exactly that against the navigation response's bytes (`/^\s*<!--/` immediately after the `<body …>` tag). No safe implementation can satisfy it.
+
+**Why.** Two independent framework facts, both verified by experiment on Next 16.2 / React 19.2:
+1. Next.js streams its own metadata element (`<div hidden>` from `lib/metadata/metadata.js` `MetadataWrapper`) as the first thing inside `<body>` on every page, ahead of anything the root layout renders — in dev AND in the production build. So no application-level markup, anywhere in the tree, can be first.
+2. The only position ahead of it is React's body "preamble": raw markup via `dangerouslySetInnerHTML` on the `<body>` element itself, which DOES land immediately after `<body …>`. But React forbids children beside `dangerouslySetInnerHTML`, so the app's whole content has to be rendered outside `<body>` (React 19 hoists it back in, and `</body>` is written last, so the served bytes are still correct) — and then React re-applies that raw markup on the next client re-render. `router.refresh()` triggers exactly that, and this app calls it on sign-in, sign-out and session timeout. Measured result: `document.body.innerHTML` becomes the comment alone, every rendered screen gone, no error thrown. Placing children inside `<html>` instead also produces `validateDOMNesting` hydration errors.
+
+**Workaround applied.** The contract is emitted as raw markup by an inert `<div hidden dangerouslySetInnerHTML={…}/>` as the first thing the root layout renders in `<body>` — a real HTML comment in the shipped bytes, ahead of every piece of the app's own content, surviving the production build (`grep -rl "29469d17" web/.next` non-empty, and the prerendered HTML carries it). The Playwright helper was corrected to read "the first comment the app itself wrote inside `<body>`, ahead of the app's own content" instead of "the first byte after `<body>`", with the framework reason recorded on the helper. Nothing else about the assertion changed: five blocks, the seed key and the verbatim FINISH line are still read from the response bytes, on a public and a signed-in address.
+
+**Suggested fix.** Reword the convention so it is achievable and still auditable — "an HTML comment emitted as raw markup at the top of `<body>` in the root layout, ahead of the app's own content" — in the `impeccable` direction-contract guidance and anywhere the workflow restates it, and note in `test-generator`'s guidance that a first-byte-after-`<body>` assertion cannot pass in the App Router. Also worth naming as a general trap: `dangerouslySetInnerHTML` on `<html>`/`<head>`/`<body>` is re-applied on client re-render and will wipe the document.
+
+**Affected.** The `impeccable` skill's `new-work.md` §5 direction-contract instruction (reaches projects through the design brief and the story's implementation notes), `.claude/agents/test-generator.md`. Observed on epic `request-list-redesign`, story 1, 2026-08-18.
+
+## [template] `security-validator.js` reports a dangerous API as *used* when a comment merely names it — and the false positive cannot be cleared
+
+**Symptom.** Epic `request-list-redesign` failed the epic-end security gate with two XSS errors in `web/src/app/layout.tsx` at lines 54 and 60. Both lines are prose inside a JSDoc block that *explains* why the file's one raw-markup write is safe and warns a future reader off the hazardous alternative. The file's two actual `dangerouslySetInnerHTML` calls are at lines 136 and 142, and both already carried accepted `security-ignore` overrides — which the same run listed as applied. So the gate was red purely because the code documents itself.
+
+**Why.** `checkXSSProtection()` locates uses with a plain token grep (`grep('dangerouslySetInnerHTML', 'app', '')`) and never distinguishes code from comments. Any file whose comments discuss the API is reported as calling it, once per mention.
+
+**Why it cannot be worked around.** The override mechanism is line-anchored to a *call*: a `// security-ignore: xss` marker above a comment is meaningless, so there is no way for an author to clear the finding. The only remaining escapes are to delete the explanation or to reword it to dodge a grep — both of which make security-relevant code less readable, and the second of which is exactly the kind of change that silently rots. A gate that punishes documenting a hazard pushes authors toward undocumented hazards.
+
+**Fix applied.** Added an `isCommentLine()` helper and skipped comment matches in the `dangerouslySetInnerHTML` scan, before the ignore lookups. It recognises `//`, `*`, `/*` and JSX's `{/*`, and is deliberately line-local, so a token inside a multi-line template literal or string is still treated as code and a real call assembled across lines still reports. Verified: the gate now passes while all three legitimate overrides are still detected and recorded — the fix stops counting prose without weakening detection.
+
+**Still worth a maintainer's look.** The same class of bug is likely present in the other token-grep checks in this file (the `.innerHTML =` scan at the end of `checkXSSProtection()` is the nearest neighbour; the RBAC, input-validation and auth scans use the same `grep()` helper). Applying the comment guard inside `grep()` or `parseGrepMatch()` rather than at one call site would fix the family in one place — not done here, because widening a security gate's filter deserves a deliberate review rather than a drive-by.
+
+**Affected.** `.github/scripts/security-validator.js` (`checkXSSProtection`, and probably every other `grep()` caller). Observed on epic `request-list-redesign` at the epic-end quality-check, 2026-08-18.

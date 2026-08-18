@@ -70,6 +70,10 @@
 
 import { Download } from 'lucide-react';
 
+import {
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastContext';
 import { deliverFile } from '@/lib/files/deliverFile';
@@ -184,8 +188,18 @@ export function ExportRequestsAction({
   };
 
   return (
-    <Button type="button" variant="outline" onClick={exportListedRequests}>
-      <Download aria-hidden="true" />
+    /* It sits on the narrowing strip's first line, so it takes the strip's notation
+       (`request-list-redesign` R12): a tracked micro-label on a rule, not a boxed
+       button — this screen has no boxes left for it to match. Its VISIBLE WORDING is
+       untouched, and therefore so is its accessible name: the capitals are
+       `text-transform`, never a rewrite of the words. */
+    <Button
+      type="button"
+      variant="ghost"
+      className={RULED_ACTION_CLASS}
+      onClick={exportListedRequests}
+    >
+      <Download aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
       {EXPORT_ACTION_LABEL}
     </Button>
   );

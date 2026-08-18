@@ -454,6 +454,24 @@ const columnHeading = (column: RegExp): HTMLElement =>
 
 const AMOUNT_COLUMN = /^amount\b/i;
 
+/**
+ * Which page the foot of the listing says the reader is on.
+ *
+ * The foot states it inside its continuation line — `RECORDS 21–25 OF 25 · PAGE 2 OF 2`
+ * (`request-list-redesign` R14) — where it used to be a bare "Page 2 of 2" scrap beside
+ * the controls. Matched at the END of an element's text, so the one element whose text
+ * finishes with this page counter is the line itself and no wrapper around it. The
+ * assertion is unchanged in strength: it still says the reader is on that page, of that
+ * many, after the refresh.
+ */
+const pageCounter = (pageNumber: number, pageCount: number): HTMLElement =>
+  screen.getByText(
+    new RegExp(
+      `page\\s+${String(pageNumber)}\\s+of\\s+${String(pageCount)}$`,
+      'i',
+    ),
+  );
+
 describe('Epic bulk-approval-and-live-refresh, Story 4: the list keeps itself current', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -512,11 +530,11 @@ describe('Epic bulk-approval-and-live-refresh, Story 4: the list keeps itself cu
     await user.click(sortControlFor(AMOUNT_COLUMN));
 
     await waitFor(() => {
-      expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+      expect(pageCounter(1, 2)).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: /^next\b/i }));
     await waitFor(() => {
-      expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+      expect(pageCounter(2, 2)).toBeInTheDocument();
     });
 
     // Ordered by amount ascending, the last two requests are the ones on the page
@@ -545,7 +563,7 @@ describe('Epic bulk-approval-and-live-refresh, Story 4: the list keeps itself cu
       'aria-sort',
       'ascending',
     );
-    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+    expect(pageCounter(2, 2)).toBeInTheDocument();
     expect(isListed(secondHighest.Reference)).toBe(true);
     expect(searchField()).toHaveFocus();
 
