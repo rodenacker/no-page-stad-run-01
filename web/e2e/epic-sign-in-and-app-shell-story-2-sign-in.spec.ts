@@ -52,6 +52,8 @@ import { expect, test } from '@playwright/test';
 
 import { importerUser } from './fixtures/credentials';
 import { sessionCookieFor } from './support/auth-api-stub';
+import { fileLogListResponse } from '../src/mocks/data/file-log';
+import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import {
   loginErrorResponse,
   loginSuccessResponse,
@@ -62,9 +64,19 @@ import { fullNameOf } from '../src/mocks/data/user';
 import type { MockCredential } from './fixtures/credentials';
 import type { Locator, Page } from '@playwright/test';
 
-/** The story's route, and the main signed-in screen it leads to (Story 3's shell). */
+/**
+ * The story's route, and the signed-in screen it leads to.
+ *
+ * That screen used to be the app's address itself (`/`, story 3's chooser). Since
+ * epic `role-aware-landing`, the app's address sends a person holding exactly one
+ * recognised role straight on to the screen that role uses — so for
+ * `importerUser`, who holds the Importer role alone, signing in ends on the expense
+ * files screen. What this story asserts is unchanged and undiminished: the sign-in
+ * screen was left behind for the signed-in app. Where a single-role person is sent
+ * is `role-aware-landing` story 1's own criterion, not restated here.
+ */
 const SIGN_IN_ROUTE = '/sign-in';
-const SIGNED_IN_ROUTE = '/';
+const SIGNED_IN_ROUTE = '/upload';
 
 /** Labels carry the required-field asterisk (R7), so match on the field name. */
 const USERNAME_LABEL = /username/i;
@@ -122,6 +134,34 @@ const mockAcceptedAuth = async (
 };
 
 /**
+ * Answers the reads the signed-in screen this story lands on makes for itself:
+ * `GET /transactions-api/v1/file-logs` and `GET /transactions-api/v1/file-settings`.
+ * Nothing here is asserted on — the mocks exist because `/transactions-api/...` is
+ * the app's OWN same-origin mount point, so an unmocked read is forwarded to the
+ * live transactions service by the app's route handler from inside the Next.js
+ * process, and the backend is always mocked (testing-policy.md). The whole mount
+ * point is aborted first, so a read this file did not anticipate fails visibly
+ * rather than leaving quietly. Bodies come from the project-wide factories.
+ */
+const mockSignedInScreenReads = async (page: Page): Promise<void> => {
+  await page.route('**/transactions-api/**', (route) => route.abort());
+  await page.route('**/transactions-api/v1/file-logs**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fileLogListResponse()),
+    }),
+  );
+  await page.route('**/transactions-api/v1/file-settings**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fileSettingListResponse()),
+    }),
+  );
+};
+
+/**
  * What the browser actually paints on a control when it has focus, or `'none'`.
  *
  * Read from computed style rather than class names on purpose: a class assertion
@@ -174,14 +214,17 @@ test.describe('Epic sign-in-and-app-shell, Story 2: Sign in', () => {
     page,
   }) => {
     await mockAcceptedAuth(page, importerUser);
+    await mockSignedInScreenReads(page);
 
     await page.goto(SIGN_IN_ROUTE);
     await page.getByLabel(USERNAME_LABEL).fill(importerUser.username);
     await page.getByLabel(PASSWORD_LABEL).fill(importerUser.password);
     await page.getByRole('button', { name: SUBMIT_NAME }).click();
 
-    // Landed on the app's main signed-in screen (R1) — not still on sign-in, and
-    // not bounced back there by the server-side session gate.
+    // Landed inside the signed-in app (R1) — not still on sign-in, and not bounced
+    // back there by the server-side session gate. For this identity that screen is
+    // the expense files screen, since the app's address sends a person holding the
+    // Importer role alone straight to it (see SIGNED_IN_ROUTE).
     await expect(page).toHaveURL(SIGNED_IN_ROUTE);
     await expect(page.getByLabel(USERNAME_LABEL)).toHaveCount(0);
 
@@ -197,6 +240,7 @@ test.describe('Epic sign-in-and-app-shell, Story 2: Sign in', () => {
     page,
   }) => {
     await mockAcceptedAuth(page, importerUser);
+    await mockSignedInScreenReads(page);
     await page.goto(SIGN_IN_ROUTE);
 
     const username = page.getByLabel(USERNAME_LABEL);

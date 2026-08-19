@@ -119,6 +119,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 import { sessionTokenFor } from './support/auth-api-stub';
+import { fileLogListResponse } from '../src/mocks/data/file-log';
+import { fileSettingListResponse } from '../src/mocks/data/file-setting';
 import { userInfoFor } from '../src/mocks/data/identity';
 import { ROLE_IMPORTER } from '../src/mocks/data/role';
 import {
@@ -132,9 +134,19 @@ import {
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { TransactionRead } from '../src/mocks/data/transaction';
 
-/** This story's screen, and the landing screen the header's app name leads back to. */
+/**
+ * This story's screen, the app's own address the header's name links to, and where
+ * that address leaves the Importer signed in below.
+ *
+ * Since epic `role-aware-landing` the app's address sends a person holding exactly
+ * one recognised role straight on to the screen that role uses, so following the
+ * header's app name as an Importer arrives at the expense files screen. The leg that
+ * uses it below is about LEAVING the request list and coming back to it, which is
+ * unchanged — only the screen in between is named differently.
+ */
 const REQUESTS_PATH = '/requests';
 const LANDING_PATH = '/';
+const UPLOAD_PATH = '/upload';
 
 /**
  * The one transactions read this screen makes, as the BROWSER addresses it: the
@@ -144,6 +156,13 @@ const LANDING_PATH = '/';
  * the epic-end production run).
  */
 const TRANSACTIONS_URL_GLOB = '**/transactions-api/v1/transactions**';
+
+/**
+ * The two reads the expense files screen makes, addressed the same way — for the one
+ * leg below that leaves this screen by the header and passes through that one.
+ */
+const FILE_LOGS_URL_GLOB = '**/transactions-api/v1/file-logs**';
+const FILE_SETTINGS_URL_GLOB = '**/transactions-api/v1/file-settings**';
 
 /**
  * The real services' own origins (project.md §Data Source & Backend Integration).
@@ -248,6 +267,25 @@ const mockBrowserIdentityCall = async (
 };
 
 /**
+ * Answers the two reads the expense files screen makes for itself
+ * (`GET /transactions-api/v1/file-logs`, `GET /transactions-api/v1/file-settings`),
+ * for the one leg below that passes through it on the way off this screen. Nothing
+ * about them is asserted: they are mocked because `/transactions-api/...` is the
+ * app's OWN same-origin mount point, so an unmocked read is forwarded to the live
+ * transactions service by the app's route handler from inside the Next.js process,
+ * where `blockLiveBackends` cannot see it. Bodies come from the project-wide
+ * factories, never authored here.
+ */
+const mockExpenseFilesScreenReads = async (page: Page): Promise<void> => {
+  await page.route(FILE_LOGS_URL_GLOB, (route) =>
+    route.fulfill(jsonResponse(fileLogListResponse())),
+  );
+  await page.route(FILE_SETTINGS_URL_GLOB, (route) =>
+    route.fulfill(jsonResponse(fileSettingListResponse())),
+  );
+};
+
+/**
  * Serves the whole request set in one response, as the real endpoint does (no query
  * parameters, no server-side paging or sorting) — so anything ordered or paged on
  * screen was ordered and paged by the app itself.
@@ -318,6 +356,24 @@ const requestsOnPage = async (
   page: Page,
   served: TransactionRead[],
 ): Promise<number> => (await referencesInOrder(page, served)).length;
+
+/**
+ * How many of the served requests are anywhere on the screen — the whole screen, not
+ * a table on it. This is what "the request list was left behind" has to be asked in
+ * terms of: the screen the user leaves for is the expense files screen, which has a
+ * listing of its own, so "no table on the screen" would be false there for a reason
+ * that has nothing to do with the request list. Whether a single request the user was
+ * just looking at is still readable does say it, and says it of the whole screen
+ * rather than of one region of it.
+ */
+const servedRequestsOnScreen = async (
+  page: Page,
+  served: TransactionRead[],
+): Promise<number> => {
+  const screenText = await listScreen(page).innerText();
+  return served.filter((request) => screenText.includes(request.Reference))
+    .length;
+};
 
 /**
  * The references of `requests` in amount order — the order the list must be in
@@ -607,6 +663,9 @@ test.describe('Epic expense-request-list, Story 4: sort and page through the req
   }) => {
     const requests = transactionsForNarrowing();
     await openRequestList(page, context, requests);
+    // This leg leaves the request list by the header, so the screen it arrives on has
+    // its own reads answered too.
+    await mockExpenseFilesScreenReads(page);
 
     const amount = sortableColumn(page, AMOUNT_COLUMN);
     await amount.control.click();
@@ -628,12 +687,19 @@ test.describe('Epic expense-request-list, Story 4: sort and page through the req
       .poll(() => referencesInOrder(page, requests))
       .toEqual(ascending);
 
-    // Leave the screen: the app's name in the header goes back to the landing
-    // screen (epic 1's shell).
+    // Leave the screen: the app's name in the header (epic 1's shell) goes to the
+    // app's own address, which for this Importer is the expense files screen — the
+    // request list really is left behind, which is all this leg needs.
     const header = page.getByRole('banner');
     await header.locator(`a[href="${LANDING_PATH}"]`).first().click();
-    await expect(page).toHaveURL(new RegExp(`${LANDING_PATH}$`));
-    await expect(requestList(page)).toHaveCount(0);
+    await expect(page).toHaveURL(UPLOAD_PATH);
+    await expect
+      .poll(() => servedRequestsOnScreen(page, requests), {
+        message:
+          'leaving the request list must leave the requests behind: not one of ' +
+          'them may still be readable on the screen the user arrives at',
+      })
+      .toBe(0);
 
     // ...and come back to it from the header navigation, the way a user would.
     await header.locator(`a[href="${REQUESTS_PATH}"]`).first().click();
