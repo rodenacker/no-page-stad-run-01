@@ -16,3 +16,18 @@
   and the request list now reads them from there. Nothing about the request list changed on
   screen — its whole test suite still passes — but there is now one copy of each rule weight
   instead of two drifting apart.
+
+## Story 2 — The submission slip
+
+- **The form for sending a file in now reads like the list underneath it:** the setting and the
+  file are underlined fields with small capitalised labels instead of boxes in a card, and Submit
+  is words on a rule rather than a blue button. Nothing about what it accepts, what it refuses,
+  or when Submit becomes available has changed.
+- **The line naming the file you picked** used to read "Chosen file: expenses.csv". It now reads
+  as a small capitalised label with the file name beside it in the fixed-width lettering — the
+  same way every stated value on these screens reads. Same words, no colon.
+- **The browser's own "Choose File" button needed stating explicitly.** Once the redrawn slip was
+  open in a browser, that button was the one thing still looking unfinished: bold, in the wrong
+  lettering, jammed against the file name beside it. It is drawn by the browser and does not pick
+  up the field's lettering on its own, so it had to be stated — plus a gap, because taking the box
+  away had taken the spacing with it.

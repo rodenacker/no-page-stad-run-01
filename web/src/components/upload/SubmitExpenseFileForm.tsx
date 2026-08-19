@@ -30,13 +30,72 @@
  * choosing a file are not keystrokes — each is a single, finished decision — so those
  * two are checked as they happen, which is what lets a non-CSV be refused the moment
  * it is picked (BR3) instead of at submission time.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — the batch's submission slip (`files-view-redesign` R13)
+ * ---------------------------------------------------------------------------
+ * This slip sits directly above the register of submitted files on the same screen,
+ * so it is set in the register's own notation and not in a dialect of its own. Every
+ * piece of that notation is IMPORTED from `components/requests/fieldNotation.ts` and
+ * never restated here (BR6):
+ *
+ * - **The slip is a ruled field strip, not a card.** The form runs full-bleed to the
+ *   page padding (`FULL_BLEED_CLASS`) and is closed by one hairline at its foot, so it
+ *   reads as the opening section of the same document the register below continues —
+ *   exactly as the expense request list's narrowing strip stands above its listing.
+ *   There is no panel, no surface and no radius anywhere on it (BR9).
+ * - **A field is an underline and nothing else** (`RULED_FIELD_CLASS`): the setting
+ *   selector and the CSV field carry no box, no fill and no corner. The underline's
+ *   COLOUR is deliberately left to the primitives' own `border-input`, which is the
+ *   darker of the two hairline tokens precisely so it clears 3:1 against the ground
+ *   (WCAG 1.4.11) now that it is the only thing outlining the field.
+ * - **The focus ring is untouched, and that is load-bearing.** Taking the box away is
+ *   what makes it possible to lose the focus indicator with it, and an underline-only
+ *   field that paints nothing when the keyboard arrives leaves a keyboard user unable
+ *   to see where they are (R4, WCAG 2.2 AA). The primitives' ring is this project's one
+ *   focus notation, so nothing here cancels it — `shadow-none` in the shared notation
+ *   removes the resting shadow only, which is also what makes the ring visible AS a
+ *   change when it lands.
+ * - **A label is a tracked micro-label** (`FIELD_LABEL_CLASS`), and the capitals are
+ *   `text-transform` — never retyped words. The wording a screen reader is given, and
+ *   the accessible name each control takes from its label, are still the app's own
+ *   sentence-case words, asterisk included.
+ * - **The section names itself in the same notation the register does**
+ *   (`LISTING_LABEL_CLASS`): a printed slip labels itself in the notation it is set in,
+ *   and a bold sentence-case title here would be the last of the card era's hierarchy
+ *   left above a ruled page.
+ * - **What the slip reports back is in the control-total grammar**: the report's own
+ *   title is a tracked micro-label and every identifier inside it — the file's name,
+ *   the setting's name — is set in the fixed-field face (`NOTATION_CELL_CLASS`), the
+ *   same face the register prints those two values in one line further down. Each
+ *   report is a full-bleed band closed by hairlines (`RULED_BAND_CLASS`) with the alert
+ *   primitive's card stripped off it, so an answer belongs to the slip rather than
+ *   floating over it.
+ * - **The submit is a tracked label on a rule** (`RULED_ACTION_WITH_ICON_CLASS`, its
+ *   glyph sized on the ICON), not a filled button: this slip has no boxes left for one
+ *   to match. Its wording, and its staying unavailable until a setting and a CSV are
+ *   both in hand, are unchanged.
+ *
+ * Nothing in this redraw changes what the slip accepts, what it refuses, when it can be
+ * sent, what it says, or who it is rendered for (`files-view-redesign` R1/BR1/BR2).
  */
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CircleCheck, TriangleAlert } from 'lucide-react';
+import { CircleCheck, TriangleAlert, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
+import {
+  FIELD_LABEL_CLASS,
+  FULL_BLEED_CLASS,
+  LISTING_LABEL_CLASS,
+  NOTATION_CELL_CLASS,
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_BAND_CLASS,
+  RULED_FIELD_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -97,6 +156,12 @@ const NO_ACTIVE_SETTINGS_MESSAGE =
 const SETTING_PLACEHOLDER = 'Select a file setting';
 
 /**
+ * Names the file the user picked, beside the name itself — a tracked label over a
+ * fixed-field value, which is how every stated value on these two screens reads.
+ */
+const CHOSEN_FILE_LABEL = 'Chosen file';
+
+/**
  * Shown if the setting that was chosen is no longer among the ones on offer by the
  * time the file is sent — so the user is asked to choose again rather than having an
  * incomplete call made on their behalf (BR1).
@@ -106,6 +171,65 @@ const CHOOSE_AGAIN_MESSAGE =
 
 /** One line explaining the asterisks, as every form in this project has. */
 const RequiredMarker = () => <span aria-hidden="true">*</span>;
+
+/**
+ * The label naming something on this slip, in the shared tracked micro-label notation
+ * with this surface's own ink: muted, so the ink belongs to the value rather than to the
+ * word naming it. The notation itself is imported, never restated (R9/BR6) — this only
+ * adds what `fieldNotation.ts` deliberately leaves to the surface.
+ */
+const SLIP_LABEL_CLASS = `${FIELD_LABEL_CLASS} text-muted-foreground`;
+
+/**
+ * A field's own label. The same micro-label, with the gap the required marker beside it
+ * needs — tighter than the `label` primitive's own, which was sized for 14px words.
+ */
+const SLIP_FIELD_LABEL_CLASS = `${SLIP_LABEL_CLASS} gap-1.5`;
+
+/**
+ * The setting selector: the shared ruled notation (an underline and nothing else, its
+ * COLOUR left to the primitive's `border-input`), set in the fixed-field face because a
+ * setting's name is an identifier — the same face the register one line below prints it
+ * in. Size and width belong here rather than to the notation.
+ */
+const SETTING_FIELD_CLASS = `${RULED_FIELD_CLASS} ${NOTATION_CELL_CLASS} h-9 w-full text-sm`;
+
+/**
+ * The CSV field: the same ruled notation, sized to hold the browser's own file-chooser
+ * chrome (which sets its own height, so this field states none).
+ *
+ * The three `file:*` utilities are about that chrome and nothing else. A
+ * `::file-selector-button` does NOT inherit the field's font-family from the user agent,
+ * so it needs the fixed-field face stated at it or it renders in the text face beside a
+ * mono file name — two faces inside one field. Its weight comes down to the notation's
+ * for the same reason (the primitive ships it at `font-medium`, which reads as emphasis
+ * on a field whose whole treatment is withholding), and it needs a margin of its own,
+ * since with the field's own padding removed there is otherwise nothing at all between
+ * the button and the name of the file beside it.
+ */
+const CSV_FIELD_CLASS = `${RULED_FIELD_CLASS} ${NOTATION_CELL_CLASS} h-auto w-full py-1.5 text-sm file:me-3 file:font-mono file:font-normal`;
+
+/**
+ * How wide each field sits before the slip's line wraps onto the next one. Each states a
+ * basis AND a minimum: the basis decides where the line wraps, the minimum stops a field
+ * being squeezed narrower than what it holds. Neither grows, so on a wide screen the slip
+ * stays a slip rather than stretching two underlines across the whole page. Wrapping,
+ * never sideways scrolling — this has to hold at 360px (R3).
+ */
+const SETTING_FIELD_WIDTH_CLASS = 'min-w-56 basis-64';
+const CSV_FIELD_WIDTH_CLASS = 'min-w-56 basis-80';
+
+/**
+ * A report from the slip, stripped of the card the `alert` primitive ships with: no
+ * radius, no border of its own and no surface, so the band's own hairlines are what frame
+ * it (BR9). Its glyph is sized down to sit with an 11px tracked title, for the reason
+ * `RULED_ACTION_ICON_CLASS` exists — a 16px mark out-weighs the words it decorates.
+ */
+const SLIP_REPORT_CLASS =
+  'rounded-none border-0 bg-transparent p-0 [&>svg]:size-3.5';
+
+/** A report's own title: the tracked micro-label, unclamped so it can wrap. */
+const SLIP_REPORT_TITLE_CLASS = `${FIELD_LABEL_CLASS} line-clamp-none`;
 
 /** Where the read of the named settings is: being read, read, or unreadable. */
 type SettingsState =
@@ -288,60 +412,92 @@ export function SubmitExpenseFileForm() {
 
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
+      {/* The slip's own name, in the same tracked micro-label notation as the register
+          below it and as the labels on its own fields — a printed slip labels itself in
+          the notation it is set in (R13). The capitals are `text-transform`, so the
+          heading a screen reader is given, and the name this section is found by, are
+          still the words the app wrote. */}
+      <h2 id={HEADING_ID} className={LISTING_LABEL_CLASS}>
         {HEADING}
       </h2>
 
+      {/* What the slip reports back, in the control-total grammar (R13): a tracked
+          micro-label title over the sentence, with the file's own name and the setting's
+          name set in the fixed-field face — the same face the register prints those two
+          values in. Composed as a full-bleed ruled band with the alert primitive's card
+          stripped off, so the answer reads as part of this document rather than as a
+          panel floating over it (BR9). Its role and its wording are untouched. */}
       {submission.phase === 'confirmed' && (
-        <Alert>
-          <CircleCheck aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">File submitted</AlertTitle>
-          <AlertDescription className="text-foreground">
-            <p>
-              {submission.fileName} was uploaded against the{' '}
-              {submission.settingName} setting. It appears in the list below
-              while it is validated and imported.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <div className={`${RULED_BAND_CLASS} py-4`}>
+          <Alert className={SLIP_REPORT_CLASS}>
+            <CircleCheck aria-hidden="true" />
+            <AlertTitle className={SLIP_REPORT_TITLE_CLASS}>
+              File submitted
+            </AlertTitle>
+            <AlertDescription className="text-foreground">
+              <p>
+                <span className={NOTATION_CELL_CLASS}>
+                  {submission.fileName}
+                </span>{' '}
+                was uploaded against the{' '}
+                <span className={NOTATION_CELL_CLASS}>
+                  {submission.settingName}
+                </span>{' '}
+                setting. It appears in the list below while it is validated and
+                imported.
+              </p>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {submission.phase === 'refused' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            The file was not submitted
-          </AlertTitle>
-          <AlertDescription className="text-foreground">
-            <p>{submission.message}</p>
-          </AlertDescription>
-        </Alert>
+        <div className={`${RULED_BAND_CLASS} py-4`}>
+          <Alert className={SLIP_REPORT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={SLIP_REPORT_TITLE_CLASS}>
+              The file was not submitted
+            </AlertTitle>
+            <AlertDescription className="text-foreground">
+              <p>{submission.message}</p>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
+      {/* A wait of a moment, said and not drawn — no rule of its own, exactly as the
+          register's own in-flight lines are, so the slip does not flash a hairline into
+          place and out again while the settings arrive. */}
       {settings.phase === 'loading' && (
-        <p role="status" className="text-muted-foreground">
+        <p role="status" className="text-muted-foreground text-sm">
           {LOADING_SETTINGS_MESSAGE}
         </p>
       )}
 
+      {/* The read left the reader with no slip at all, so this band stands where the
+          fields would be — ruled and full-bleed like them. The wording, the role and the
+          retry are unchanged, the retry now wearing the same ruled notation as every
+          other control on the screen: words on a rule, no box. */}
       {settings.phase === 'failed' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {SETTINGS_FAILED_TITLE}
-          </AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{settings.message}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={readSettingsAgain}
-            >
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <div className={`${RULED_BAND_CLASS} py-4`}>
+          <Alert className={SLIP_REPORT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={SLIP_REPORT_TITLE_CLASS}>
+              {SETTINGS_FAILED_TITLE}
+            </AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p>{settings.message}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                className={RULED_ACTION_CLASS}
+                onClick={readSettingsAgain}
+              >
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {settings.phase === 'loaded' && (
@@ -352,7 +508,14 @@ export function SubmitExpenseFileForm() {
             // worded to satisfy R2/R7.
             noValidate
             onSubmit={form.handleSubmit(onSubmit)}
-            className="grid max-w-xl gap-6"
+            /* The slip runs full-bleed to the page padding and is closed by one
+               hairline at its foot (R13): it is the opening section of the same ruled
+               document the register below continues, not a card of its own sitting on
+               top of one. The rule's colour is `border-input` for the reason the shared
+               field notation states — with no box anywhere on the slip, a hairline is
+               the only thing outlining it, and the lighter token would drop it below
+               3:1 (WCAG 1.4.11). */
+            className={`${FULL_BLEED_CLASS} border-input grid gap-5 border-b pb-5`}
           >
             <p className="text-muted-foreground text-sm">
               <RequiredMarker /> indicates a required field
@@ -364,111 +527,159 @@ export function SubmitExpenseFileForm() {
               </p>
             )}
 
-            <FormField
-              control={form.control}
-              name="fileSettingId"
-              render={({ field }) => {
-                const chosenSetting = offered.find(
-                  (setting) => String(setting.Id) === field.value,
-                );
+            {/* The two fields on one line, wrapping onto the next rather than ever
+                scrolling the page sideways (R3). Aligned at their tops, since each
+                carries a line of its own beneath it. */}
+            <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
+              <FormField
+                control={form.control}
+                name="fileSettingId"
+                render={({ field }) => {
+                  const chosenSetting = offered.find(
+                    (setting) => String(setting.Id) === field.value,
+                  );
 
-                return (
-                  <FormItem>
-                    <FormLabel>
-                      File setting <RequiredMarker />
-                    </FormLabel>
-                    <Select value={field.value} onValueChange={onSettingChosen}>
-                      <FormControl>
-                        {/* The trigger takes the id the label points at, so the
-                            label reaches it. */}
-                        <SelectTrigger
-                          className="w-full"
-                          name={field.name}
-                          onBlur={field.onBlur}
-                          aria-required="true"
-                        >
-                          <SelectValue placeholder={SETTING_PLACEHOLDER} />
-                        </SelectTrigger>
-                      </FormControl>
-                      {/*
-                        Each option carries the setting's NAME and nothing else: the
-                        name is how the setting is identified in the picker, on the
-                        submission and in the file list, so anything else read out
-                        alongside it would only blur what was chosen. The chosen
-                        setting's source and type are given below instead.
-                      */}
-                      <SelectContent>
-                        {offered.map((setting) => (
-                          <SelectItem
-                            key={setting.Id}
-                            value={String(setting.Id)}
+                  return (
+                    <FormItem
+                      className={`gap-1.5 ${SETTING_FIELD_WIDTH_CLASS}`}
+                    >
+                      {/* The label is the tracked micro-label; the capitals are CSS,
+                          so the words — and the accessible name the trigger takes from
+                          them, asterisk included — are unchanged. */}
+                      <FormLabel className={SLIP_FIELD_LABEL_CLASS}>
+                        File setting <RequiredMarker />
+                      </FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={onSettingChosen}
+                      >
+                        <FormControl>
+                          {/* The trigger takes the id the label points at, so the
+                              label reaches it. Underline only, and no box. */}
+                          <SelectTrigger
+                            className={SETTING_FIELD_CLASS}
+                            name={field.name}
+                            onBlur={field.onBlur}
+                            aria-required="true"
                           >
-                            {setting.Name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {chosenSetting === undefined
-                        ? 'Choose the named setting this file should be imported against.'
-                        : `Files for this setting come from ${chosenSetting.SourceName}, as ${chosenSetting.TypeName}.`}
+                            <SelectValue placeholder={SETTING_PLACEHOLDER} />
+                          </SelectTrigger>
+                        </FormControl>
+                        {/*
+                          Each option carries the setting's NAME and nothing else: the
+                          name is how the setting is identified in the picker, on the
+                          submission and in the file list, so anything else read out
+                          alongside it would only blur what was chosen. The chosen
+                          setting's source and type are given below instead.
+                        */}
+                        <SelectContent>
+                          {offered.map((setting) => (
+                            <SelectItem
+                              key={setting.Id}
+                              value={String(setting.Id)}
+                            >
+                              {setting.Name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        {chosenSetting === undefined ? (
+                          'Choose the named setting this file should be imported against.'
+                        ) : (
+                          <>
+                            Files for this setting come from{' '}
+                            <span className={NOTATION_CELL_CLASS}>
+                              {chosenSetting.SourceName}
+                            </span>
+                            , as{' '}
+                            <span className={NOTATION_CELL_CLASS}>
+                              {chosenSetting.TypeName}
+                            </span>
+                            .
+                          </>
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              <FormField
+                control={form.control}
+                name="fileName"
+                render={({ field }) => (
+                  <FormItem className={`gap-1.5 ${CSV_FIELD_WIDTH_CLASS}`}>
+                    <FormLabel className={SLIP_FIELD_LABEL_CLASS}>
+                      CSV file <RequiredMarker />
+                    </FormLabel>
+                    <FormControl>
+                      {/*
+                        A real file input, kept in the tab order so a keyboard user can
+                        open the file chooser (feature NFR, WCAG 2.2 AA) — the ruled
+                        treatment takes the box away and NOTHING else: this must never
+                        become a styled div with a click handler, which takes no focus
+                        and opens no chooser. `accept` is only a hint to that chooser —
+                        a user can still pick "All files" — which is why the CSV rule is
+                        enforced below rather than here.
+                      */}
+                      <Input
+                        key={chooserGeneration}
+                        type="file"
+                        accept=".csv,text/csv"
+                        required
+                        name={field.name}
+                        onBlur={field.onBlur}
+                        onChange={onFileChosen}
+                        className={CSV_FIELD_CLASS}
+                      />
+                    </FormControl>
+                    {/* Once a file is picked, its name is stated as a tracked label
+                        over a fixed-field value — the slip's own control total. */}
+                    <FormDescription className="flex flex-wrap items-baseline gap-x-2">
+                      {chosenFile === null ? (
+                        'Choose the CSV file of expense payment requests to submit.'
+                      ) : (
+                        <>
+                          <span className={SLIP_LABEL_CLASS}>
+                            {CHOSEN_FILE_LABEL}
+                          </span>
+                          <span
+                            className={`${NOTATION_CELL_CLASS} text-foreground`}
+                          >
+                            {chosenFile.name}
+                          </span>
+                        </>
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
-                );
-              }}
-            />
-
-            <FormField
-              control={form.control}
-              name="fileName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    CSV file <RequiredMarker />
-                  </FormLabel>
-                  <FormControl>
-                    {/*
-                      A real file input, kept in the tab order so a keyboard user can
-                      open the file chooser (feature NFR, WCAG 2.2 AA). `accept` is
-                      only a hint to that chooser — a user can still pick "All files"
-                      — which is why the CSV rule is enforced below rather than here.
-                    */}
-                    <Input
-                      key={chooserGeneration}
-                      type="file"
-                      accept=".csv,text/csv"
-                      required
-                      name={field.name}
-                      onBlur={field.onBlur}
-                      onChange={onFileChosen}
-                      className="h-auto py-1.5"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {chosenFile === null ? (
-                      'Choose the CSV file of expense payment requests to submit.'
-                    ) : (
-                      <>
-                        Chosen file:{' '}
-                        <span className="text-foreground font-medium">
-                          {chosenFile.name}
-                        </span>
-                      </>
-                    )}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                )}
+              />
+            </div>
 
             <div>
               {/*
                 One submit control, whose wording never changes: it is how the action
                 is recognised, so a busy state is expressed by disabling it (and by
                 the confirmation that follows) rather than by renaming it mid-flight.
+
+                A tracked label on a rule, not a filled button — the slip has no boxes
+                left for one to match (R13/R19/BR9). Its glyph is sized on the ICON,
+                because the button primitive's own selector beats a size set on the
+                button. Wrapped, so it takes its own width rather than the grid's.
               */}
-              <Button type="submit" disabled={!readyToSubmit}>
+              <Button
+                type="submit"
+                variant="ghost"
+                className={RULED_ACTION_WITH_ICON_CLASS}
+                disabled={!readyToSubmit}
+              >
+                <Upload
+                  aria-hidden="true"
+                  className={RULED_ACTION_ICON_CLASS}
+                />
                 Upload file
               </Button>
             </div>
