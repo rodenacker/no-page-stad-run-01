@@ -20,6 +20,7 @@ Every epic in this project, what it delivers, and what it builds on. Live status
 | 9 | Delete a submitted file (`file-deletion`) | Let the Importer delete any submitted file — including one whose rows have already imported — from the files list as well as the file's own page, after a confirmation that states exactly what is being destroyed. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`), Approve or reject a request (`expense-decisions`) |
 | 10 | Redesign the request list as a batch listing (`request-list-redesign`) | Rebuild the shared expense request list in the Batch Listing design — a control block showing the batch's outstanding count at a glance, a scannable exception gutter, and no change to what anyone can do. | Sign in and the signed-in app shell (`sign-in-and-app-shell`), Bulk approval and a self-updating list (`bulk-approval-and-live-refresh`), Export requests for the payment system (`csv-export`) |
 | 11 | Land on the screen your role uses (`role-aware-landing`) | Send a person straight to the screen their role actually works in after they sign in — the expense requests list for an Approver, the expense files screen for an Importer — instead of a menu, while leaving who may open what exactly as it is. | Sign in and the signed-in app shell (`sign-in-and-app-shell`), Upload an expense file (`expense-file-upload`), The shared expense request list (`expense-request-list`) |
+| 12 | Redesign the expense files view as a batch register (`files-view-redesign`) | Rebuild the whole expense files area in the Batch Listing design — the submitted files as a register of batches, the submit form as the batch's submission slip, and a file's own page (its history, its import preview and its rejected rows) as the source artifact the world is drawn from — with no change to what anyone can do. | Upload an expense file (`expense-file-upload`), Rejected rows, retry and cancel (`file-validation-and-retry`), Preview the rows of an import (`import-preview`), Delete a submitted file (`file-deletion`), Redesign the request list as a batch listing (`request-list-redesign`) |
 
 ## Coverage
 
@@ -142,6 +143,12 @@ Requested by the user on 2026-08-18, after epics 1–10 had shipped:
 | What you asked for | Epic |
 |---|---|
 | Land on the expense requests list as an Approver, and on the expense files screen as an Importer, instead of choosing from a menu (N6) | Land on the screen your role uses (`role-aware-landing`) |
+
+Requested by the user on 2026-08-19, after epics 1–11 had shipped:
+
+| What you asked for | Epic |
+|---|---|
+| Carry the Batch Listing design across the whole expense files area — the files register, the submission slip, and a file's own page with its history, import preview and rejected rows (N7) | Redesign the expense files view as a batch register (`files-view-redesign`) |
 
 ## Decisions made at the plan approval
 
