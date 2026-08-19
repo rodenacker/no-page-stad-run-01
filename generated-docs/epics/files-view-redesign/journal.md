@@ -104,3 +104,18 @@
   phone width). It looked for the file's row as a table row; at phone width the register is a list of
   items instead. It now accepts either shape and still checks on exactly the same two of the file's
   own values, so the test proves precisely what it did before.
+
+## Story 1 — cadence test fix (epic-end)
+
+- **The files register's automated timing test was failing, and the register was innocent.** It
+  still re-reads the service every 15 seconds, exactly as before the redesign. The test was
+  measuring wrongly: it sped the browser's clock up to just before 15 seconds and then watched for
+  two real seconds to prove nothing had been asked yet — but the browser's clock keeps running
+  during those two seconds, so it sailed past 15 seconds, caught a perfectly punctual re-read, and
+  called it early. Arithmetically it could never have passed.
+- **The test now stops the browser's clock outright** and holds back the register's first answer
+  until it has stopped, so the 15-second countdown starts at a moment the test knows precisely. Both
+  limits it checks are unchanged.
+- **To be sure it still catches a real fault**, the register was temporarily made to re-read every 5
+  seconds (the test failed, as it should) and every 20 seconds (it failed the other way), then put
+  back to 15. No application code changed.

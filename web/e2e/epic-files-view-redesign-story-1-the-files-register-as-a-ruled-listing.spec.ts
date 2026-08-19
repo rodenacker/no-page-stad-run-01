@@ -124,12 +124,35 @@
  * (:3000) and the epic-end production run (:3100). `Secure` is omitted because the E2E
  * app is served over plain http on localhost.
  *
- * TIMING — why nothing here waits real time: the register's refresh is timer-driven, so
- * AC-5 drives the browser clock with `page.clock` (`install()` before navigating, then
- * `fastForward()` across the REAL configured cadence). No test-only "short interval"
- * prop is needed in production code and no test sits waiting. `page.waitForTimeout` is
- * never used. AC-6 installs no clock: every file it lists is settled, so nothing is
- * refreshing underneath it.
+ * TIMING — why nothing here waits real time, and why the clock is STOPPED: the
+ * register's refresh is timer-driven, so AC-5 drives the browser clock with
+ * `page.clock` (`install()` before navigating, then `fastForward()` across the REAL
+ * configured cadence). No test-only "short interval" prop is needed in production code
+ * and no test sits waiting. `page.waitForTimeout` is never used.
+ *
+ * `install()` on its own does NOT stop time. The faked clock goes on flowing with real
+ * time and only `pauseAt()` stops it — measured on this app, not assumed: with a clock
+ * merely installed, the page's own `Date.now()` advances ~517ms across 500ms of real
+ * time. That is what the FLOOR half of AC-5 turns on. While the clock flows, the real
+ * seconds spent watching for an early re-read ARE browser seconds, so jumping to 14s and
+ * then watching 2s of real time carries the clock to 16s — past the 15s cadence — and a
+ * perfectly ON-TIME re-read lands inside the very window that was meant to prove
+ * earliness. Nothing about the register's cadence is wrong when that happens; the
+ * measurement is.
+ *
+ * So the clock is STOPPED before the register is given its answer at all, and the answer
+ * is what starts the refresh timer. From that follows everything AC-5 needs:
+ *   - the timer starts at the instant the stopped clock is standing at, so that instant
+ *     is the cadence's exact zero;
+ *   - the only browser time that passes afterwards is time a `fastForward` puts on the
+ *     clock, so "nothing re-read within 14s" is exactly 14s of the register's own life;
+ *   - and real time spent waiting for an early re-read to show up costs no browser time
+ *     at all, because a stopped clock fires nothing.
+ * The register's first answer is held back in the route handler until the clock has
+ * stopped (`holdListReadsUntil` below) — the one device that pins the cadence's zero.
+ *
+ * AC-6 installs no clock: every file it lists is settled, so nothing is refreshing
+ * underneath it.
  *
  * WHAT AC-5's "adds no movement of its own" DOES AND DOES NOT ASSERT:
  * What it asserts, in a real browser and deterministically — a refresh that brings a
@@ -247,8 +270,28 @@ const PAST_CADENCE_MS = 1_500;
  * shortened. It is watched from the moment the watcher is registered, so the reads the
  * first render issues (React's development double-render included) are already behind
  * it and cannot be mistaken for a poll.
+ *
+ * It costs no browser time: it is only ever waited out with the clock STOPPED (see the
+ * TIMING note above), so nothing can fall due while it runs and its length can never
+ * carry the clock towards the cadence it is there to check.
  */
 const QUIET_WINDOW_MS = 2_000;
+
+/**
+ * How far ahead of where it stands the clock is stopped. `pauseAt` stops the clock AT an
+ * instant, so that instant has to still be ahead of the page when the call gets there; a
+ * whole second is far more than the round trip needs, and nothing in this app falls due
+ * inside it (the register's answer is still held, and the idle-session check is 29
+ * minutes out).
+ */
+const FREEZE_LEAD_MS = 1_000;
+
+/**
+ * Every read of the register AC-5 allows: the one the screen opens with, then exactly one
+ * per cadence window it crosses. A register asking more often than its cadence shows up
+ * here as an extra read, whichever window it came from.
+ */
+const READS_ALLOWED = 3;
 
 /**
  * Total browser time this spec advances. It is idle time as far as epic 1's
@@ -261,7 +304,7 @@ const QUIET_WINDOW_MS = 2_000;
  * guard is what will tell you.
  */
 const CLOCK_BUDGET_MS =
-  BEFORE_CADENCE_MS + PAST_CADENCE_MS + REFRESH_CADENCE_MS;
+  FREEZE_LEAD_MS + BEFORE_CADENCE_MS + PAST_CADENCE_MS + REFRESH_CADENCE_MS;
 
 if (CLOCK_BUDGET_MS >= SESSION_IDLE_TIMEOUT_MS - SESSION_WARNING_LEAD_MS) {
   throw new Error(
@@ -361,6 +404,11 @@ interface UploadScreenFeed {
  *
  * `refuseDelete` is how a test says what the service does with the one mutating call:
  * refuse it in its own words, or accept it.
+ *
+ * `holdListReadsUntil` is how a test says WHEN the register may have its answer. It is
+ * already released unless a test hands in a gate, and the only test that does is AC-5,
+ * which holds the first answer back until the browser clock has stopped so that the
+ * refresh timer's start is an instant it knows exactly (see the TIMING note above).
  */
 const serveUploadScreen = async (
   page: Page,
@@ -368,10 +416,12 @@ const serveUploadScreen = async (
     files,
     requests = [],
     refuseDelete = false,
+    holdListReadsUntil = Promise.resolve(),
   }: {
     files: FileLog[];
     requests?: TransactionRead[];
     refuseDelete?: boolean;
+    holdListReadsUntil?: Promise<void>;
   },
 ): Promise<UploadScreenFeed> => {
   let currentFiles = files;
@@ -384,8 +434,10 @@ const serveUploadScreen = async (
   await page.route(TRANSACTIONS_API_GLOB, (route) => route.abort());
 
   // 2. The register itself, and the two other reads that share this screen.
-  await page.route(FILE_LOGS_URL_GLOB, (route) => {
+  await page.route(FILE_LOGS_URL_GLOB, async (route) => {
     fileListReads.push(route.request().url());
+    // Asked now, answered when the test allows: nothing waits on this by default.
+    await holdListReadsUntil;
     return route.fulfill(jsonResponse(fileLogListResponse(currentFiles)));
   });
   // The whole set, other files' rows and all — the app narrows to one file's requests
@@ -510,6 +562,31 @@ const markCurrentDocument = async (page: Page): Promise<void> => {
   }, NO_RELOAD_MARKER);
 };
 
+/** A one-way gate: something to wait on, and the switch that lets it through. */
+interface Gate {
+  passable: Promise<void>;
+  open: () => void;
+}
+
+const gate = (): Gate => {
+  let open = (): void => undefined;
+  const passable = new Promise<void>((letThrough) => {
+    open = letThrough;
+  });
+  return { passable, open };
+};
+
+/**
+ * Stops the browser clock where it stands — a second ahead of it, which is what
+ * `pauseAt` needs (see {@link FREEZE_LEAD_MS}). From here on the only browser time that
+ * passes is time a `fastForward` puts on the clock, which is what makes every window
+ * below an exact measure of the register's own life rather than of the test's.
+ */
+const stopTheClock = async (page: Page): Promise<void> => {
+  const standingAt = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(standingAt + FREEZE_LEAD_MS);
+};
+
 test.describe('Epic files-view-redesign, Story 1: the files register as a ruled batch listing', () => {
   test.beforeEach(async ({ context }) => {
     // Every test starts signed out and seeds the identity it needs.
@@ -535,14 +612,25 @@ test.describe('Epic files-view-redesign, Story 1: the files register as a ruled 
     );
 
     // Control the browser clock before anything schedules a timer, so the register's
-    // real cadence can be crossed instantly and measured from both sides.
+    // real cadence can be crossed instantly and measured from both sides — and hold the
+    // register's first answer back, because an installed clock is still a FLOWING clock
+    // and the cadence has to be measured from an instant this test knows (TIMING above).
     await page.clock.install();
+    const registerAnswer = gate();
     const feed = await serveUploadScreen(page, {
       files: [uploading, validating],
+      holdListReadsUntil: registerAnswer.passable,
     });
     await seedSession(context, ROLE_IMPORTER);
 
     await page.goto(UPLOAD_ROUTE);
+
+    // The clock stops here, with the register still waiting to be answered — so letting
+    // the answer through now starts its refresh timer at the instant the stopped clock
+    // is standing at. That instant is the cadence's zero, and nothing moves the clock
+    // from here on but the jumps below.
+    await stopTheClock(page);
+    registerAnswer.open();
 
     // As it lands: both files are getting on, each row showing the status, most recent
     // activity and record count the SERVICE reported.
@@ -578,8 +666,10 @@ test.describe('Epic files-view-redesign, Story 1: the files register as a ruled 
     const anchorsBefore = await verticalAnchorsOf(anchors);
     const scrollBefore = await scrollPositionOf(page);
 
-    // Nothing may be re-read before the cadence is due. Watched from HERE, so the reads
-    // the first render issued are already behind the watcher.
+    // Nothing may be re-read before the cadence is due. Watched from HERE, so the read
+    // the first render issued is already behind the watcher — and watched against a
+    // STOPPED clock, so the watching cannot itself carry the clock towards the cadence:
+    // the 14s jumped below is 14s of the register's life and nothing else.
     const earlyReRead = page
       .waitForRequest(FILE_LOGS_URL_GLOB, { timeout: QUIET_WINDOW_MS })
       .then((request) => request.url())
@@ -668,6 +758,17 @@ test.describe('Epic files-view-redesign, Story 1: the files register as a ruled 
       `every read of the register must carry ${ACTIVE_FILES_QUERY} (epic brief ` +
         `§Notes: IsActive is a required query parameter)`,
     ).toEqual([]);
+
+    // And the register was asked exactly as often as its cadence allows across the whole
+    // of the browser time this test spent: the read it opened with, then one per cadence
+    // window. Two in any one window would be a shortened cadence; none would be a
+    // register that had stopped asking.
+    expect(
+      feed.fileListReads,
+      `over ${String(CLOCK_BUDGET_MS - FREEZE_LEAD_MS)}ms of browser time the register ` +
+        `may ask exactly ${String(READS_ALLOWED)} times — the read it opens with, then ` +
+        `one per ${String(REFRESH_CADENCE_MS)}ms cadence window (BR2)`,
+    ).toHaveLength(READS_ALLOWED);
 
     // The reader spent the whole time on the register, in the document they opened.
     await expect(page).toHaveURL(UPLOAD_URL_PATTERN);
