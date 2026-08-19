@@ -491,11 +491,7 @@ import {
   isPageVisibleOnServer,
   subscribeToPageVisibility,
 } from '@/lib/layout/pageVisibility';
-import {
-  isNarrowViewport,
-  isNarrowViewportOnServer,
-  subscribeToViewportWidth,
-} from '@/lib/layout/viewport';
+import { useNarrowViewport } from '@/lib/layout/useNarrowViewport';
 import {
   BULK_APPROVE_ACTION_LABEL,
   BULK_APPROVE_CONFIRMATION_MESSAGE,
@@ -1304,14 +1300,12 @@ export function ExpenseRequestList({
   const duplicatesAlreadyAnnounced = useRef<Set<number>>(new Set());
 
   /**
-   * Whether the reader is at phone width. The browser already knows before React runs,
-   * so it is watched rather than copied into state (see `lib/layout/viewport.ts`).
+   * Whether the reader is at phone width. The browser already knows before React runs, so
+   * it is watched rather than copied into state — through the one hook every listing in the
+   * app asks with (`lib/layout/useNarrowViewport.ts`), over the one crossover
+   * `lib/layout/viewport.ts` states.
    */
-  const narrowViewport = useSyncExternalStore(
-    subscribeToViewportWidth,
-    isNarrowViewport,
-    isNarrowViewportOnServer,
-  );
+  const narrowViewport = useNarrowViewport();
 
   /**
    * Whether the reader is looking at this tab at all (BR6). The document knows before

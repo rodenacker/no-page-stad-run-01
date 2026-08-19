@@ -19,7 +19,8 @@
       "The file's name is the largest text on its page (about 20px, typewriter face). The brief deliberately forbids a big control-total figure here (BR5), so nothing on the slip is set at display scale — worth an eye against the register it sits beside.",
       "The rejected block's heading reads 'Rejected — will not import' rather than 'Rejected rows'. The brief only asked for 'its own small capitalised heading', and the same page already has a whole section named exactly 'Rejected rows' — two things with one name on one screen cannot be told apart, by a reader or by a test. Confirm the wording reads right.",
       "R15 names the reference, the transaction date and the masked account number as the values to set in the typewriter face. The amount was also set in it, right-aligned so the digits line up down the column — how every other figure in this design reads, and what R16 asks of the rejected-rows listing. Confirm you want the amount treated as a figure here too.",
-      "Every control on /upload/file is now ruled text on a hairline, but the delete confirmation's own two choices INSIDE the dialog ('Delete the file' / 'Keep the file') are still ordinary buttons — deliberate, because R20 and the story's reuse note both say to restyle nothing inside it, and every confirmation in the app stays consistent. Worth a glance in case you expected the dialog's choices to be ruled too; that would be a project-wide change."
+      "Every control on /upload/file is now ruled text on a hairline, but the delete confirmation's own two choices INSIDE the dialog ('Delete the file' / 'Keep the file') are still ordinary buttons — deliberate, because R20 and the story's reuse note both say to restyle nothing inside it, and every confirmation in the app stays consistent. Worth a glance in case you expected the dialog's choices to be ruled too; that would be a project-wide change.",
+      "At phone width a register row shows the file's name plus three key values — its status, its record count and what last happened to it — and drops the file setting it was sent against (still one tap away on the file's own page). UI-23 allows only two to three key values, so one of the register's five had to give way; confirm the setting is the right one to lose when you check the register on a phone."
     ],
     "manualTestResults": []
   },
@@ -61,13 +62,13 @@
       "completedAt": "2026-08-19T10:29:37.860Z"
     },
     "6": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-19T10:30:37.982Z",
+      "completedAt": "2026-08-19T11:20:20.240Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-19T10:29:37.860Z"
+  "lastUpdated": "2026-08-19T11:20:20.240Z"
 }

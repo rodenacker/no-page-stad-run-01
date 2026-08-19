@@ -83,6 +83,22 @@
  *   card gone there is nothing else framing an answer, and the wording, the roles and
  *   the actions of all four are untouched.
  *
+ * AND ON A PHONE IT IS THE SAME REGISTER, TIGHTENED (R3, source UI-23). Below the one
+ * crossover `lib/layout/viewport.ts` states, each file becomes a group of ruled lines
+ * carrying its own name, its status, its own control total and what last happened to it,
+ * with both of its controls on a line of their own — the shared
+ * `components/files/NarrowListing` composition, which the other three listings on these two
+ * screens wear too. Three things about that switch are load-bearing:
+ *
+ * - **One presentation or the other, never both.** A seven-column table kept inside the
+ *   primitive's own `overflow-x-auto` wrapper is exactly the contained sideways scroll R3
+ *   refuses, so the table is not rendered at all at that width.
+ * - **The column heads and the narrow labels are ONE wording** ({@link COLUMN}), so the two
+ *   presentations cannot name the same value two ways.
+ * - **A group offers exactly what a line offers** ({@link FileRowControls}): the same `Open`
+ *   link and the same delete, from the same markup, so nothing can be reachable only on a
+ *   wide screen.
+ *
  * The status pairs an intent colour with the status TEXT and a drawn shape, never
  * colour alone (brief §Feature NFRs, source UI-21). It is `components/files/
  * FileStatusBadge` — the one file-status vocabulary in the project, shared with a
@@ -150,7 +166,14 @@ import {
 } from '@/components/files/DeleteFileConfirmation';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
 import {
+  NarrowField,
+  NarrowListing,
+  NarrowRecord,
+  NarrowRecordLine,
+} from '@/components/files/NarrowListing';
+import {
   FIGURE_CELL_CLASS,
+  FIGURE_CLASS,
   LISTING_EDGE_PADDING_CLASS,
   LISTING_LABEL_CLASS,
   LISTING_ROW_CLASS,
@@ -184,6 +207,7 @@ import {
 import { DELETE_FILE_LABEL } from '@/lib/files/deleteConfirmation';
 import { submittedFileAddress } from '@/lib/files/fileAddress';
 import { subscribeToFileSubmissions } from '@/lib/files/fileSubmissions';
+import { useNarrowViewport } from '@/lib/layout/useNarrowViewport';
 import { ROLE_IMPORTER } from '@/types/auth';
 import {
   FILE_STATUS_IMPORTED,
@@ -313,6 +337,85 @@ const deleteLabelFor = (file: FileLog): string =>
 
 /** The last column holds what can be DONE with a row, not one named action. */
 const ACTIONS_COLUMN_LABEL = 'Actions';
+
+/**
+ * WHAT EACH OF A FILE'S VALUES IS CALLED — one wording, spent twice.
+ *
+ * The wide register heads its columns with these words and the narrow group labels its
+ * fields with the same ones (R3/R10): a column head and a field label are the same object
+ * in this design, and two copies is how the register and the phone-width register quietly
+ * end up naming one value two ways. R10/R3 restyle these; they rename none of them.
+ */
+const COLUMN = {
+  file: 'File',
+  setting: 'File setting',
+  processed: 'Processed',
+  status: 'Status',
+  activity: 'Most recent activity',
+  records: 'Records',
+} as const;
+
+/**
+ * What the register IS, for a phone-width reader who meets the list without seeing its
+ * shape. The wide presentation says it in a table caption; at this width there is no
+ * caption, so the list says it of itself.
+ */
+const NARROW_LISTING_LABEL = 'Submitted expense files';
+
+/**
+ * WHAT A FILE'S LINE OFFERS — one markup, rendered by both presentations, which is what
+ * makes "nothing is reachable only on a wide screen" (R3) structural rather than a promise.
+ *
+ * The way in stays a real navigational link carrying the file's identifier
+ * (`file-validation-and-retry` FR8) — a link, not a button that pushes a route, so it can be
+ * opened in a new tab and is announced as somewhere to go. The delete sits beside it and is
+ * reachable by Tab alone, never behind a menu that has to be opened first (`file-deletion`
+ * story 3 AC-6): a session the server did not name gets no markup for it at all, and there
+ * is no status condition on it — a file may be deleted whatever its status, an `Imported`
+ * one included (R3/BR1).
+ */
+function FileRowControls({
+  file,
+  actingUploader,
+  onAskToDelete,
+}: {
+  file: FileLog;
+  /** The Finance Uploader's own name where this session may delete; `undefined` otherwise
+   * — see {@link SubmittedFilesListProps}. Absent, never disabled (source UI-24). */
+  actingUploader: string | undefined;
+  onAskToDelete: (file: FileLog) => void;
+}) {
+  return (
+    <>
+      <Button asChild variant="ghost" className={ROW_ACTION_CLASS}>
+        <Link href={submittedFileAddress(file)}>
+          <PanelRightOpen
+            aria-hidden="true"
+            className={RULED_ACTION_ICON_CLASS}
+          />
+          {OPEN_LABEL} <span className="sr-only">{openLabelFor(file)}</span>
+        </Link>
+      </Button>
+
+      {actingUploader !== undefined && (
+        <Button
+          type="button"
+          variant="ghost"
+          className={ROW_ACTION_CLASS}
+          onClick={() => {
+            // Asking is the event that both opens the confirmation and starts reading what
+            // this file would destroy — never a render reacting to the dialog.
+            onAskToDelete(file);
+          }}
+        >
+          <Trash2 aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+          {DELETE_FILE_LABEL}{' '}
+          <span className="sr-only">{deleteLabelFor(file)}</span>
+        </Button>
+      )}
+    </>
+  );
+}
 
 /** Announced while the delete is on its way, since the row has not changed yet. */
 const deletingMessage = (file: FileLog): string =>
@@ -453,6 +556,12 @@ export function SubmittedFilesList({
    * answers, so the most recent question is always the one that gets to answer.
    */
   const readsIssued = useRef(0);
+  /**
+   * Whether the reader is at phone width, which decides which of the two presentations of
+   * this register is in the markup at all (R3). One crossover, read through the one hook
+   * every listing in the app asks with — never a second breakpoint of this screen's own.
+   */
+  const narrowViewport = useNarrowViewport();
 
   /**
    * Whether the person watching this list is the one the rejected-rows notification
@@ -879,6 +988,59 @@ export function SubmittedFilesList({
           <div className={`${RULED_BAND_CLASS} py-10`}>
             <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
           </div>
+        ) : narrowViewport ? (
+          /* THE SAME REGISTER ON A PHONE (R3, source UI-23): each file is one group of
+             ruled lines — its own name, then its status, its own control total and the
+             setting it was sent against, then its two controls — and the groups run
+             together as one ruled sequence, because a box per file is the card treatment
+             this design names as an anti-goal (BR9). The wide table is not rendered at
+             all here: seven columns inside the primitive's `overflow-x-auto` wrapper is
+             precisely the contained sideways scroll R3 refuses. */
+          <NarrowListing label={NARROW_LISTING_LABEL}>
+            {state.files.map((file) => (
+              // Keyed by the file's own id, for the reason the wide row is: a re-read
+              // brings a group UP TO DATE rather than rebuilding it, and a rebuilt group
+              // drops the keyboard of whoever was standing on it.
+              <NarrowRecord key={file.Id}>
+                {/* This batch's real name — the primary identifier UI-23 asks for, in the
+                    fixed-field face, broken mid-token if it has to be rather than pushing
+                    the page sideways. */}
+                <NarrowRecordLine>
+                  <span className={`${NOTATION_CELL_CLASS} break-all`}>
+                    {file.CurrentFileName}
+                  </span>
+                </NarrowRecordLine>
+
+                {/* THE THREE KEY VALUES UI-23 ALLOWS, and no fourth: where the file
+                    stands, its own control total (R11) and what last happened to it —
+                    which together are what a reader watching a submission get on came for
+                    (Key Workflow 3). The setting it was sent against is the value that
+                    gives way at this width; it is one tap away on the file's own slip
+                    (R17). The status names itself, so it carries no label — it is the
+                    shared ruled mark, words beside a shape, never colour alone (R2). */}
+                <NarrowRecordLine>
+                  <FileStatusBadge status={file.CurrentStatus} />
+                  <NarrowField label={COLUMN.records}>
+                    <span className={FIGURE_CLASS}>{file.RecordCount}</span>
+                  </NarrowField>
+                  <NarrowField label={COLUMN.activity}>
+                    {/* Prose, so it stays in the text face. */}
+                    {file.LastExecutedActivityName}
+                  </NarrowField>
+                </NarrowRecordLine>
+
+                {/* A line of its own, so both controls have the group's whole width to sit
+                    across and wrap into at 360px. */}
+                <NarrowRecordLine>
+                  <FileRowControls
+                    file={file}
+                    actingUploader={actingUploader}
+                    onAskToDelete={deleteConfirmation.ask}
+                  />
+                </NarrowRecordLine>
+              </NarrowRecord>
+            ))}
+          </NarrowListing>
         ) : (
           /* The register runs full-bleed to the page padding (R10): the box is widened
              past `<main>`'s `px-4` so every hairline row rule reaches the edge of the
@@ -902,26 +1064,26 @@ export function SubmittedFilesList({
                       capitalised by `text-transform` so each head's wording is exactly
                       the word the app wrote (R10). */}
                   <TableHead scope="col" className={LISTING_LABEL_CLASS}>
-                    File
+                    {COLUMN.file}
                   </TableHead>
                   <TableHead scope="col" className={LISTING_LABEL_CLASS}>
-                    File setting
+                    {COLUMN.setting}
                   </TableHead>
                   <TableHead scope="col" className={LISTING_LABEL_CLASS}>
-                    Processed
+                    {COLUMN.processed}
                   </TableHead>
                   <TableHead scope="col" className={LISTING_LABEL_CLASS}>
-                    Status
+                    {COLUMN.status}
                   </TableHead>
                   <TableHead scope="col" className={LISTING_LABEL_CLASS}>
-                    Most recent activity
+                    {COLUMN.activity}
                   </TableHead>
                   {/* Heads a column of figures, so it is right-aligned over them. */}
                   <TableHead
                     scope="col"
                     className={`${LISTING_LABEL_CLASS} text-right`}
                   >
-                    Records
+                    {COLUMN.records}
                   </TableHead>
                   {/* The controls column: named for a screen reader, and nothing to
                       label on the page — the controls carry their own words. */}
@@ -966,53 +1128,14 @@ export function SubmittedFilesList({
                         rather than as a ragged band in the middle of it. */}
                     <TableCell className="text-right">
                       <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
-                        {/* A real link, so the file's page can be opened in a new tab
-                            and is announced as somewhere to go — never a button that
-                            pushes a route. */}
-                        <Button
-                          asChild
-                          variant="ghost"
-                          className={ROW_ACTION_CLASS}
-                        >
-                          <Link href={submittedFileAddress(file)}>
-                            <PanelRightOpen
-                              aria-hidden="true"
-                              className={RULED_ACTION_ICON_CLASS}
-                            />
-                            {OPEN_LABEL}{' '}
-                            <span className="sr-only">
-                              {openLabelFor(file)}
-                            </span>
-                          </Link>
-                        </Button>
-
-                        {/* The delete, IN the row beside the link and reachable by Tab
-                            alone — never behind a menu. There is no status condition on
-                            it: a file may be deleted whatever its status, an `Imported`
-                            one included (R3/BR1). A session the server did not name gets
-                            no markup for it at all. */}
-                        {actingUploader !== undefined && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className={ROW_ACTION_CLASS}
-                            onClick={() => {
-                              // Asking is the event that both opens the confirmation and
-                              // starts reading what this file would destroy — never a
-                              // render reacting to the dialog.
-                              deleteConfirmation.ask(file);
-                            }}
-                          >
-                            <Trash2
-                              aria-hidden="true"
-                              className={RULED_ACTION_ICON_CLASS}
-                            />
-                            {DELETE_FILE_LABEL}{' '}
-                            <span className="sr-only">
-                              {deleteLabelFor(file)}
-                            </span>
-                          </Button>
-                        )}
+                        {/* The SAME two controls the phone-width group offers, from one
+                            piece of markup: the way into the file's own page and, for a
+                            session the server named, the delete. */}
+                        <FileRowControls
+                          file={file}
+                          actingUploader={actingUploader}
+                          onAskToDelete={deleteConfirmation.ask}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

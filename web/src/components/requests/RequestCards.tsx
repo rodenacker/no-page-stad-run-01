@@ -82,6 +82,7 @@ import { memo } from 'react';
 
 import {
   FIELD_LABEL_CLASS,
+  NARROW_RECORD_CLASS,
   PAGE_BLEED_CLASS,
 } from '@/components/requests/fieldNotation';
 import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
@@ -128,8 +129,12 @@ const TRANSACTION_DATE_LABEL = labelOfColumn('transactionDate');
  *
  * The left rule is always drawn, transparent unless the request is an exception, so a
  * marked group and an ordinary one line up to the pixel down the page.
+ *
+ * The box itself is the shared narrow-record notation (`NARROW_RECORD_CLASS`), which every
+ * narrow listing in the app wears; this group adds only the reserved left rule the request
+ * list's own exception mark needs.
  */
-const GROUP_CLASS = 'border-b border-l-2 border-l-transparent px-4 py-3';
+const GROUP_CLASS = `${NARROW_RECORD_CLASS} border-l-2 border-l-transparent`;
 
 /**
  * A request that needs attention, marked as a rule down the group's outer edge — the

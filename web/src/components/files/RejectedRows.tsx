@@ -90,6 +90,22 @@
  *   the one way to ask again are unchanged, that control now wearing the shared ruled
  *   action notation like every other one on this page.
  *
+ * AND ON A PHONE, THE SAME REJECT LISTING TIGHTENED (R3, source UI-23): below the one
+ * crossover `lib/layout/viewport.ts` states, each rejected row becomes a group of ruled
+ * lines — its reference, its amount and date, its masked account number with its OWN reveal,
+ * and what is wrong with it — through the shared `components/files/NarrowListing`
+ * composition every listing on these two screens wears. Three things about that switch are
+ * load-bearing:
+ *
+ * - **One presentation or the other, never both.** Eight columns inside the primitive's own
+ *   `overflow-x-auto` wrapper is exactly the contained sideways scroll R3 refuses.
+ * - **The masked number stays legible at that width, and the reveal stays a DIRECT control**
+ *   — these are the rows a reader has to go and correct, and a control behind a menu is one
+ *   more gesture between a keyboard user and the number they came for (R4).
+ * - **One reveal, one piece of markup** ({@link RejectedAccountNumber}), rendered by both
+ *   presentations: which row a reveal acts on, and the masking itself, cannot differ by
+ *   width.
+ *
  * Nothing in this redraw changes a value, its source, when it is read, what any of these
  * answers says, or which row a reveal acts on (R1/BR1/BR2).
  */
@@ -98,7 +114,14 @@ import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  NarrowField,
+  NarrowListing,
+  NarrowRecord,
+  NarrowRecordLine,
+} from '@/components/files/NarrowListing';
+import {
   FIGURE_CELL_CLASS,
+  FIGURE_CLASS,
   LISTING_EDGE_PADDING_CLASS,
   LISTING_LABEL_CLASS,
   LISTING_ROW_CLASS,
@@ -130,6 +153,7 @@ import {
   validationErrorsFailureMessage,
 } from '@/lib/api/files';
 import { NO_REASON_GIVEN, defectWordingFor } from '@/lib/files/defectWording';
+import { useNarrowViewport } from '@/lib/layout/useNarrowViewport';
 import { FILE_STATUS_VALIDATION_FAILED } from '@/types/files';
 
 import type { FileLog, ValidationErrorRow } from '@/types/files';
@@ -188,7 +212,11 @@ const rowLabelOf = (row: ValidationErrorRow): string | undefined =>
 /** Said in a cell whose value the source file did not hold at all. */
 const NOT_RECORDED = 'Not recorded';
 
-/** What each recorded value is called in the heading row. */
+/**
+ * What each recorded value is called in the heading row — and, at phone width, on the field
+ * label beside that same value (R3), because a column head and a field label are the same
+ * object in this design. R16 restyles these; it renames none of them.
+ */
 const COLUMN = {
   reference: 'Reference',
   transactionDate: 'Transaction date',
@@ -199,6 +227,22 @@ const COLUMN = {
   currency: 'Currency',
   defect: 'What is wrong',
 } as const;
+
+/**
+ * What this listing IS, for a phone-width reader who meets it without seeing its shape. The
+ * wide presentation says it in a table caption; at this width there is no caption, so the
+ * list says it of itself — including that the numbers in it are masked until one is revealed.
+ */
+const NARROW_LISTING_LABEL =
+  'Rows of this file that validation rejected. Account numbers show their last four digits until you reveal one.';
+
+/**
+ * A rejected row's own key: nothing on one is documented as unique — the rows come from
+ * parsing an untrusted string — so its position in this answer completes the key rather than
+ * standing in for it. Stated once, because both presentations key their records by it.
+ */
+const rejectedRowKey = (row: ValidationErrorRow, position: number): string =>
+  `${String(row.Id ?? '')}|${String(position)}`;
 
 /** Where the rejected rows are: being read, read, unreadable, or unreachable. */
 type RejectedRowsState =
@@ -230,6 +274,154 @@ function RecordedValue({ value }: { value: string | number | undefined }) {
 }
 
 /**
+ * THIS ROW'S ACCOUNT NUMBER, and the one way to see the whole of it.
+ *
+ * Masked to its last four digits (POPIA, project.md §Compliance) with a per-row reveal, and
+ * ONE piece of markup for both presentations: which row the reveal acts on, what the mask
+ * shows and what the control is called cannot differ by viewport width, and a second copy
+ * for the phone-width group is how the mask on one of them would quietly come off.
+ *
+ * The reveal is a control on a ruled listing, so it wears the shared ruled action notation
+ * rather than a boxed button — there are no boxes left on this page for one to match — and it
+ * stays a DIRECT control at every width: these are the rows a reader has to correct, and a
+ * menu in front of the number is one more gesture between a keyboard user and it (R4).
+ */
+function RejectedAccountNumber({
+  accountNumber,
+  rowLabel,
+  position,
+  isRevealed,
+  onReveal,
+  onHide,
+}: {
+  accountNumber: string;
+  /** Which row this control belongs to, for a reader who meets it out of context. */
+  rowLabel: string | undefined;
+  position: number;
+  isRevealed: boolean;
+  onReveal: (position: number) => void;
+  onHide: (position: number) => void;
+}) {
+  return (
+    <span className="flex min-w-0 flex-wrap items-center gap-2">
+      {isRevealed ? (
+        <span className="tabular-nums">{accountNumber}</span>
+      ) : (
+        <MaskedAccountNumber accountNumber={accountNumber} />
+      )}
+      {/* Its wording, and the row it names, are unchanged: the capitals are
+          `text-transform`. */}
+      <Button
+        type="button"
+        variant="ghost"
+        className={RULED_ACTION_WITH_ICON_CLASS}
+        onClick={() => {
+          if (isRevealed) {
+            onHide(position);
+          } else {
+            onReveal(position);
+          }
+        }}
+      >
+        {isRevealed ? (
+          <EyeOff aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+        ) : (
+          <Eye aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+        )}
+        {isRevealed ? HIDE_ACCOUNT_NUMBER : REVEAL_ACCOUNT_NUMBER}
+        {rowLabel !== undefined && (
+          <span className="sr-only">for {rowLabel}</span>
+        )}
+      </Button>
+    </span>
+  );
+}
+
+/** What this row says is wrong with it — the service's words or the app's, never mixed. */
+function DefectWording({ row }: { row: ValidationErrorRow }) {
+  const wording = defectWordingFor(row);
+  return wording === undefined ? (
+    <span className="text-muted-foreground">{NO_REASON_GIVEN}</span>
+  ) : (
+    <>{wording}</>
+  );
+}
+
+/**
+ * ONE REJECTED ROW AS A PHONE-WIDTH READER RECEIVES IT (R3, source UI-23): a group of ruled
+ * lines carrying its reference — the identifier a reader looks it up by — then the amount and
+ * date it recorded, its masked account number with its own reveal, and what is wrong with it.
+ *
+ * Its values, its masking and its reveal are the wide row's; only how many of them fit on a
+ * line differs. The description, transaction type and currency the wide listing also prints
+ * are left for that width: UI-23 asks for the identifier and two to three key values, not for
+ * eight columns folded into a box.
+ */
+function RejectedRecord({
+  row,
+  position,
+  isRevealed,
+  onReveal,
+  onHide,
+}: {
+  row: ValidationErrorRow;
+  position: number;
+  isRevealed: boolean;
+  onReveal: (position: number) => void;
+  onHide: (position: number) => void;
+}) {
+  const accountNumber = row.AccountNumber;
+
+  return (
+    <NarrowRecord>
+      <NarrowRecordLine>
+        <span className={`${NOTATION_CELL_CLASS} break-all`}>
+          <RecordedValue value={row.Reference} />
+        </span>
+      </NarrowRecordLine>
+
+      <NarrowRecordLine>
+        <NarrowField label={COLUMN.amount}>
+          <span className={FIGURE_CLASS}>
+            <RecordedValue value={row.Amount} />
+          </span>
+        </NarrowField>
+        <NarrowField label={COLUMN.transactionDate}>
+          <span className={NOTATION_CELL_CLASS}>
+            <RecordedValue value={row.TransactionDate} />
+          </span>
+        </NarrowField>
+      </NarrowRecordLine>
+
+      <NarrowRecordLine>
+        <NarrowField label={COLUMN.accountNumber}>
+          {accountNumber === undefined || accountNumber === '' ? (
+            <RecordedValue value={accountNumber} />
+          ) : (
+            <span className={NOTATION_CELL_CLASS}>
+              <RejectedAccountNumber
+                accountNumber={accountNumber}
+                rowLabel={rowLabelOf(row)}
+                position={position}
+                isRevealed={isRevealed}
+                onReveal={onReveal}
+                onHide={onHide}
+              />
+            </span>
+          )}
+        </NarrowField>
+      </NarrowRecordLine>
+
+      <NarrowRecordLine>
+        <NarrowField label={COLUMN.defect}>
+          <DefectWording row={row} />
+        </NarrowField>
+      </NarrowRecordLine>
+    </NarrowRecord>
+  );
+}
+
+/**
  * ONE REJECTED ROW of the listing, drawn in the register's own grammar (R16) — the same
  * ruled line the import preview's own reject listing draws, since the two are the same
  * object in this design.
@@ -254,8 +446,6 @@ function RejectedRow({
   onHide: (position: number) => void;
 }) {
   const accountNumber = row.AccountNumber;
-  const defectWording = defectWordingFor(row);
-  const rowLabel = rowLabelOf(row);
 
   return (
     <TableRow className={LISTING_ROW_CLASS}>
@@ -274,42 +464,14 @@ function RejectedRow({
         {accountNumber === undefined || accountNumber === '' ? (
           <RecordedValue value={accountNumber} />
         ) : (
-          <span className="flex flex-wrap items-center gap-2">
-            {isRevealed ? (
-              <span className="tabular-nums">{accountNumber}</span>
-            ) : (
-              <MaskedAccountNumber accountNumber={accountNumber} />
-            )}
-            {/* The reveal is a control on a ruled listing, so it wears the shared ruled
-                action notation rather than a boxed button — there are no boxes left on
-                this page for one to match. Its wording, and the row it names, are
-                unchanged: the capitals are `text-transform`. */}
-            <Button
-              type="button"
-              variant="ghost"
-              className={RULED_ACTION_WITH_ICON_CLASS}
-              onClick={() => {
-                if (isRevealed) {
-                  onHide(position);
-                } else {
-                  onReveal(position);
-                }
-              }}
-            >
-              {isRevealed ? (
-                <EyeOff
-                  aria-hidden="true"
-                  className={RULED_ACTION_ICON_CLASS}
-                />
-              ) : (
-                <Eye aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
-              )}
-              {isRevealed ? HIDE_ACCOUNT_NUMBER : REVEAL_ACCOUNT_NUMBER}
-              {rowLabel !== undefined && (
-                <span className="sr-only">for {rowLabel}</span>
-              )}
-            </Button>
-          </span>
+          <RejectedAccountNumber
+            accountNumber={accountNumber}
+            rowLabel={rowLabelOf(row)}
+            position={position}
+            isRevealed={isRevealed}
+            onReveal={onReveal}
+            onHide={onHide}
+          />
         )}
       </TableCell>
       <TableCell className="whitespace-normal">
@@ -329,15 +491,9 @@ function RejectedRow({
       <TableCell>
         <RecordedValue value={row.Currency} />
       </TableCell>
-      {defectWording === undefined ? (
-        <TableCell className="text-muted-foreground max-w-prose whitespace-normal">
-          {NO_REASON_GIVEN}
-        </TableCell>
-      ) : (
-        <TableCell className="max-w-prose whitespace-normal">
-          {defectWording}
-        </TableCell>
-      )}
+      <TableCell className="max-w-prose whitespace-normal">
+        <DefectWording row={row} />
+      </TableCell>
     </TableRow>
   );
 }
@@ -380,6 +536,13 @@ function RejectedRowsSection({
   const [state, setState] = useState<RejectedRowsState>(LOADING);
   /** Bumped by the ask-again action; asking for the rows is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
+  /**
+   * Whether the reader is at phone width, which decides which of the two presentations of
+   * this reject listing is in the markup at all (R3). One crossover, read through the one
+   * hook every listing in the app asks with — never a second breakpoint of this section's
+   * own.
+   */
+  const narrowViewport = useNarrowViewport();
 
   /**
    * Reads the rejected rows and puts what came back on screen.
@@ -540,6 +703,24 @@ function RejectedRowsSection({
               {NONE_REPORTED_MESSAGE}
             </p>
           </div>
+        ) : narrowViewport ? (
+          /* THE SAME REJECT LISTING ON A PHONE (R3, source UI-23): each rejected row is one
+             group of ruled lines, and the groups run together as one ruled sequence rather
+             than standing apart as boxes (BR9). The wide table is not rendered at all here:
+             eight columns inside the primitive's `overflow-x-auto` wrapper is precisely the
+             contained sideways scroll R3 refuses. */
+          <NarrowListing label={NARROW_LISTING_LABEL}>
+            {state.rows.map((row, position) => (
+              <RejectedRecord
+                key={rejectedRowKey(row, position)}
+                row={row}
+                position={position}
+                isRevealed={state.revealed.has(position)}
+                onReveal={revealAccountNumber}
+                onHide={hideAccountNumber}
+              />
+            ))}
+          </NarrowListing>
         ) : (
           /* THE REJECT LISTING. It runs full-bleed to the page padding so every hairline
              row rule reaches the edge of the page, with that padding put back on the
@@ -588,10 +769,7 @@ function RejectedRowsSection({
               <TableBody>
                 {state.rows.map((row, position) => (
                   <RejectedRow
-                    // Nothing on a rejected row is documented as unique — the rows
-                    // come from parsing an untrusted string — so its position in this
-                    // answer completes the key rather than standing in for it.
-                    key={`${String(row.Id ?? '')}|${String(position)}`}
+                    key={rejectedRowKey(row, position)}
                     row={row}
                     position={position}
                     isRevealed={state.revealed.has(position)}

@@ -89,3 +89,18 @@
   component "already reads in the ruled notation project-wide". It does not — it is the unmodified
   Shadcn dialog. The same note also said to restyle nothing inside it, so nothing was changed; the
   inaccuracy is recorded here rather than acted on.
+
+## Story 6 — The same two screens on a phone
+
+- **On a phone the four listings on the expense-files screens stop being wide tables** and become
+  the same ruled listing, tightened — each file, preview row, rejected row and recorded activity is
+  one group of ruled lines. They use the very same narrow/wide switch the expense request list
+  already uses, so there is only one place in the app that decides what counts as a phone.
+- **Fixed a layout fault on the file's own page that was there before this story and that no test
+  had caught:** the "Download rows to fix and re-upload" control refused to wrap its words, and that
+  one control was quietly making the whole screen 24 pixels wider than a phone, so every section on
+  it scrolled sideways. Controls of that kind now wrap onto a second line instead.
+- **Re-pointed one locator in an earlier epic's test** (getting between screens by the header at
+  phone width). It looked for the file's row as a table row; at phone width the register is a list of
+  items instead. It now accepts either shape and still checks on exactly the same two of the file's
+  own values, so the test proves precisely what it did before.

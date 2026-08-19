@@ -78,8 +78,17 @@ export const RULED_FIELD_CLASS =
  *   (`gap-1.5`); the ink is whatever the surface it sits on gives it.
  * - **The wording is untouched wherever it is used**: the capitals are `text-transform`, so
  *   a control's accessible name is still the words the app wrote.
+ * - **ITS WORDS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS** (`files-view-redesign` R3, source
+ *   UI-23). The `button` primitive ships `whitespace-nowrap` and `shrink-0`, which together
+ *   make a control's minimum width its ENTIRE label — and a tracked label carries 0.18em of
+ *   extra space per character, so a control worded like a sentence ("Download rows to fix and
+ *   re-upload") measures over 350px. That minimum then propagates up every grid it sits
+ *   inside, because a grid item's `min-width: auto` is its min-content size and an `auto`
+ *   track is at least that wide: ONE such control made the whole `/upload/file` screen 24px
+ *   wider than a 360px phone, sideways-scrolling every section on it. Both are cancelled
+ *   here rather than per surface, because it is the notation that carries the long labels.
  */
-export const RULED_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto rounded-none border-b px-1 py-1`;
+export const RULED_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto shrink rounded-none border-b px-1 py-1 whitespace-normal`;
 
 /**
  * The glyph beside a ruled action's words, stated here beside the notation it belongs to.
@@ -185,6 +194,31 @@ export const LISTING_EDGE_PADDING_CLASS =
  */
 export const LISTING_ROW_CLASS =
   'transition-none hover:bg-transparent has-aria-expanded:bg-transparent';
+
+/**
+ * ONE RECORD AT PHONE WIDTH: a group of ruled lines, not a card
+ * (`request-list-redesign` R4/R10, `files-view-redesign` R3 — both from UI-23).
+ *
+ * A screen too narrow for nine columns gets a genuinely DIFFERENT presentation rather than
+ * a re-flowed table (`lib/layout/viewport.ts` owns the crossover), and this is the box each
+ * record is drawn in: the hairline beneath it is the whole treatment, the page padding is
+ * put back inside it, and it carries NO MARGIN — so consecutive records touch and the
+ * listing reads as one ruled sequence rather than as the stack of boxes every listing in
+ * this design names as an anti-goal. That is measurable: a card stack leaves a visible
+ * gutter between each pair, a hairline rule costs nothing at all.
+ *
+ * The LAST record's rule is the listing's own closing edge, which is why the box around a
+ * narrow listing draws none of its own — unlike the wide table, whose primitive
+ * deliberately leaves its last row unruled.
+ *
+ * It is stated here rather than beside one listing because five surfaces now wear it — the
+ * expense request list's line-group and the four listings on the two expense-files screens
+ * (the register, the import preview, the rejected rows, the processing history) — and five
+ * copies of one string is how the rule under one of them quietly stops matching the rest.
+ * Padding a surface needs MORE of (a block heading opening a section of the listing) is
+ * composed on top through `cn`, never by restating this.
+ */
+export const NARROW_RECORD_CLASS = 'border-b px-4 py-3';
 
 /**
  * A word that NAMES something in a listing rather than being a value in it: a column head,

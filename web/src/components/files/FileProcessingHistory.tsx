@@ -72,11 +72,26 @@
  *   the wait, the nothing-recorded-yet sentence and a failed read, the last carrying the
  *   `alert` with the card the primitive ships with stripped off it (`RULED_ALERT_CLASS`).
  *   The wording, the roles and the one `Try again` are all unchanged.
+ *
+ * AND ON A PHONE, THE SAME HISTORY TIGHTENED (R3, source UI-23): below the one crossover
+ * `lib/layout/viewport.ts` states, each activity becomes a group of ruled lines — the
+ * activity, then the outcome recorded for it and the two times — through the shared
+ * `components/files/NarrowListing` composition every listing on these two screens wears.
+ * The table is not rendered at all at that width: four columns of timestamps inside the
+ * primitive's own `overflow-x-auto` wrapper is exactly the contained sideways scroll R3
+ * refuses. The narrow labels are the SAME {@link COLUMN} wording the heads use, and an
+ * activity still running says the same "not recorded yet" in both.
  */
 
 import { TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
+import {
+  NarrowField,
+  NarrowListing,
+  NarrowRecord,
+  NarrowRecordLine,
+} from '@/components/files/NarrowListing';
 import {
   LISTING_EDGE_PADDING_CLASS,
   LISTING_LABEL_CLASS,
@@ -104,6 +119,7 @@ import {
   fetchFileProcessingHistory,
   processingHistoryFailureMessage,
 } from '@/lib/api/files';
+import { useNarrowViewport } from '@/lib/layout/useNarrowViewport';
 
 import type { FileProcessLog, FileProcessLogList } from '@/types/files';
 
@@ -139,13 +155,32 @@ const NOT_RECORDED_YET = 'Not recorded yet';
  */
 const NOT_RECORDED_CELL_CLASS = 'text-muted-foreground';
 
-/** The four columns this history has always had. R18 restyles them; it renames none. */
+/**
+ * The four columns this history has always had. R18 restyles them; it renames none — and
+ * the phone-width group labels its own fields with these same words (R3), because a column
+ * head and a field label are the same object in this design.
+ */
 const COLUMN = {
   activity: 'Activity',
   outcome: 'Outcome',
   started: 'Started',
   finished: 'Finished',
 } as const;
+
+/**
+ * What the history IS, for a phone-width reader who meets the list without seeing its
+ * shape. The wide presentation says it in a table caption; at this width there is no
+ * caption, so the list says it of itself.
+ */
+const NARROW_LISTING_LABEL = 'Processing activities recorded for this file';
+
+/**
+ * An activity's own key: nothing on one is documented as unique — a retry re-runs the same
+ * activity name — so its position in the answer completes the key rather than standing in
+ * for it. Stated once, because both presentations key their records by it.
+ */
+const activityKey = (activity: FileProcessLog, position: number): string =>
+  `${activity.ActivityName}|${activity.StartDate}|${String(position)}`;
 
 /** Where the history is: being read, read, or unreadable. */
 type HistoryState =
@@ -183,6 +218,12 @@ export function FileProcessingHistory({
   const [state, setState] = useState<HistoryState>(LOADING);
   /** Bumped by Try again; asking for the history again is what re-runs the read. */
   const [readsRequested, setReadsRequested] = useState(0);
+  /**
+   * Whether the reader is at phone width, which decides which of the two presentations of
+   * this history is in the markup at all (R3). One crossover, read through the one hook
+   * every listing in the app asks with — never a second breakpoint of this section's own.
+   */
+  const narrowViewport = useNarrowViewport();
 
   /**
    * Reads the history and puts what came back on screen.
@@ -306,6 +347,61 @@ export function FileProcessingHistory({
           <div className={`${RULED_BAND_CLASS} py-8`}>
             <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
           </div>
+        ) : narrowViewport ? (
+          /* THE SAME HISTORY ON A PHONE (R3, source UI-23): each activity is one group of
+             ruled lines — the activity, then the outcome recorded for it and the two times
+             — and the groups run together as one ruled sequence rather than standing apart
+             as boxes (BR9). The wide table is not rendered at all here: four columns of
+             timestamps inside the primitive's `overflow-x-auto` wrapper is precisely the
+             contained sideways scroll R3 refuses. An activity still running says exactly
+             what it says in the table: nothing is invented for either of its two absent
+             values. */
+          <NarrowListing label={NARROW_LISTING_LABEL}>
+            {state.activities.map((activity, position) => (
+              <NarrowRecord key={activityKey(activity, position)}>
+                {/* Which activity this was — the primary identifier UI-23 asks for. Prose,
+                    so it stays in the text face. */}
+                <NarrowRecordLine>
+                  <span className="break-words">{activity.ActivityName}</span>
+                </NarrowRecordLine>
+
+                {/* What came of it, and when it ran: the three key values, each keeping
+                    its own label with its own value. */}
+                <NarrowRecordLine>
+                  <NarrowField label={COLUMN.outcome}>
+                    <span
+                      className={
+                        activity.DecisionResult === undefined
+                          ? NOT_RECORDED_CELL_CLASS
+                          : undefined
+                      }
+                    >
+                      {activity.DecisionResult ?? NOT_RECORDED_YET}
+                    </span>
+                  </NarrowField>
+                </NarrowRecordLine>
+
+                <NarrowRecordLine>
+                  <NarrowField label={COLUMN.started}>
+                    <span className={NOTATION_CELL_CLASS}>
+                      {activity.StartDate}
+                    </span>
+                  </NarrowField>
+                  <NarrowField label={COLUMN.finished}>
+                    <span
+                      className={
+                        activity.EndDate === undefined
+                          ? NOT_RECORDED_CELL_CLASS
+                          : NOTATION_CELL_CLASS
+                      }
+                    >
+                      {activity.EndDate ?? NOT_RECORDED_YET}
+                    </span>
+                  </NarrowField>
+                </NarrowRecordLine>
+              </NarrowRecord>
+            ))}
+          </NarrowListing>
         ) : (
           /* The history runs full-bleed to the page padding, so every hairline row rule
              reaches the edge of the page while the values inside keep that padding
@@ -341,10 +437,7 @@ export function FileProcessingHistory({
               <TableBody>
                 {state.activities.map((activity, position) => (
                   <TableRow
-                    // Nothing on an activity is documented as unique — a retry re-runs
-                    // the same activity name — so the position in the answer completes
-                    // the key rather than standing in for it.
-                    key={`${activity.ActivityName}|${activity.StartDate}|${String(position)}`}
+                    key={activityKey(activity, position)}
                     className={LISTING_ROW_CLASS}
                   >
                     {/* The activity's name and the outcome recorded for it are prose,
