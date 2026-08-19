@@ -12,18 +12,56 @@
       "request-list-redesign"
     ],
     "introducesSharedSurface": false,
-    "unverifiedAssumptions": [],
+    "unverifiedAssumptions": [
+      "The register's section heading 'Submitted files' is now set as a small capitalised tracked label rather than a bold title, matching the column heads below it. That is a judgement about how the screen should read, not something the brief states outright — worth a glance to confirm it looks like a document label rather than a heading that got lost."
+    ],
     "manualTestResults": []
   },
-  "phase": "READY-TO-BUILD",
+  "phase": "BUILD",
   "stories": {
-    "1": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "2": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "3": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "4": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "5": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
-    "6": { "status": "pending", "commit": null, "e2eStatus": "deferred", "startedAt": null, "completedAt": null }
+    "1": {
+      "status": "complete",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": "2026-08-19T08:53:42.611Z",
+      "completedAt": "2026-08-19T09:11:47.810Z"
+    },
+    "2": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "4": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "5": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "6": {
+      "status": "pending",
+      "commit": null,
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
   },
   "halt": null,
-  "lastUpdated": "2026-08-19T06:22:17.985Z"
+  "lastUpdated": "2026-08-19T09:11:47.810Z"
 }

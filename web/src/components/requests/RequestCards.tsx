@@ -80,7 +80,10 @@
 
 import { memo } from 'react';
 
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  FIELD_LABEL_CLASS,
+  PAGE_BLEED_CLASS,
+} from '@/components/requests/fieldNotation';
 import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RequestActions } from '@/components/requests/RequestActions';
@@ -117,14 +120,6 @@ const labelOfColumn = (key: RequestColumn): string =>
 
 const AMOUNT_LABEL = labelOfColumn('amount');
 const TRANSACTION_DATE_LABEL = labelOfColumn('transactionDate');
-
-/**
- * Full-bleed to the page padding (R13 — the same convention the control block, the
- * narrowing strip and the wide listing use): the box is widened past `<main>`'s `px-4` so
- * every hairline reaches the edge of the page, and each group puts that padding back
- * inside.
- */
-const PAGE_BLEED_CLASS = '-mx-4';
 
 /**
  * One request's group of ruled lines. The hairline beneath it is the whole treatment —

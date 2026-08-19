@@ -70,8 +70,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import {
   FIELD_LABEL_CLASS,
-  RULED_ACTION_CLASS,
   RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
   RULED_FIELD_CLASS,
 } from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
@@ -170,7 +170,7 @@ const PAGE_SIZE_FIELD_CLASS = `${RULED_FIELD_CLASS} h-8 w-auto min-w-14 justify-
  * these two apart is the word and the direction of the glyph, never weight or colour. The
  * primitive's own `disabled:opacity-50` is what makes an unusable control look unusable.
  */
-const PAGE_CONTROL_CLASS = `${RULED_ACTION_CLASS} gap-1.5`;
+const PAGE_CONTROL_CLASS = RULED_ACTION_WITH_ICON_CLASS;
 
 interface RequestListPaginationProps {
   /** How many requests the current search and filters left — what is being paged. */

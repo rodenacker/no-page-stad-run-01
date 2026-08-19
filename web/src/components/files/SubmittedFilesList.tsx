@@ -42,11 +42,53 @@
  *   twice. The rejected-rows one does not fade and carries the way to the file's own
  *   rejected rows (`file-validation-and-retry` FR9 / NFR-3).
  *
- * The status chip pairs an intent colour with the status TEXT and an icon, never
+ * HOW IT IS DRAWN — A REGISTER OF BATCHES, ONE RULED LINE EACH
+ * (`files-view-redesign` R10/R11/R12, design brief §3 "Files list… a register of
+ * batches, one ruled line each with its control totals"). Every part of that is
+ * imported from `components/requests/fieldNotation.ts`, never restated here (BR6):
+ *
+ * - **Full-bleed to the page padding.** The listing's box is widened past `<main>`'s
+ *   own `px-4` (`PAGE_BLEED_CLASS`) so every hairline row rule reaches the edge of
+ *   the page, with that padding put back on the outer cells
+ *   (`LISTING_EDGE_PADDING_CLASS`) so the values stay lined up with the labels above
+ *   them. The closing hairline is drawn on that box, because the table primitive
+ *   deliberately leaves its last row unruled and a register worked down a page needs
+ *   a bottom edge as much as it needs the rules between its lines.
+ * - **There is no card, no panel and no striped-row treatment.** What frames the
+ *   register is the ruling. The primitive's per-row hover fill and its colour
+ *   transition are cancelled at the row (`LISTING_ROW_CLASS`): a row that tints under
+ *   the pointer is the stripe arriving one row at a time, which this design names as
+ *   an anti-goal (BR9).
+ * - **The column heads and this section's own heading are the same object**: the
+ *   tracked 11px mono micro-label at the muted ink (`LISTING_LABEL_CLASS`). The
+ *   capitals are `text-transform`, so every heading's wording — and the table's own
+ *   accessible structure — is exactly the words the app wrote. Never retype a head in
+ *   capitals to get the look.
+ * - **A file's own record count is its "control total"**: right-aligned, mono and
+ *   tabular (`FIGURE_CELL_CLASS`) so the digits line up column-perfect down the
+ *   register. There is deliberately NO register-spanning total above the rows (BR5) —
+ *   each line states its own, which is the whole of what this design asks for here.
+ * - **The file name, the setting and the process date are identifiers**, set in the
+ *   fixed-field face (`NOTATION_CELL_CLASS`) with no added weight: down a ruled column
+ *   the mono face is what makes one file scannable against the next, so a `font-medium`
+ *   on top of it is the card-era treatment rather than this one. The most recent
+ *   activity is prose and stays in the text face.
+ * - **Every control is a tracked label on a rule** (`RULED_ACTION_WITH_ICON_CLASS`,
+ *   with its glyph sized on the ICON — a glyph that omits `RULED_ACTION_ICON_CLASS`
+ *   quietly renders at the button primitive's 16px). That is the same notation the
+ *   expense request's own controls wear, and it carries no colour: a delete is
+ *   protected by its confirmation, not by how heavy or how red its button is.
+ * - **Each answer that is not a row is a full-bleed ruled band** (`RULED_BAND_CLASS`)
+ *   — the wait, nothing-submitted-yet, a failed read and a refused delete. With the
+ *   card gone there is nothing else framing an answer, and the wording, the roles and
+ *   the actions of all four are untouched.
+ *
+ * The status pairs an intent colour with the status TEXT and a drawn shape, never
  * colour alone (brief §Feature NFRs, source UI-21). It is `components/files/
  * FileStatusBadge` — the one file-status vocabulary in the project, shared with a
  * file's own page, and itself built on the shared `components/status/StatusBadge`,
- * which owns the intents and their tokens.
+ * which owns the intents and their shapes and has read as a RULED MARK rather than a
+ * pill project-wide since `request-list-redesign`. Nothing here draws a second one.
  *
  * Each row also offers the way INTO that file's own page, as a real navigational link
  * carrying the file's identifier (`file-validation-and-retry` FR8): a link, not a
@@ -107,6 +149,18 @@ import {
   useDeleteFileConfirmation,
 } from '@/components/files/DeleteFileConfirmation';
 import { FileStatusBadge } from '@/components/files/FileStatusBadge';
+import {
+  FIGURE_CELL_CLASS,
+  LISTING_EDGE_PADDING_CLASS,
+  LISTING_LABEL_CLASS,
+  LISTING_ROW_CLASS,
+  NOTATION_CELL_CLASS,
+  PAGE_BLEED_CLASS,
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -144,6 +198,27 @@ const HEADING = 'Submitted files';
 
 /** Announced while the list is being read, so the wait is not colour and motion only. */
 const LOADING_MESSAGE = 'Loading the submitted files…';
+
+/**
+ * How many ruled placeholder lines stand in for the register while it is being read.
+ *
+ * Enough to read as a register rather than as one stray line, few enough that the answer
+ * landing does not shorten the page. They are `aria-hidden`: what a screen reader is given
+ * is {@link LOADING_MESSAGE}, because a shape says nothing.
+ */
+const PLACEHOLDER_LINES = [1, 2, 3];
+
+/**
+ * A control a register row offers: the app's one ruled action notation, imported whole.
+ *
+ * Named here only so the two controls in a row cannot be given different ones by accident.
+ * It is deliberately the SAME value the expense request's controls wear rather than a
+ * files-only variant of it (`files-view-redesign` R12/BR6) — including its ink: the delete
+ * carried `text-destructive` in the card era, and a single red control repeated once per
+ * row is the loudest thing on a screen whose colour budget is ground, ink, hairline and the
+ * four status tokens.
+ */
+const ROW_ACTION_CLASS = RULED_ACTION_WITH_ICON_CLASS;
 
 /** Nothing has been submitted yet — an empty list is an answer, not a failure. */
 const EMPTY_MESSAGE = 'No files have been submitted yet.';
@@ -690,14 +765,20 @@ export function SubmittedFilesList({
 
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      {/* Focusable only on purpose (`tabIndex={-1}`), so it can be where a keyboard
+      {/* The register's own name, in the same tracked micro-label notation as the column
+          heads below it — a printed listing labels itself in the notation it is set in,
+          and a bold sentence-case title here would be the last of the card era's
+          hierarchy left on the screen (R10). The capitals are `text-transform`, so the
+          heading a screen reader is given is still the words the app wrote.
+
+          Focusable only on purpose (`tabIndex={-1}`), so it can be where a keyboard
           reader is put when the row they were standing on is deleted out from under
           them — without joining the tab order for anybody else. */}
       <h2
         id={HEADING_ID}
         ref={headingRef}
         tabIndex={-1}
-        className="text-lg font-semibold tracking-tight"
+        className={LISTING_LABEL_CLASS}
       >
         {HEADING}
       </h2>
@@ -708,16 +789,24 @@ export function SubmittedFilesList({
           refused file, each naming its own: two files refused is two answers, not one
           overwriting the other. */}
       {refusedDeletes.map((refused) => (
-        <Alert key={refused.file.Id}>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {deleteRefusedTitleFor(refused.file)}
-          </AlertTitle>
-          <AlertDescription className="text-foreground">
-            <p>{refused.message}</p>
-            <p>{STILL_LISTED_MESSAGE}</p>
-          </AlertDescription>
-        </Alert>
+        /* Composed as a ruled band, like every other answer on this register that is
+           not a row (R12): the `alert` itself is stripped of the card the primitive
+           ships with — no radius, no border of its own, no surface — and the band's
+           own hairlines frame it, so a refusal reads as this register's own place
+           rather than as a panel floating over it (BR9). Its wording and its role are
+           untouched. */
+        <div key={refused.file.Id} className={`${RULED_BAND_CLASS} py-4`}>
+          <Alert className="rounded-none border-0 bg-transparent p-0">
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className="line-clamp-none">
+              {deleteRefusedTitleFor(refused.file)}
+            </AlertTitle>
+            <AlertDescription className="text-foreground">
+              <p>{refused.message}</p>
+              <p>{STILL_LISTED_MESSAGE}</p>
+            </AlertDescription>
+          </Alert>
+        </div>
       ))}
 
       {/* One line per delete on its way, each its own live region naming its own file —
@@ -734,118 +823,202 @@ export function SubmittedFilesList({
       ))}
 
       {state.phase === 'loading' && (
-        <div role="status" className="grid gap-2">
+        <div role="status">
           <span className="sr-only">{LOADING_MESSAGE}</span>
-          {/* Placeholders stand in for the rows that are on their way; the sentence
-              above is what a screen reader is given, since a shape says nothing. */}
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
+          {/* Placeholders stand in for the lines that are on their way, ruled and
+              full-bleed exactly as those lines will be — so the register does not jump
+              from a stack of floating boxes into a ruled page when the answer lands.
+              Square, because nothing in this world has a radius. The sentence above is
+              what a screen reader is given, since a shape says nothing. */}
+          <div aria-hidden="true" className={`${PAGE_BLEED_CLASS} border-y`}>
+            {PLACEHOLDER_LINES.map((line) => (
+              <div key={line} className="border-b px-4 py-3.5 last:border-b-0">
+                <Skeleton className="h-4 w-full rounded-none" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {state.phase === 'failed' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{state.message}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={readAgain}
-            >
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
+        /* The read left the reader with nothing, so this band stands where the register
+           would be, ruled and full-bleed like it (R12). The `alert` is stripped of the
+           primitive's card and the band's own hairlines frame it; the wording, the role
+           and the retry are unchanged, the retry now wearing the same ruled notation as
+           every other control on the screen. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className="rounded-none border-0 bg-transparent p-0">
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p>{state.message}</p>
+              {/* The bare notation, without the gap a glyph needs: this control is
+                  words alone, exactly as the request list's own retry is. */}
+              <Button
+                type="button"
+                variant="ghost"
+                className={RULED_ACTION_CLASS}
+                onClick={readAgain}
+              >
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {state.phase === 'loaded' &&
         (state.files.length === 0 ? (
-          <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
+          /* Nothing has been submitted yet — an answer, and with no card to sit inside
+             it is composed as a band of its own: the same hairlines and the same full
+             bleed the lines would have had, so the reader is looking at an empty
+             register rather than at a sentence on a blank page. The wording is
+             unchanged, and it offers no next step — the slip that submits a file is
+             already on this screen, immediately above. */
+          <div className={`${RULED_BAND_CLASS} py-10`}>
+            <p className="text-muted-foreground max-w-prose">{EMPTY_MESSAGE}</p>
+          </div>
         ) : (
-          <Table>
-            <TableCaption className="sr-only">
-              Submitted expense files, with the setting each was sent against,
-              when it was processed, its status, its most recent processing
-              activity, how many records it holds and what can be done with it.
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">File</TableHead>
-                <TableHead scope="col">File setting</TableHead>
-                <TableHead scope="col">Processed</TableHead>
-                <TableHead scope="col">Status</TableHead>
-                <TableHead scope="col">Most recent activity</TableHead>
-                <TableHead scope="col" className="text-right">
-                  Records
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  <span className="sr-only">{ACTIONS_COLUMN_LABEL}</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {state.files.map((file) => (
-                <TableRow key={file.Id}>
-                  <TableCell className="font-medium">
-                    {file.CurrentFileName}
-                  </TableCell>
-                  <TableCell>{file.SettingName}</TableCell>
-                  <TableCell>{file.ProcessDate}</TableCell>
-                  <TableCell>
-                    <FileStatusBadge status={file.CurrentStatus} />
-                  </TableCell>
-                  <TableCell>{file.LastExecutedActivityName}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {file.RecordCount}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-1">
-                      {/* A real link, so the file's page can be opened in a new tab
-                          and is announced as somewhere to go — never a button that
-                          pushes a route. */}
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={submittedFileAddress(file)}>
-                          <PanelRightOpen aria-hidden="true" />
-                          {OPEN_LABEL}{' '}
-                          <span className="sr-only">{openLabelFor(file)}</span>
-                        </Link>
-                      </Button>
-
-                      {/* The delete, IN the row beside the link and reachable by Tab
-                          alone — never behind a menu. There is no status condition on
-                          it: a file may be deleted whatever its status, an `Imported`
-                          one included (R3/BR1). A session the server did not name gets
-                          no markup for it at all. */}
-                      {actingUploader !== undefined && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            // Asking is the event that both opens the confirmation and
-                            // starts reading what this file would destroy — never a
-                            // render reacting to the dialog.
-                            deleteConfirmation.ask(file);
-                          }}
-                        >
-                          <Trash2 aria-hidden="true" />
-                          {DELETE_FILE_LABEL}{' '}
-                          <span className="sr-only">
-                            {deleteLabelFor(file)}
-                          </span>
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+          /* The register runs full-bleed to the page padding (R10): the box is widened
+             past `<main>`'s `px-4` so every hairline row rule reaches the edge of the
+             page, while the values inside keep that padding through the outer cells. The
+             closing hairline is drawn here rather than on the last row, which the table
+             primitive deliberately leaves unruled — a register worked down a page needs a
+             bottom edge as much as it needs the rules between its lines. There is no
+             card, no panel and no striped-row treatment around it: what frames the
+             register is the ruling. */
+          <div className={`${PAGE_BLEED_CLASS} border-b`}>
+            <Table className={LISTING_EDGE_PADDING_CLASS}>
+              <TableCaption className="sr-only">
+                Submitted expense files, with the setting each was sent against,
+                when it was processed, its status, its most recent processing
+                activity, how many records it holds and what can be done with
+                it.
+              </TableCaption>
+              <TableHeader>
+                <TableRow className={LISTING_ROW_CLASS}>
+                  {/* The column heads: 11px tracked mono micro-labels at the muted ink,
+                      capitalised by `text-transform` so each head's wording is exactly
+                      the word the app wrote (R10). */}
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    File
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    File setting
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    Processed
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    Status
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    Most recent activity
+                  </TableHead>
+                  {/* Heads a column of figures, so it is right-aligned over them. */}
+                  <TableHead
+                    scope="col"
+                    className={`${LISTING_LABEL_CLASS} text-right`}
+                  >
+                    Records
+                  </TableHead>
+                  {/* The controls column: named for a screen reader, and nothing to
+                      label on the page — the controls carry their own words. */}
+                  <TableHead scope="col" className="text-right">
+                    <span className="sr-only">{ACTIONS_COLUMN_LABEL}</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {state.files.map((file) => (
+                  // Keyed by the file's own id, which is what lets a re-read bring a
+                  // line UP TO DATE rather than rebuilding it — a rebuilt row drops the
+                  // keyboard of whoever was standing on it (story 1 AC-5).
+                  <TableRow key={file.Id} className={LISTING_ROW_CLASS}>
+                    {/* This batch's real name, and the setting it was sent against: the
+                        two identifiers a register of batches is read by, in the
+                        fixed-field face and at no added weight. */}
+                    <TableCell className={NOTATION_CELL_CLASS}>
+                      {file.CurrentFileName}
+                    </TableCell>
+                    <TableCell className={NOTATION_CELL_CLASS}>
+                      {file.SettingName}
+                    </TableCell>
+                    {/* The process date exactly as the service wrote it (BR5) — a fixed
+                        field, not a figure to be added up. */}
+                    <TableCell className={NOTATION_CELL_CLASS}>
+                      {file.ProcessDate}
+                    </TableCell>
+                    <TableCell>
+                      <FileStatusBadge status={file.CurrentStatus} />
+                    </TableCell>
+                    {/* Prose, so it stays in the text face. */}
+                    <TableCell>{file.LastExecutedActivityName}</TableCell>
+                    {/* This line's own control total (R11): right-aligned, mono and
+                        tabular, so the digits line up down the column. Its own — there
+                        is no register-spanning total anywhere on this screen (BR5). */}
+                    <TableCell className={FIGURE_CELL_CLASS}>
+                      {file.RecordCount}
+                    </TableCell>
+                    {/* The line's own controls, held to the right-hand edge of the page
+                        so they read as a column of margin annotations down the register
+                        rather than as a ragged band in the middle of it. */}
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                        {/* A real link, so the file's page can be opened in a new tab
+                            and is announced as somewhere to go — never a button that
+                            pushes a route. */}
+                        <Button
+                          asChild
+                          variant="ghost"
+                          className={ROW_ACTION_CLASS}
+                        >
+                          <Link href={submittedFileAddress(file)}>
+                            <PanelRightOpen
+                              aria-hidden="true"
+                              className={RULED_ACTION_ICON_CLASS}
+                            />
+                            {OPEN_LABEL}{' '}
+                            <span className="sr-only">
+                              {openLabelFor(file)}
+                            </span>
+                          </Link>
+                        </Button>
+
+                        {/* The delete, IN the row beside the link and reachable by Tab
+                            alone — never behind a menu. There is no status condition on
+                            it: a file may be deleted whatever its status, an `Imported`
+                            one included (R3/BR1). A session the server did not name gets
+                            no markup for it at all. */}
+                        {actingUploader !== undefined && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className={ROW_ACTION_CLASS}
+                            onClick={() => {
+                              // Asking is the event that both opens the confirmation and
+                              // starts reading what this file would destroy — never a
+                              // render reacting to the dialog.
+                              deleteConfirmation.ask(file);
+                            }}
+                          >
+                            <Trash2
+                              aria-hidden="true"
+                              className={RULED_ACTION_ICON_CLASS}
+                            />
+                            {DELETE_FILE_LABEL}{' '}
+                            <span className="sr-only">
+                              {deleteLabelFor(file)}
+                            </span>
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ))}
 
       {/* The epic's ONE confirmation, shared with the file's own page — it names the

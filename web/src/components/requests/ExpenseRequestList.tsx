@@ -438,7 +438,13 @@ import { BatchControlBlock } from '@/components/requests/BatchControlBlock';
 import { ExportRequestsAction } from '@/components/requests/ExportRequestsAction';
 import {
   FIELD_LABEL_CLASS,
+  FIGURE_CELL_CLASS,
+  LISTING_EDGE_PADDING_CLASS,
+  LISTING_ROW_CLASS,
+  NOTATION_CELL_CLASS,
+  PAGE_BLEED_CLASS,
   RULED_ACTION_CLASS,
+  RULED_BAND_CLASS,
 } from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
@@ -653,51 +659,13 @@ const ACTIONS_COLUMN_LABEL = 'Actions';
 const GUTTER_COLUMN_LABEL = 'Exceptions and selection';
 
 /**
- * FULL-BLEED TO THE PAGE PADDING, stated once for every part of this screen that runs
- * edge to edge (`request-list-redesign` R13 — the same convention the control block and
- * the narrowing strip already use).
- *
- * `-mx-4` cancels `<main>`'s own `px-4`, so the element's box — and therefore any rule
- * drawn on it — reaches the edge of the page; `px-4` puts the padding back inside, so the
- * content still lines up with the app's name in the header, with the control block's
- * labels and with the strip's fields above it. If the layout's horizontal padding
- * changes, this changes with it.
+ * The full bleed, the ruled band, the listing's edge padding and the listed row's own
+ * treatment all live in `fieldNotation.ts` now (`PAGE_BLEED_CLASS`, `RULED_BAND_CLASS`,
+ * `LISTING_EDGE_PADDING_CLASS`, `LISTING_ROW_CLASS`, imported above): `files-view-redesign`
+ * carries this same ruled listing onto the expense-files screens, and a second copy of any
+ * of them under `components/files/` is how the rule weight or the bleed on one surface
+ * quietly stops matching the rest (that epic's BR6).
  */
-const PAGE_BLEED_CLASS = '-mx-4';
-const FULL_BLEED_CLASS = `${PAGE_BLEED_CLASS} px-4`;
-
-/**
- * A place in the listing that is not a row: the wait, an empty batch, a failed read, a
- * narrowing that hid everything, and the notice saying the list has stopped keeping
- * itself current.
- *
- * With the card gone (R13/AC-1) there is nothing framing any of these but the ruling
- * itself, so each one is a full-bleed band closed by a hairline top and bottom — the same
- * rule weight the rows carry, so an answer reads as part of the listing rather than as
- * text stranded on a blank page. The vertical room is what keeps it from reading as one
- * more row.
- */
-const RULED_BAND_CLASS = `${FULL_BLEED_CLASS} border-y`;
-
-/**
- * The page padding, applied to the listing's own outer cells instead of to a box around
- * it. The table itself is full-bleed so every hairline row rule reaches the edge of the
- * page like the strip's rule above it; putting the padding on the first and last cell is
- * what keeps the values inside those rules lined up with everything else on the screen.
- */
-const LISTING_EDGE_PADDING_CLASS =
-  '[&_th:first-child]:pl-4 [&_td:first-child]:pl-4 [&_th:last-child]:pr-4 [&_td:last-child]:pr-4';
-
-/**
- * A listed row (R13/AC-1): the hairline rule beneath it is the whole treatment. The
- * primitive's hover fill is cancelled here rather than in the primitive itself — the files
- * screens are not restyled by this epic (R28) — because a row that tints under the pointer
- * is the striped-table treatment arriving one row at a time, and BR8 keeps this screen's
- * one motion grammar for a decision resolving. Cancelling the transition with it also
- * keeps a page of rows off the compositor at the 10,000-request volume (R8).
- */
-const LISTING_ROW_CLASS =
-  'transition-none hover:bg-transparent has-aria-expanded:bg-transparent';
 
 /**
  * The reserved gutter's own cell, for the heading row and for every listed row alike
@@ -772,19 +740,10 @@ const EXCEPTION_RULE_CLASS = 'border-l-warning';
  */
 const DECIDED_ROW_CLASS = 'text-muted-foreground';
 
-/**
- * A figure in the listing: Azeret Mono, tabular, and right-aligned so the digits line up
- * column-perfect down the page (R13/AC-2).
- */
-const FIGURE_CELL_CLASS = 'font-mono text-right tabular-nums';
-
-/**
- * A fixed-field value that is not a figure to be added up — the reference, the masked
- * account number, the transaction date as the service wrote it. Mono, because that is the
- * notation this design reads them in (project.md §Styling & Branding), and left where the
- * column starts.
- */
-const NOTATION_CELL_CLASS = 'font-mono';
+/* A figure cell and a fixed-field cell are `fieldNotation.ts`'s `FIGURE_CELL_CLASS` /
+   `NOTATION_CELL_CLASS`, imported above — the files register, the import preview and the
+   rejected rows read their identifiers and their counts in the same notation
+   (`files-view-redesign` R11/R15/R16, BR6). */
 
 /** A stable empty set, so narrowing is not recomputed while the list is not loaded. */
 const NO_REQUESTS: TransactionRead[] = [];

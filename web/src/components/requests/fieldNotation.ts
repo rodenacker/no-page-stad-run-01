@@ -91,3 +91,104 @@ export const RULED_ACTION_CLASS = `${FIELD_LABEL_CLASS} border-input h-auto roun
  * omits this quietly renders at the primitive's 16px rather than at the notation's size.
  */
 export const RULED_ACTION_ICON_CLASS = 'size-3';
+
+/**
+ * A ruled action that carries a glyph beside its words — the common case.
+ *
+ * {@link RULED_ACTION_CLASS} deliberately states no gap, because the notation is worn by
+ * controls with and without a glyph. Every control that HAS one needs the same gap, so
+ * the pair is stated once here rather than composed per surface: the expense request's
+ * own three controls and each register row's Open / Delete are the same object, and a
+ * second copy of `gap-1.5` beside a second copy of the notation is how one of them
+ * quietly stops matching the rest.
+ */
+export const RULED_ACTION_WITH_ICON_CLASS = `${RULED_ACTION_CLASS} gap-1.5`;
+
+/**
+ * FULL-BLEED TO THE PAGE PADDING, stated once for every surface in the app that runs edge
+ * to edge (`request-list-redesign` R13, `files-view-redesign` R10/R15/R16).
+ *
+ * `-mx-4` cancels `<main>`'s own `px-4`, so the element's box — and therefore any rule
+ * drawn on it — reaches the edge of the page; `px-4` puts the padding back inside, so the
+ * content still lines up with the app's name in the header and with every label above it.
+ * If the authenticated layout's horizontal padding changes, this changes with it.
+ *
+ * Both halves are exported because a listing needs the bleed WITHOUT the padding: a table
+ * puts the page padding on its own outer cells instead ({@link LISTING_EDGE_PADDING_CLASS}),
+ * which is what keeps the values inside the rules aligned with everything else.
+ */
+export const PAGE_BLEED_CLASS = '-mx-4';
+export const FULL_BLEED_CLASS = `${PAGE_BLEED_CLASS} px-4`;
+
+/**
+ * A place in a listing that is NOT a row: a wait, an empty set, a failed read, a notice
+ * about the reading itself, a refusal reported behind a closed dialog.
+ *
+ * With the card gone from every listing in this design there is nothing framing any of
+ * these but the ruling itself, so each one is a full-bleed band closed by a hairline top
+ * and bottom — the same rule weight the rows carry, so an answer reads as part of the
+ * listing rather than as text stranded on a blank page. The vertical room the surface adds
+ * (`py-*`) is what keeps it from reading as one more row.
+ */
+export const RULED_BAND_CLASS = `${FULL_BLEED_CLASS} border-y`;
+
+/**
+ * The page padding, applied to a listing's own outer cells instead of to a box around it.
+ *
+ * The table itself is full-bleed ({@link PAGE_BLEED_CLASS}) so every hairline row rule
+ * reaches the edge of the page; putting the padding on the first and last cell is what
+ * keeps the values inside those rules lined up with the labels and bands above them.
+ */
+export const LISTING_EDGE_PADDING_CLASS =
+  '[&_th:first-child]:pl-4 [&_td:first-child]:pl-4 [&_th:last-child]:pr-4 [&_td:last-child]:pr-4';
+
+/**
+ * A listed row: the hairline rule beneath it (the table primitive's own `border-b`) is the
+ * whole treatment.
+ *
+ * This cancels the primitive's per-row hover fill and its colour transition, and it is the
+ * requirement rather than a preference: a row that tints under the pointer is the
+ * striped-table treatment arriving one row at a time, which every listing in this design
+ * names as an anti-goal. Cancelling the transition with it also keeps a page of rows off
+ * the compositor at volume.
+ */
+export const LISTING_ROW_CLASS =
+  'transition-none hover:bg-transparent has-aria-expanded:bg-transparent';
+
+/**
+ * A word that NAMES something in a listing rather than being a value in it: a column head,
+ * and a block's own heading over the rules beneath it.
+ *
+ * The tracked micro-label at `--muted-foreground`, so the ink belongs to the values rather
+ * than to the words naming them — and one string, because a column head and the heading
+ * above the block it heads are the same object in this design (`request-list-redesign` R13,
+ * `files-view-redesign` R10/R15). It also cancels the table primitive's own head weight and
+ * near-black ink.
+ *
+ * The capitals are `text-transform`, so the wording — and any accessible name built from
+ * it — still reads as words: never retype a label in capitals to get the look. Alignment
+ * belongs to the surface: a figure column adds `text-right` itself.
+ *
+ * A head that carries a CONTROL (the request list's sort buttons) wears
+ * {@link FIELD_LABEL_CLASS} on the control instead and keeps only the ink on the `th`,
+ * because the primitive's own selectors beat a `font-*` utility inherited from the cell.
+ */
+export const LISTING_LABEL_CLASS = `${FIELD_LABEL_CLASS} text-muted-foreground`;
+
+/**
+ * A figure in a listing: Azeret Mono, tabular, and right-aligned, so the digits line up
+ * column-perfect down the page (`request-list-redesign` R13, `files-view-redesign` R11).
+ */
+export const FIGURE_CELL_CLASS = 'font-mono text-right tabular-nums';
+
+/**
+ * A fixed-field value that is not a figure to be added up — a reference, a file name, a
+ * setting name, a masked account number, a date as the service wrote it. Mono, because
+ * that is the notation this design reads an identifier in (project.md §Styling &
+ * Branding), and left where the column starts.
+ *
+ * Its weight is the notation's, never an added emphasis: down a ruled column the
+ * fixed-width face is what makes one identifier scannable against the next, so a
+ * `font-medium` on top of it is the card-era treatment rather than this one.
+ */
+export const NOTATION_CELL_CLASS = 'font-mono';
