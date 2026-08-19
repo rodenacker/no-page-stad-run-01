@@ -56,21 +56,20 @@
  *   focus notation, so nothing here cancels it — `shadow-none` in the shared notation
  *   removes the resting shadow only, which is also what makes the ring visible AS a
  *   change when it lands.
- * - **A label is a tracked micro-label** (`FIELD_LABEL_CLASS`), and the capitals are
+ * - **A label is a tracked micro-label** (`LISTING_LABEL_CLASS` — the same object the
+ *   register's column heads and this section's own heading are), and the capitals are
  *   `text-transform` — never retyped words. The wording a screen reader is given, and
  *   the accessible name each control takes from its label, are still the app's own
- *   sentence-case words, asterisk included.
- * - **The section names itself in the same notation the register does**
- *   (`LISTING_LABEL_CLASS`): a printed slip labels itself in the notation it is set in,
- *   and a bold sentence-case title here would be the last of the card era's hierarchy
- *   left above a ruled page.
+ *   sentence-case words, asterisk included. A printed slip labels itself in the notation
+ *   it is set in, and a bold sentence-case title here would be the last of the card era's
+ *   hierarchy left above a ruled page.
  * - **What the slip reports back is in the control-total grammar**: the report's own
- *   title is a tracked micro-label and every identifier inside it — the file's name,
- *   the setting's name — is set in the fixed-field face (`NOTATION_CELL_CLASS`), the
- *   same face the register prints those two values in one line further down. Each
- *   report is a full-bleed band closed by hairlines (`RULED_BAND_CLASS`) with the alert
- *   primitive's card stripped off it, so an answer belongs to the slip rather than
- *   floating over it.
+ *   title is a tracked micro-label (`RULED_ALERT_TITLE_CLASS`) and every identifier inside
+ *   it — the file's name, the setting's name — is set in the fixed-field face
+ *   (`NOTATION_CELL_CLASS`), the same face the register prints those two values in one
+ *   line further down. Each report is a full-bleed band closed by hairlines
+ *   (`RULED_BAND_CLASS`) with the alert primitive's card stripped off it
+ *   (`RULED_ALERT_CLASS`), so an answer belongs to the slip rather than floating over it.
  * - **The submit is a tracked label on a rule** (`RULED_ACTION_WITH_ICON_CLASS`, its
  *   glyph sized on the ICON), not a filled button: this slip has no boxes left for one
  *   to match. Its wording, and its staying unavailable until a setting and a CSV are
@@ -86,13 +85,14 @@ import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
 import {
-  FIELD_LABEL_CLASS,
   FULL_BLEED_CLASS,
   LISTING_LABEL_CLASS,
   NOTATION_CELL_CLASS,
   RULED_ACTION_CLASS,
   RULED_ACTION_ICON_CLASS,
   RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
   RULED_BAND_CLASS,
   RULED_FIELD_CLASS,
 } from '@/components/requests/fieldNotation';
@@ -173,18 +173,12 @@ const CHOOSE_AGAIN_MESSAGE =
 const RequiredMarker = () => <span aria-hidden="true">*</span>;
 
 /**
- * The label naming something on this slip, in the shared tracked micro-label notation
- * with this surface's own ink: muted, so the ink belongs to the value rather than to the
- * word naming it. The notation itself is imported, never restated (R9/BR6) — this only
- * adds what `fieldNotation.ts` deliberately leaves to the surface.
+ * A field's own label: the shared tracked micro-label at the muted ink — the same object
+ * the register's column heads and this section's own heading are (`LISTING_LABEL_CLASS`,
+ * imported and never restated, R9/BR6) — with the gap the required marker beside it needs,
+ * tighter than the `label` primitive's own, which was sized for 14px words.
  */
-const SLIP_LABEL_CLASS = `${FIELD_LABEL_CLASS} text-muted-foreground`;
-
-/**
- * A field's own label. The same micro-label, with the gap the required marker beside it
- * needs — tighter than the `label` primitive's own, which was sized for 14px words.
- */
-const SLIP_FIELD_LABEL_CLASS = `${SLIP_LABEL_CLASS} gap-1.5`;
+const SLIP_FIELD_LABEL_CLASS = `${LISTING_LABEL_CLASS} gap-1.5`;
 
 /**
  * The setting selector: the shared ruled notation (an underline and nothing else, its
@@ -218,18 +212,6 @@ const CSV_FIELD_CLASS = `${RULED_FIELD_CLASS} ${NOTATION_CELL_CLASS} h-auto w-fu
  */
 const SETTING_FIELD_WIDTH_CLASS = 'min-w-56 basis-64';
 const CSV_FIELD_WIDTH_CLASS = 'min-w-56 basis-80';
-
-/**
- * A report from the slip, stripped of the card the `alert` primitive ships with: no
- * radius, no border of its own and no surface, so the band's own hairlines are what frame
- * it (BR9). Its glyph is sized down to sit with an 11px tracked title, for the reason
- * `RULED_ACTION_ICON_CLASS` exists — a 16px mark out-weighs the words it decorates.
- */
-const SLIP_REPORT_CLASS =
-  'rounded-none border-0 bg-transparent p-0 [&>svg]:size-3.5';
-
-/** A report's own title: the tracked micro-label, unclamped so it can wrap. */
-const SLIP_REPORT_TITLE_CLASS = `${FIELD_LABEL_CLASS} line-clamp-none`;
 
 /** Where the read of the named settings is: being read, read, or unreadable. */
 type SettingsState =
@@ -429,9 +411,9 @@ export function SubmitExpenseFileForm() {
           panel floating over it (BR9). Its role and its wording are untouched. */}
       {submission.phase === 'confirmed' && (
         <div className={`${RULED_BAND_CLASS} py-4`}>
-          <Alert className={SLIP_REPORT_CLASS}>
+          <Alert className={RULED_ALERT_CLASS}>
             <CircleCheck aria-hidden="true" />
-            <AlertTitle className={SLIP_REPORT_TITLE_CLASS}>
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
               File submitted
             </AlertTitle>
             <AlertDescription className="text-foreground">
@@ -453,9 +435,9 @@ export function SubmitExpenseFileForm() {
 
       {submission.phase === 'refused' && (
         <div className={`${RULED_BAND_CLASS} py-4`}>
-          <Alert className={SLIP_REPORT_CLASS}>
+          <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
-            <AlertTitle className={SLIP_REPORT_TITLE_CLASS}>
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
               The file was not submitted
             </AlertTitle>
             <AlertDescription className="text-foreground">
@@ -480,9 +462,9 @@ export function SubmitExpenseFileForm() {
           other control on the screen: words on a rule, no box. */}
       {settings.phase === 'failed' && (
         <div className={`${RULED_BAND_CLASS} py-4`}>
-          <Alert className={SLIP_REPORT_CLASS}>
+          <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
-            <AlertTitle className={SLIP_REPORT_TITLE_CLASS}>
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
               {SETTINGS_FAILED_TITLE}
             </AlertTitle>
             <AlertDescription className="text-foreground gap-3">
@@ -642,7 +624,7 @@ export function SubmitExpenseFileForm() {
                         'Choose the CSV file of expense payment requests to submit.'
                       ) : (
                         <>
-                          <span className={SLIP_LABEL_CLASS}>
+                          <span className={LISTING_LABEL_CLASS}>
                             {CHOSEN_FILE_LABEL}
                           </span>
                           <span

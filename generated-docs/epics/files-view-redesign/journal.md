@@ -31,3 +31,22 @@
   lettering, jammed against the file name beside it. It is drawn by the browser and does not pick
   up the field's lettering on its own, so it had to be stated — plus a gap, because taking the box
   away had taken the spacing with it.
+
+## Story 3 — A file's own slip, and its processing history
+
+- **A file's own page now opens like the register line it was opened from:** the file name in the
+  typewriter face, then its setting, processed time, status, record count and latest activity as
+  small capitalised labels each sitting directly over its own value, on one ruled line that wraps
+  on a phone. The old boxed "File details" card is gone. It says exactly what it said before.
+- **The processing history is now a ruled table** — thin lines between activities, small
+  capitalised column headings, both times in the typewriter face — with no box around it. An
+  activity still running still shows no outcome and no finish time; those two cells are simply
+  greyed so the times the service did record hold the ink.
+- **Three treatments that had quietly been written out twice each are now stated once** in the
+  shared notation file and imported everywhere: the mono-tabular figure, the notice with its box
+  stripped off, and that notice's small capitalised title. The submitted-files register and the
+  submission slip now point at those shared copies instead of their own. One side effect worth
+  knowing: the register's two notices now draw their warning symbol 2px smaller, matching the
+  words beside it.
+- **"Back to Expense files" and "Load this file again" are no longer boxed buttons** — they are
+  small capitalised labels on a rule, like every other control on these two screens.

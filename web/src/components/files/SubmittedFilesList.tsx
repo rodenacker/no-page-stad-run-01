@@ -159,6 +159,7 @@ import {
   RULED_ACTION_CLASS,
   RULED_ACTION_ICON_CLASS,
   RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
   RULED_BAND_CLASS,
 } from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -796,7 +797,7 @@ export function SubmittedFilesList({
            rather than as a panel floating over it (BR9). Its wording and its role are
            untouched. */
         <div key={refused.file.Id} className={`${RULED_BAND_CLASS} py-4`}>
-          <Alert className="rounded-none border-0 bg-transparent p-0">
+          <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
             <AlertTitle className="line-clamp-none">
               {deleteRefusedTitleFor(refused.file)}
@@ -847,7 +848,7 @@ export function SubmittedFilesList({
            and the retry are unchanged, the retry now wearing the same ruled notation as
            every other control on the screen. */
         <div className={`${RULED_BAND_CLASS} py-6`}>
-          <Alert className="rounded-none border-0 bg-transparent p-0">
+          <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
             <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
             <AlertDescription className="text-foreground gap-3">

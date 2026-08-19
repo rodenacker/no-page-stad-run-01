@@ -14,7 +14,9 @@
     "introducesSharedSurface": false,
     "unverifiedAssumptions": [
       "The register's section heading 'Submitted files' is now set as a small capitalised tracked label rather than a bold title, matching the column heads below it. That is a judgement about how the screen should read, not something the brief states outright — worth a glance to confirm it looks like a document label rather than a heading that got lost.",
-      "AC-1 says the slip must be underlined fields with small capitalised labels and no card, but not how the slip as a whole is bounded. It was read as one ruled field strip closed by a single hairline at its foot — the same shape the request list's narrowing strip has above its listing — rather than each field getting a band of its own. Worth a glance to confirm that is the intended reading of 'the same control-total grammar'."
+      "AC-1 says the slip must be underlined fields with small capitalised labels and no card, but not how the slip as a whole is bounded. It was read as one ruled field strip closed by a single hairline at its foot — the same shape the request list's narrowing strip has above its listing — rather than each field getting a band of its own. Worth a glance to confirm that is the intended reading of 'the same control-total grammar'.",
+      "On the three screens that have no file to show (still loading, file not available, file could not be read), the page's own title 'Submitted file' is now set as a small capitalised label rather than a large page heading — consistent with how the register and the slip label themselves, but a judgement about hierarchy on a screen with nothing else on it.",
+      "The file's name is the largest text on its page (about 20px, typewriter face). The brief deliberately forbids a big control-total figure here (BR5), so nothing on the slip is set at display scale — worth an eye against the register it sits beside."
     ],
     "manualTestResults": []
   },
@@ -35,11 +37,11 @@
       "completedAt": "2026-08-19T09:33:46.233Z"
     },
     "3": {
-      "status": "pending",
+      "status": "complete",
       "commit": null,
       "e2eStatus": "deferred",
-      "startedAt": null,
-      "completedAt": null
+      "startedAt": "2026-08-19T09:34:36.569Z",
+      "completedAt": "2026-08-19T09:56:03.048Z"
     },
     "4": {
       "status": "pending",
@@ -64,5 +66,5 @@
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-19T09:33:46.233Z"
+  "lastUpdated": "2026-08-19T09:56:03.048Z"
 }

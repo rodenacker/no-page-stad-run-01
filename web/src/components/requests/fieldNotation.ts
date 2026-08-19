@@ -133,6 +133,37 @@ export const FULL_BLEED_CLASS = `${PAGE_BLEED_CLASS} px-4`;
 export const RULED_BAND_CLASS = `${FULL_BLEED_CLASS} border-y`;
 
 /**
+ * The `alert` primitive with the CARD it ships with taken off it, for an answer that sits
+ * inside a ruled band ({@link RULED_BAND_CLASS}) rather than floating over the page.
+ *
+ * No radius, no border of its own, no surface and no padding: the band's own hairlines are
+ * what frame it, and the padding belongs to the band. Everything the alert IS — its role,
+ * its wording, its title and description — is untouched; only the box around it goes.
+ *
+ * It is stated here rather than beside each use because a refusal on the register, a report
+ * from the submission slip, a file that cannot be opened and a history that cannot be read
+ * are all the same object in this design (`request-list-redesign` R13,
+ * `files-view-redesign` R12/BR9), and four copies of one string is how the radius or the
+ * surface quietly comes back on one of them.
+ *
+ * It sizes the alert's own glyph down with it, for the reason {@link RULED_ACTION_ICON_CLASS}
+ * exists: the primitive's 16px mark out-weighs the words it decorates once those words are
+ * a tracked micro-label ({@link RULED_ALERT_TITLE_CLASS}).
+ */
+export const RULED_ALERT_CLASS =
+  'rounded-none border-0 bg-transparent p-0 [&>svg]:size-3.5';
+
+/**
+ * An alert's own title inside a ruled band: the tracked micro-label, unclamped so a title
+ * too long for one line wraps instead of being cut off.
+ *
+ * A notice's heading is a word that NAMES what happened rather than a sentence about it, so
+ * it is the same object as a column head — and it carries no colour of its own, leaving the
+ * alert's own foreground to ink it.
+ */
+export const RULED_ALERT_TITLE_CLASS = `${FIELD_LABEL_CLASS} line-clamp-none`;
+
+/**
  * The page padding, applied to a listing's own outer cells instead of to a box around it.
  *
  * The table itself is full-bleed ({@link PAGE_BLEED_CLASS}) so every hairline row rule
@@ -176,10 +207,23 @@ export const LISTING_ROW_CLASS =
 export const LISTING_LABEL_CLASS = `${FIELD_LABEL_CLASS} text-muted-foreground`;
 
 /**
- * A figure in a listing: Azeret Mono, tabular, and right-aligned, so the digits line up
+ * A FIGURE — a number this world counts or totals: Azeret Mono and tabular, so digits are
+ * the same width wherever they are read and a figure changing in place shifts nothing
+ * around it (`request-list-redesign` R13, `files-view-redesign` R11/R17).
+ *
+ * Alignment and size deliberately belong to the surface, because the same figure is set
+ * two ways: down a listing's column it is right-aligned so the digits line up
+ * ({@link FIGURE_CELL_CLASS}), while on a slip it sits under the label naming it and must
+ * start where that label starts. Both are the same object, so the face and the tabular
+ * figures are stated once here.
+ */
+export const FIGURE_CLASS = 'font-mono tabular-nums';
+
+/**
+ * A figure in a LISTING: the figure notation, right-aligned, so the digits line up
  * column-perfect down the page (`request-list-redesign` R13, `files-view-redesign` R11).
  */
-export const FIGURE_CELL_CLASS = 'font-mono text-right tabular-nums';
+export const FIGURE_CELL_CLASS = `${FIGURE_CLASS} text-right`;
 
 /**
  * A fixed-field value that is not a figure to be added up — a reference, a file name, a
