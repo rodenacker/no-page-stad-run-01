@@ -50,11 +50,67 @@
  * attempt's rows would stay up for good (brief FR4, Key Workflow step 5). One timer on
  * the file's page drives this list, the history and the file together; this section
  * grows none of its own.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — the reject listing, in the register's own grammar
+ * (`files-view-redesign` R16, design brief §3)
+ * ---------------------------------------------------------------------------
+ * The design brief calls the import preview and these rejected rows its strongest fit,
+ * because they ARE the source artifact — "the reject listing… exactly as the document
+ * does it". So this section is drawn as the same listing `ImportPreview` draws, and every
+ * piece of the notation is IMPORTED from `components/requests/fieldNotation.ts` and never
+ * restated here (R9/BR6):
+ *
+ * - **Restyled THROUGH the Shadcn table primitive**, never replaced: real `<table>`
+ *   semantics, `<th scope="col">`, the caption and the header row all stay, because a
+ *   screen reader navigates these rows by their eight named columns.
+ * - **Full-bleed to the page padding** (`PAGE_BLEED_CLASS`) so every hairline row rule
+ *   reaches the edge of the page, with that padding put back on the outer cells
+ *   (`LISTING_EDGE_PADDING_CLASS`) so the values stay lined up with the file's own slip
+ *   above them. The closing hairline is drawn on that box: the primitive deliberately
+ *   leaves the last row unruled.
+ * - **No card and no striped row.** The rules are the whole treatment, and the
+ *   primitive's per-row hover fill and colour transition are cancelled at the row
+ *   (`LISTING_ROW_CLASS`) — a row that tints under the pointer is the stripe arriving one
+ *   row at a time (BR9).
+ * - **This section's heading and its column heads are the same object**: the tracked 11px
+ *   mono micro-label at the muted ink (`LISTING_LABEL_CLASS`). The capitals are
+ *   `text-transform`, so every head's wording — and the accessible name built from it —
+ *   is exactly the word the app wrote. R16 restyles these heads; it renames none of them.
+ * - **Reference, transaction date and the masked account number are set in the
+ *   fixed-field face** (`NOTATION_CELL_CLASS`): each is an identifier rather than a figure
+ *   to be added up. The amount is the row's own figure, so it is right-aligned and tabular
+ *   (`FIGURE_CELL_CLASS`) even where the file held something that is not a number — which
+ *   is exactly what a reader has to see to correct it. Description, transaction type and
+ *   the defect are prose and stay in the text face, at no added weight.
+ * - **Each answer that is not a row is a full-bleed ruled band** (`RULED_BAND_CLASS`) —
+ *   the wait, a body that could not be read, a refused read, and the service reporting no
+ *   rejected rows at all — the two problems carrying the `alert` with the card the
+ *   primitive ships with stripped off it (`RULED_ALERT_CLASS`). The wording, the roles and
+ *   the one way to ask again are unchanged, that control now wearing the shared ruled
+ *   action notation like every other one on this page.
+ *
+ * Nothing in this redraw changes a value, its source, when it is read, what any of these
+ * answers says, or which row a reveal acts on (R1/BR1/BR2).
  */
 
 import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
+import {
+  FIGURE_CELL_CLASS,
+  LISTING_EDGE_PADDING_CLASS,
+  LISTING_LABEL_CLASS,
+  LISTING_ROW_CLASS,
+  NOTATION_CELL_CLASS,
+  PAGE_BLEED_CLASS,
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -171,6 +227,119 @@ function RecordedValue({ value }: { value: string | number | undefined }) {
   // Printed as it arrived: an amount that is text and a date that is not a date
   // cannot be formatted, and the reader needs to see exactly what to correct.
   return <>{value}</>;
+}
+
+/**
+ * ONE REJECTED ROW of the listing, drawn in the register's own grammar (R16) — the same
+ * ruled line the import preview's own reject listing draws, since the two are the same
+ * object in this design.
+ *
+ * It is its own component so the listing's markup stays readable at the depth the ruled
+ * treatment adds, and so the row's own values — and the one control on it — are in one
+ * place. Nothing here decides anything the section did not already decide: which rows
+ * exist, which of them is revealed, and what is wrong with each are all handed in.
+ */
+function RejectedRow({
+  row,
+  position,
+  isRevealed,
+  onReveal,
+  onHide,
+}: {
+  row: ValidationErrorRow;
+  /** Where this row sits in THIS answer — the only handle the reveal has (POPIA). */
+  position: number;
+  isRevealed: boolean;
+  onReveal: (position: number) => void;
+  onHide: (position: number) => void;
+}) {
+  const accountNumber = row.AccountNumber;
+  const defectWording = defectWordingFor(row);
+  const rowLabel = rowLabelOf(row);
+
+  return (
+    <TableRow className={LISTING_ROW_CLASS}>
+      {/* The reference is this row's identifier, so it is set in the fixed-field face —
+          and at no added weight, a `font-medium` down a ruled column being the card
+          era's hierarchy rather than this one. */}
+      <TableCell className={NOTATION_CELL_CLASS}>
+        <RecordedValue value={row.Reference} />
+      </TableCell>
+      <TableCell className={NOTATION_CELL_CLASS}>
+        <RecordedValue value={row.TransactionDate} />
+      </TableCell>
+      {/* The masked number is a fixed-field value too, so the mask and the number it
+          stands for are read in the same face as every other identifier here. */}
+      <TableCell className={NOTATION_CELL_CLASS}>
+        {accountNumber === undefined || accountNumber === '' ? (
+          <RecordedValue value={accountNumber} />
+        ) : (
+          <span className="flex flex-wrap items-center gap-2">
+            {isRevealed ? (
+              <span className="tabular-nums">{accountNumber}</span>
+            ) : (
+              <MaskedAccountNumber accountNumber={accountNumber} />
+            )}
+            {/* The reveal is a control on a ruled listing, so it wears the shared ruled
+                action notation rather than a boxed button — there are no boxes left on
+                this page for one to match. Its wording, and the row it names, are
+                unchanged: the capitals are `text-transform`. */}
+            <Button
+              type="button"
+              variant="ghost"
+              className={RULED_ACTION_WITH_ICON_CLASS}
+              onClick={() => {
+                if (isRevealed) {
+                  onHide(position);
+                } else {
+                  onReveal(position);
+                }
+              }}
+            >
+              {isRevealed ? (
+                <EyeOff
+                  aria-hidden="true"
+                  className={RULED_ACTION_ICON_CLASS}
+                />
+              ) : (
+                <Eye aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+              )}
+              {isRevealed ? HIDE_ACCOUNT_NUMBER : REVEAL_ACCOUNT_NUMBER}
+              {rowLabel !== undefined && (
+                <span className="sr-only">for {rowLabel}</span>
+              )}
+            </Button>
+          </span>
+        )}
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        <RecordedValue value={row.Description} />
+      </TableCell>
+      {/* The row's own figure: right-aligned and tabular down the column, so the digits
+          line up — including where the file held something that is not a number at all,
+          which is exactly what the reader has to see to correct it. */}
+      <TableCell className={FIGURE_CELL_CLASS}>
+        <RecordedValue value={row.Amount} />
+      </TableCell>
+      <TableCell>
+        {/* The type as the file recorded it. NOT translated — see this file's header,
+            and FR3: the app judges no transaction type. */}
+        <RecordedValue value={row.TransactionType} />
+      </TableCell>
+      <TableCell>
+        <RecordedValue value={row.Currency} />
+      </TableCell>
+      {defectWording === undefined ? (
+        <TableCell className="text-muted-foreground max-w-prose whitespace-normal">
+          {NO_REASON_GIVEN}
+        </TableCell>
+      ) : (
+        <TableCell className="max-w-prose whitespace-normal">
+          {defectWording}
+        </TableCell>
+      )}
+    </TableRow>
+  );
 }
 
 /**
@@ -302,157 +471,137 @@ function RejectedRowsSection({
 
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
+      {/* The section names itself in the same tracked micro-label its own column heads
+          wear — a printed reject listing labels itself in the notation it is set in, and
+          a bold sentence-case title here would be the last of the card era's hierarchy
+          left above a ruled page. The capitals are `text-transform`, so the heading a
+          screen reader is given (and the name this region is addressed by) is still the
+          words the app wrote. */}
+      <h2 id={HEADING_ID} className={LISTING_LABEL_CLASS}>
         {HEADING}
       </h2>
 
       {state.phase === 'loading' && (
-        <div role="status" className="grid gap-2">
+        /* The wait is a place that is not a row, so it is the shared ruled band — the
+           rules the rows will carry are already there when the answer lands, rather than
+           the section jumping from floating shapes into a ruled page. */
+        <div role="status" className={`${RULED_BAND_CLASS} py-4`}>
           <span className="sr-only">{LOADING_MESSAGE}</span>
           {/* Placeholders stand in for the rows on their way; the sentence above is
-              what a screen reader is given, since a shape says nothing. */}
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
+              what a screen reader is given, since a shape says nothing. Square —
+              nothing in this world has a radius. */}
+          <div aria-hidden="true" className="grid gap-3">
+            <Skeleton className="h-4 w-full rounded-none" />
+            <Skeleton className="h-4 w-2/3 rounded-none" />
+          </div>
         </div>
       )}
 
       {(state.phase === 'unreadable' || state.phase === 'failed') && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {state.phase === 'unreadable' ? UNREADABLE_TITLE : FAILED_TITLE}
-          </AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>
-              {state.phase === 'unreadable'
-                ? UNREADABLE_MESSAGE
-                : state.message}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={readAgain}
-            >
-              {ASK_AGAIN_LABEL}
-            </Button>
-          </AlertDescription>
-        </Alert>
+        /* Nothing honest can be listed, so this band stands where the listing would be,
+           ruled and full-bleed like it. The `alert` is stripped of the primitive's card
+           and the band's own hairlines frame it; its wording, its role and its one way
+           to ask again are unchanged, the control now wearing the same ruled notation as
+           every other one on this page. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className={RULED_ALERT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {state.phase === 'unreadable' ? UNREADABLE_TITLE : FAILED_TITLE}
+            </AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p className="max-w-prose">
+                {state.phase === 'unreadable'
+                  ? UNREADABLE_MESSAGE
+                  : state.message}
+              </p>
+              {/* The bare notation, without the gap a glyph needs: this control is
+                  words alone, exactly as the file slip's own read-again is. */}
+              <Button
+                type="button"
+                variant="ghost"
+                className={RULED_ACTION_CLASS}
+                onClick={readAgain}
+              >
+                {ASK_AGAIN_LABEL}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {state.phase === 'loaded' &&
         (state.rows.length === 0 ? (
-          <p className="text-muted-foreground max-w-prose">
-            {NONE_REPORTED_MESSAGE}
-          </p>
+          /* An answer about the file rather than a failure — but still a place in the
+             listing that is not a row, so it stands in the same ruled band the wait and
+             the problems do. */
+          <div className={`${RULED_BAND_CLASS} py-6`}>
+            <p className="text-muted-foreground max-w-prose">
+              {NONE_REPORTED_MESSAGE}
+            </p>
+          </div>
         ) : (
-          <Table>
-            <TableCaption className="sr-only">
-              Every row of this file that validation rejected, with the values
-              the file recorded for it and what is wrong with it. Account
-              numbers show their last four digits until you reveal one.
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">{COLUMN.reference}</TableHead>
-                <TableHead scope="col">{COLUMN.transactionDate}</TableHead>
-                <TableHead scope="col">{COLUMN.accountNumber}</TableHead>
-                <TableHead scope="col">{COLUMN.description}</TableHead>
-                <TableHead scope="col">{COLUMN.amount}</TableHead>
-                <TableHead scope="col">{COLUMN.transactionType}</TableHead>
-                <TableHead scope="col">{COLUMN.currency}</TableHead>
-                <TableHead scope="col">{COLUMN.defect}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {state.rows.map((row, position) => {
-                const accountNumber = row.AccountNumber;
-                const isRevealed = state.revealed.has(position);
-                const defectWording = defectWordingFor(row);
-                const rowLabel = rowLabelOf(row);
-
-                return (
-                  <TableRow
+          /* THE REJECT LISTING. It runs full-bleed to the page padding so every hairline
+             row rule reaches the edge of the page, with that padding put back on the
+             outer cells; the closing hairline is drawn here rather than on the last row,
+             which the primitive deliberately leaves unruled. No card, no panel, no
+             striped rows: what frames these rows is the ruling. */
+          <div className={`${PAGE_BLEED_CLASS} border-b`}>
+            <Table className={LISTING_EDGE_PADDING_CLASS}>
+              <TableCaption className="sr-only">
+                Every row of this file that validation rejected, with the values
+                the file recorded for it and what is wrong with it. Account
+                numbers show their last four digits until you reveal one.
+              </TableCaption>
+              <TableHeader>
+                <TableRow className={LISTING_ROW_CLASS}>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.reference}
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.transactionDate}
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.accountNumber}
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.description}
+                  </TableHead>
+                  {/* The figure column names itself over the digits it heads. */}
+                  <TableHead
+                    scope="col"
+                    className={`${LISTING_LABEL_CLASS} text-right`}
+                  >
+                    {COLUMN.amount}
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.transactionType}
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.currency}
+                  </TableHead>
+                  <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                    {COLUMN.defect}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {state.rows.map((row, position) => (
+                  <RejectedRow
                     // Nothing on a rejected row is documented as unique — the rows
                     // come from parsing an untrusted string — so its position in this
                     // answer completes the key rather than standing in for it.
                     key={`${String(row.Id ?? '')}|${String(position)}`}
-                  >
-                    <TableCell className="font-medium">
-                      <RecordedValue value={row.Reference} />
-                    </TableCell>
-                    <TableCell>
-                      <RecordedValue value={row.TransactionDate} />
-                    </TableCell>
-                    <TableCell>
-                      {accountNumber === undefined || accountNumber === '' ? (
-                        <RecordedValue value={accountNumber} />
-                      ) : (
-                        <span className="flex flex-wrap items-center gap-2">
-                          {isRevealed ? (
-                            <span className="tabular-nums">
-                              {accountNumber}
-                            </span>
-                          ) : (
-                            <MaskedAccountNumber
-                              accountNumber={accountNumber}
-                            />
-                          )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (isRevealed) {
-                                hideAccountNumber(position);
-                              } else {
-                                revealAccountNumber(position);
-                              }
-                            }}
-                          >
-                            {isRevealed ? (
-                              <EyeOff aria-hidden="true" />
-                            ) : (
-                              <Eye aria-hidden="true" />
-                            )}
-                            {isRevealed
-                              ? HIDE_ACCOUNT_NUMBER
-                              : REVEAL_ACCOUNT_NUMBER}
-                            {rowLabel !== undefined && (
-                              <span className="sr-only">for {rowLabel}</span>
-                            )}
-                          </Button>
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-normal">
-                      <RecordedValue value={row.Description} />
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      <RecordedValue value={row.Amount} />
-                    </TableCell>
-                    <TableCell>
-                      {/* The type as the file recorded it. NOT translated — see this
-                          file's header, and FR3: the app judges no transaction type. */}
-                      <RecordedValue value={row.TransactionType} />
-                    </TableCell>
-                    <TableCell>
-                      <RecordedValue value={row.Currency} />
-                    </TableCell>
-                    {defectWording === undefined ? (
-                      <TableCell className="text-muted-foreground max-w-prose whitespace-normal">
-                        {NO_REASON_GIVEN}
-                      </TableCell>
-                    ) : (
-                      <TableCell className="max-w-prose whitespace-normal">
-                        {defectWording}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                    row={row}
+                    position={position}
+                    isRevealed={state.revealed.has(position)}
+                    onReveal={revealAccountNumber}
+                    onHide={hideAccountNumber}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ))}
     </section>
   );

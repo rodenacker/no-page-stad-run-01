@@ -45,6 +45,29 @@
  *   service accepts a delete on a file that has already IMPORTED is unverified against
  *   the real backend (`file-deletion` BR6), so whatever it answers is what the user is
  *   told: never a claimed success, never a silent no-op.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — two ruled actions, no boxes (`files-view-redesign` R19/R20)
+ * ---------------------------------------------------------------------------
+ * Every piece of the notation is IMPORTED from `components/requests/fieldNotation.ts` and
+ * never restated here (R9/BR6) — `RequestActions` established it on the expense request
+ * list, and a second dialect of it under `components/files/` is exactly what BR6 forbids:
+ *
+ * - **Retry and the delete are tracked micro-labels on a hairline rule**
+ *   (`RULED_ACTION_WITH_ICON_CLASS`), drawn THROUGH the `button` primitive so each stays a
+ *   real, focusable, keyboard-operable control with the primitive's own focus ring. Each
+ *   glyph is sized down with the notation (`RULED_ACTION_ICON_CLASS`), which an icon that
+ *   omits the class quietly renders at the primitive's 16px instead.
+ * - **The section's heading is the tracked micro-label** (`LISTING_LABEL_CLASS`).
+ * - **A refusal is a full-bleed ruled band** (`RULED_BAND_CLASS`) carrying the `alert`
+ *   with its card stripped off (`RULED_ALERT_CLASS`).
+ * - **THE CONFIRMATION IS NOT RESTYLED HERE.** `DeleteFileConfirmation`'s three shapes
+ *   ride the shared `ConfirmAction` primitive every confirmation in this project reaches
+ *   through, and its two choices inside the modal are that primitive's own — exactly as
+ *   `request-list-redesign` left them (R20).
+ *
+ * Nothing in this redraw changes a control's wording, its accessible name, when it is
+ * offered, to whom, what it sends, or where the reader is left (R1/BR1/BR2/BR7).
  */
 
 import { RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
@@ -55,6 +78,14 @@ import {
   DeleteFileConfirmation,
   useDeleteFileConfirmation,
 } from '@/components/files/DeleteFileConfirmation';
+import {
+  LISTING_LABEL_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -196,25 +227,46 @@ function OfferedActions({
 
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
+      {/* The section names itself in the same tracked micro-label every heading across
+          these two screens wears: a printed document labels itself in the notation it is
+          set in. The capitals are `text-transform`, so the words are still the app's. */}
+      <h2 id={HEADING_ID} className={LISTING_LABEL_CLASS}>
         {HEADING}
       </h2>
 
       {state.phase === 'refused' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">{state.title}</AlertTitle>
-          <AlertDescription className="text-foreground">
-            <p>{state.message}</p>
-            <p>{ASK_AGAIN_MESSAGE}</p>
-          </AlertDescription>
-        </Alert>
+        /* A refusal is a place on the page that is not a control, so it stands in the
+           shared full-bleed ruled band with the card the `alert` primitive ships with
+           stripped off it: the band's own hairlines are what frame it. Its title, the
+           service's own reason and the sentence saying the file is untouched are all
+           unchanged. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className={RULED_ALERT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {state.title}
+            </AlertTitle>
+            <AlertDescription className="text-foreground">
+              <p className="max-w-prose">{state.message}</p>
+              <p className="max-w-prose">{ASK_AGAIN_MESSAGE}</p>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Both controls wear the SAME shared ruled action notation — a tracked micro-label
+          on a hairline, never a boxed button (R19). What tells them apart is the WORD and
+          the glyph, never weight or colour: the delete is protected by its confirmation,
+          not by how heavy its button is. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
         {retryApplies(file) && (
-          <Button type="button" onClick={startRetry}>
-            <RotateCcw aria-hidden="true" />
+          <Button
+            type="button"
+            variant="ghost"
+            className={RULED_ACTION_WITH_ICON_CLASS}
+            onClick={startRetry}
+          >
+            <RotateCcw aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
             {RETRY_LABEL}
           </Button>
         )}
@@ -223,14 +275,15 @@ function OfferedActions({
             act on, imported ones included (`file-deletion` R3/BR1). */}
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
+          className={RULED_ACTION_WITH_ICON_CLASS}
           onClick={() => {
             // Asking is the event that both opens the confirmation and starts reading
             // what this file would destroy — never a render reacting to the dialog.
             deleteConfirmation.ask(file);
           }}
         >
-          <Trash2 aria-hidden="true" />
+          <Trash2 aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
           {DELETE_FILE_LABEL}
         </Button>
         {/* The epic's one confirmation, shared with the Expense files list: it names

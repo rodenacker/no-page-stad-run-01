@@ -38,11 +38,41 @@
  *   The control is never disabled, in this state or while a file is being built:
  *   disabling the control a keyboard user just activated takes the focus out from under
  *   them.
+ * - **THE FILE KEEPS THE MASKING CONVENTION IT ALREADY HAD** — account numbers WHOLE
+ *   (`correctionCsv.ts`, the documented compliance exception). The screen masks these very
+ *   numbers; the file must not, because it has to round-trip through an upload contract
+ *   with no masked-value concept, and a masked column would dead-end the download →
+ *   correct → re-upload loop. The presentation mask never reaches the bytes.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — one ruled action, no box (`files-view-redesign` R19)
+ * ---------------------------------------------------------------------------
+ * Every piece of the notation is IMPORTED from `components/requests/fieldNotation.ts` and
+ * never restated here (R9/BR6) — `RequestActions` established it on the expense request
+ * list, and a second dialect of it under `components/files/` is exactly what BR6 forbids:
+ *
+ * - **The control is a tracked micro-label on a hairline rule**
+ *   (`RULED_ACTION_WITH_ICON_CLASS`), drawn THROUGH the `button` primitive so it stays a
+ *   real, focusable, keyboard-operable control with the primitive's own focus ring. Its
+ *   glyph is sized down with the notation (`RULED_ACTION_ICON_CLASS`), which an icon that
+ *   omits the class quietly renders at the primitive's 16px instead.
+ * - **A refusal is a full-bleed ruled band** (`RULED_BAND_CLASS`) carrying the `alert` with
+ *   its card stripped off (`RULED_ALERT_CLASS`).
+ *
+ * Nothing in this redraw changes the label, the description tied to it, when the control is
+ * offered, or a single byte of what it produces (R1/BR1/BR2, R5).
  */
 
 import { Download, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 
+import {
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -137,22 +167,35 @@ export function CorrectionRowsDownload({
   return (
     <div className="grid justify-items-start gap-2">
       {state.phase === 'failed' && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
-          <AlertDescription className="text-foreground">
-            <p>{FAILED_MESSAGE}</p>
-          </AlertDescription>
-        </Alert>
+        /* A refusal is a place on the page that is not a control, so it stands in the
+           shared full-bleed ruled band with the card the `alert` primitive ships with
+           stripped off it: the band's own hairlines are what frame it. Its title and its
+           wording are unchanged. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className={RULED_ALERT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {FAILED_TITLE}
+            </AlertTitle>
+            <AlertDescription className="text-foreground">
+              <p className="max-w-prose">{FAILED_MESSAGE}</p>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
+      {/* The shared ruled action notation — a tracked micro-label on a hairline, never a
+          boxed button, this page having no boxes left for one to match (R19). Its
+          wording, its accessible name and the description tied to it are untouched: the
+          capitals are `text-transform`. */}
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
+        className={RULED_ACTION_WITH_ICON_CLASS}
         aria-describedby={DESCRIPTION_ID}
         onClick={handOverTheRowsToFix}
       >
-        <Download aria-hidden="true" />
+        <Download aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
         {CORRECTION_DOWNLOAD_LABEL}
       </Button>
 

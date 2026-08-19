@@ -71,3 +71,21 @@
 - **The preview is now drawn as the same ruled listing as the rest of the app** — full width, thin
   lines between rows, small capitalised column headings, and the reference, date, account number
   and amount in the typewriter face.
+
+## Story 5 — The rejected rows, and everything you can do to a file
+
+- **Each rejected row is now its own small component**, the same way the import preview's rows
+  already are. Nothing about a row changed — it just keeps the redrawn listing readable, and means
+  the rejected rows and the preview's rejected rows can't quietly drift apart in future.
+- **When the service says a failed file had no rejected rows after all**, that sentence now sits
+  inside the same ruled band the wait and the error messages use, instead of floating as loose text
+  under the heading — so it reads as part of the listing rather than as a stranded paragraph.
+- **The last five boxed buttons on a file's page are gone.** Retry validation, Delete file, and the
+  three downloads are now small capitalised labels on a rule, like every other control on these two
+  screens. The delete confirmation's own two choices, inside its dialog, are deliberately left as
+  they were — every confirmation in the app looks the same, and changing that would be a change to
+  the whole app rather than to these screens.
+- **A note on the plan, for the record:** the story's reuse notes said the shared confirmation
+  component "already reads in the ruled notation project-wide". It does not — it is the unmodified
+  Shadcn dialog. The same note also said to restyle nothing inside it, so nothing was changed; the
+  inaccuracy is recorded here rather than acted on.
