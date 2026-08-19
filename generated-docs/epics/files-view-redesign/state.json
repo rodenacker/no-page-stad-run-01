@@ -22,53 +22,59 @@
       "Every control on /upload/file is now ruled text on a hairline, but the delete confirmation's own two choices INSIDE the dialog ('Delete the file' / 'Keep the file') are still ordinary buttons — deliberate, because R20 and the story's reuse note both say to restyle nothing inside it, and every confirmation in the app stays consistent. Worth a glance in case you expected the dialog's choices to be ruled too; that would be a project-wide change.",
       "At phone width a register row shows the file's name plus three key values — its status, its record count and what last happened to it — and drops the file setting it was sent against (still one tap away on the file's own page). UI-23 allows only two to three key values, so one of the register's five had to give way; confirm the setting is the right one to lose when you check the register on a phone."
     ],
-    "manualTestResults": []
+    "manualTestResults": [
+      {
+        "decision": "all-passed",
+        "at": "2026-08-19T12:50:07.282Z",
+        "note": "All 34 per-story checks plus the 8-item check-these-first ledger confirmed by the user."
+      }
+    ]
   },
-  "phase": "EPIC-END",
+  "phase": "COMPLETE-ON-BRANCH",
   "stories": {
     "1": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed-after-fix",
       "startedAt": "2026-08-19T08:53:42.611Z",
       "completedAt": "2026-08-19T09:11:47.810Z"
     },
     "2": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-19T09:13:00.663Z",
       "completedAt": "2026-08-19T09:33:46.233Z"
     },
     "3": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-19T09:34:36.569Z",
       "completedAt": "2026-08-19T09:56:03.048Z"
     },
     "4": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-19T09:57:05.637Z",
       "completedAt": "2026-08-19T10:15:06.139Z"
     },
     "5": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-19T10:16:00.033Z",
       "completedAt": "2026-08-19T10:29:37.860Z"
     },
     "6": {
       "status": "complete",
       "commit": null,
-      "e2eStatus": "deferred",
+      "e2eStatus": "passed",
       "startedAt": "2026-08-19T10:30:37.982Z",
       "completedAt": "2026-08-19T11:20:20.240Z"
     }
   },
   "halt": null,
-  "lastUpdated": "2026-08-19T11:21:28.584Z"
+  "lastUpdated": "2026-08-19T12:50:07.282Z"
 }
