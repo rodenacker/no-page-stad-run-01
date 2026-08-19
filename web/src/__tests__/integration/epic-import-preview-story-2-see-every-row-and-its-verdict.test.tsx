@@ -21,8 +21,11 @@
  * - AC-6 (FR5) — the preview states, in plain language, how many of the file's rows
  *   will import and how many were rejected.
  *
- * AC-1 (every row listed, in file order, each carrying a text verdict) is tagged
- * `playwright` and lives in this story's browser spec — deliberately not repeated here.
+ * AC-1 (every row listed, each carrying a text verdict) is tagged `playwright` and lives
+ * in this story's browser spec — deliberately not repeated here. Its "in file order" half
+ * was superseded by `files-view-redesign` R14 (will-import rows first, the rejected ones
+ * appended at the back, each in the file's own relative order among themselves) and is
+ * re-pointed there under that epic's BR3, not loosened.
  * Stories 1 (the CSV reader), 3 (the unreadable-file states) and 4 (the correction CSV)
  * are their own files.
  *
@@ -62,8 +65,13 @@
  *     `web/src/lib/files/importPreviewRows.ts`. The component composes both — it
  *     re-implements neither, and it does not re-parse the `JsonArray` wire quirk
  *     (`rejectedRowsIn` owns that).
- *  7. ONE TABLE ROW PER PARSED LINE of the file, in file order, plus ONE MORE for each
- *     validation-errors entry that could not be matched to a line (BR9, item 11).
+ *  7. ONE TABLE ROW PER PARSED LINE of the file, plus ONE MORE for each validation-errors
+ *     entry that could not be matched to a line (BR9, item 11) — every line listed exactly
+ *     once, which is what this file pins and what {@link dataRows} counts. Their
+ *     ARRANGEMENT is no longer this contract's: `files-view-redesign` R14/R15 lists every
+ *     will-import row first and appends every rejected one at the back as its own named
+ *     block, each keeping the file's own relative order among its own rows, and that
+ *     epic's story 4 asserts it on these same fixtures.
  *  8. THE VERDICT IS A TEXT LABEL, and there are exactly two of them:
  *     `Will import` and `Rejected`. **Never "Imported"** — the backend has not imported
  *     anything, and the app must not claim it has (BR2, the epic's honesty rule). This
@@ -357,6 +365,28 @@ const rowsCarrying = (reference: string): number =>
   within(screen.getByRole('table'))
     .getAllByRole('row')
     .filter((row) => row.textContent?.includes(reference)).length;
+
+/**
+ * Every row of the listing that carries a ROW OF DATA — told from a heading row by
+ * holding cells rather than column headers, so it counts a row whatever it holds and
+ * whatever block it sits in.
+ *
+ * RE-POINTED, not weakened (`files-view-redesign` BR3). This used to be "every `row` in
+ * the table, minus the one header row", which stopped being arithmetic the moment the
+ * preview grew a second, headed block for its rejected rows
+ * (`files-view-redesign` story 4 R14/R15). The claim it serves — one row per line of the
+ * file plus one per rejection that matches no line, never dropped and never duplicated —
+ * is unchanged and is still counted over EVERY row on screen, so an invented or duplicated
+ * row is caught here exactly as it was before, empty or not.
+ *
+ * Where those rows are ARRANGED is `files-view-redesign` story 4's own criterion (AC-1/
+ * AC-2, with the block boundary), asserted in its own suite on these same fixtures and
+ * deliberately not restated here.
+ */
+const dataRows = (): HTMLElement[] =>
+  within(screen.getByRole('table'))
+    .getAllByRole('row')
+    .filter((row) => within(row).queryAllByRole('cell').length > 0);
 
 /**
  * The one element that states `pattern` and nothing else. An identical wrapper around
@@ -657,10 +687,10 @@ describe('Epic import-preview, Story 2: see every row of the file, and what will
     const table = await screen.findByRole('table');
 
     // NEVER DROPPED, NEVER DUPLICATED: one row for every line of the file, plus one
-    // more for the rejection that belongs to no line, plus the header row.
+    // more for the rejection that belongs to no line.
     await waitFor(() => {
-      expect(within(table).getAllByRole('row')).toHaveLength(
-        preview.rows.length + preview.unmatchableRejections.length + 1,
+      expect(dataRows()).toHaveLength(
+        preview.rows.length + preview.unmatchableRejections.length,
       );
     });
     expect(rowsCarrying(UNMATCHABLE_REFERENCE)).toBe(1);
@@ -739,11 +769,11 @@ describe('Epic import-preview, Story 2: see every row of the file, and what will
 
     const table = await screen.findByRole('table');
 
-    // ONE row per line of the file, plus ONE for the orphaned entry, plus the header —
-    // the twice-reported line has NOT produced a phantom second row.
+    // ONE row per line of the file, plus ONE for the orphaned entry — the twice-reported
+    // line has NOT produced a phantom second row.
     await waitFor(() => {
-      expect(within(table).getAllByRole('row')).toHaveLength(
-        preview.rows.length + preview.unmatchableRejections.length + 1,
+      expect(dataRows()).toHaveLength(
+        preview.rows.length + preview.unmatchableRejections.length,
       );
     });
     preview.rows.forEach((row) => {

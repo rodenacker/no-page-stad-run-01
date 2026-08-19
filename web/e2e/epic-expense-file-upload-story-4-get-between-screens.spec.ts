@@ -360,11 +360,20 @@ const listedRequestRow = (page: Page): Locator =>
  * processing activity, which no request row carries. Matching on both is what makes
  * this locator mean "the files screen's row for this file" rather than "somewhere
  * this file is mentioned".
+ *
+ * WHICH ARIA GROUPING the register announces its rows in is the app's own presentation
+ * decision, and it differs by width: at desktop width the register is a `table` of
+ * `row`s, and at phone width it is a `list` of `listitem`s, because a seven-column table
+ * at 360px would have to scroll sideways (`files-view-redesign` R3, source UI-23).
+ * `.or()` is Playwright's own locator combinator, not a query fallback — only one of the
+ * two shapes exists at any given width — and this is a markup re-point only: BOTH values
+ * this locator matches on, and therefore everything it proves, are exactly as before.
  */
 const listedFileRow = (page: Page): Locator =>
   page
     .getByRole('main')
     .getByRole('row')
+    .or(page.getByRole('main').getByRole('listitem'))
     .filter({ hasText: LISTED_FILE.CurrentFileName })
     .filter({ hasText: LISTED_FILE.LastExecutedActivityName });
 

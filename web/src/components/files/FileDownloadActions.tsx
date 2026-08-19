@@ -48,11 +48,39 @@
  *   NOT the answer here — it would make the second control silently do nothing, which is
  *   worse than the interference. So the state is per download, and each download's wait
  *   and refusal name the file they are about.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — two ruled actions, no boxes (`files-view-redesign` R19)
+ * ---------------------------------------------------------------------------
+ * Every piece of the notation is IMPORTED from `components/requests/fieldNotation.ts` and
+ * never restated here (R9/BR6) — `RequestActions` established it on the expense request
+ * list, and a second dialect of it under `components/files/` is exactly what BR6 forbids:
+ *
+ * - **Each download is a tracked micro-label on a hairline rule**
+ *   (`RULED_ACTION_WITH_ICON_CLASS`), drawn THROUGH the `button` primitive so it stays a
+ *   real, focusable, keyboard-operable control with the primitive's own focus ring. Its
+ *   glyph is sized down with the notation (`RULED_ACTION_ICON_CLASS`), which an icon that
+ *   omits the class quietly renders at the primitive's 16px instead.
+ * - **The section's heading is the tracked micro-label** (`LISTING_LABEL_CLASS`), the same
+ *   object the listings' column heads are.
+ * - **A refusal is a full-bleed ruled band** (`RULED_BAND_CLASS`) carrying the `alert`
+ *   with its card stripped off (`RULED_ALERT_CLASS`).
+ *
+ * Nothing in this redraw changes a control's wording, its accessible name, the description
+ * tied to it, when it is offered, or what it hands over (R1/BR1/BR2).
  */
 
 import { Download, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 
+import {
+  LISTING_LABEL_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -219,36 +247,46 @@ export function FileDownloadActions({ file }: { file: FileLog }) {
 
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
+      {/* The section names itself in the same tracked micro-label every heading across
+          these two screens wears: a printed document labels itself in the notation it is
+          set in. The capitals are `text-transform`, so the words are still the app's. */}
+      <h2 id={HEADING_ID} className={LISTING_LABEL_CLASS}>
         {HEADING}
       </h2>
 
       {/* One refusal per download that was refused, each naming its own file — so a
           refusal on one download can never be overwritten, or explained away, by what
-          happened to the other. */}
+          happened to the other. Each stands in the shared full-bleed ruled band, with
+          the card the `alert` primitive ships with stripped off it: on a page with no
+          boxes left, the band's own hairlines are what frame a refusal. */}
       {offered.map((download) => {
         const state = stateOf(download);
         if (state.phase !== 'refused') {
           return null;
         }
         return (
-          <Alert key={download.label}>
-            <TriangleAlert aria-hidden="true" />
-            <AlertTitle className="line-clamp-none">
-              {failedTitleFor(download.subject)}
-            </AlertTitle>
-            <AlertDescription className="text-foreground">
-              <p>{state.message}</p>
-              <p>{ASK_AGAIN_MESSAGE}</p>
-            </AlertDescription>
-          </Alert>
+          <div key={download.label} className={`${RULED_BAND_CLASS} py-6`}>
+            <Alert className={RULED_ALERT_CLASS}>
+              <TriangleAlert aria-hidden="true" />
+              <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+                {failedTitleFor(download.subject)}
+              </AlertTitle>
+              <AlertDescription className="text-foreground">
+                <p className="max-w-prose">{state.message}</p>
+                <p className="max-w-prose">{ASK_AGAIN_MESSAGE}</p>
+              </AlertDescription>
+            </Alert>
+          </div>
         );
       })}
 
       {/* Each control with the words that say which file it hands over, tied to it by
           `aria-describedby` so the two downloads are told apart by ear as well as by
-          eye (`import-preview` FR7/BR6). */}
-      <div className="flex flex-wrap items-start gap-6">
+          eye (`import-preview` FR7/BR6). Both wear the shared ruled action notation — a
+          tracked micro-label on a hairline, never a boxed button, this page having no
+          boxes left for one to match (R19). Their wording, and the description tied to
+          each, are untouched: the capitals are `text-transform`. */}
+      <div className="flex flex-wrap items-start gap-x-10 gap-y-6">
         {offered.map((download) => (
           <div
             key={download.label}
@@ -256,13 +294,17 @@ export function FileDownloadActions({ file }: { file: FileLog }) {
           >
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              className={RULED_ACTION_WITH_ICON_CLASS}
               aria-describedby={download.descriptionId}
               onClick={() => {
                 startDownload(download);
               }}
             >
-              <Download aria-hidden="true" />
+              <Download
+                aria-hidden="true"
+                className={RULED_ACTION_ICON_CLASS}
+              />
               {download.label}
             </Button>
             <p

@@ -48,9 +48,48 @@
  *   out to be working, `isFileInProgress` takes the watch over from there and holds it
  *   until the file settles; when the reads run out and nothing is in progress, the page
  *   goes quiet rather than asking a settled question forever.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — the file's own slip (`files-view-redesign` R17, design brief §3)
+ * ---------------------------------------------------------------------------
+ * This page is opened FROM a line of the register and shows the file that line names, so
+ * it opens in the register's own notation: a COMPACT SLIP of small capitalised labels over
+ * their values — the same five things the row states, in the same grammar the submission
+ * slip that produced the file is set in. Every piece of that notation is IMPORTED from
+ * `components/requests/fieldNotation.ts` and never restated here (R9/BR6):
+ *
+ * - **It is a ruled field strip, not a card and not prose.** The five fields run
+ *   full-bleed to the page padding (`FULL_BLEED_CLASS`) and are closed by one hairline at
+ *   their foot, so the slip reads as the head of the same document the processing history
+ *   below it continues. There is no panel, no surface and no radius anywhere on it (BR9).
+ * - **A label is the tracked micro-label at the muted ink** (`LISTING_LABEL_CLASS`) — the
+ *   same object the register's column heads are, which is what makes the two surfaces read
+ *   as one document. The capitals are `text-transform`, so the wording a screen reader is
+ *   given is still the app's own words.
+ * - **Each label stays STRUCTURALLY PAIRED with its own value** (`dt`/`dd` inside one
+ *   field block). Five labels on one line over five values on another would still show
+ *   every value while leaving a reader — and a screen reader — to guess which figure
+ *   belongs to which word.
+ * - **The file's name, the setting and the processed time are identifiers**, set in the
+ *   fixed-field face (`NOTATION_CELL_CLASS`) at no added weight — the same face the
+ *   register prints all three in. **The record count is this file's own control total**,
+ *   mono and tabular (`FIGURE_CLASS`); alignment belongs to the surface, and on a slip a
+ *   figure starts where the label above it starts. The most recent activity is prose and
+ *   stays in the text face.
+ * - **The status is the shared ruled mark** (`FileStatusBadge` → `StatusBadge`): the
+ *   status's own words beside a drawn shape in the intent's ink, never colour alone and
+ *   never a pill. Nothing here draws or maps a second one.
+ * - **Each answer that is not the file is a full-bleed ruled band** (`RULED_BAND_CLASS`) —
+ *   the wait, a file that is not available and a read that failed — carrying the `alert`
+ *   with the card the primitive ships with stripped off it (`RULED_ALERT_CLASS`). All three
+ *   keep their existing wording, their roles and their existing way on, and both controls
+ *   wear the shared ruled action notation.
+ *
+ * Nothing in this redraw changes a value, its source, when it is read, or what any of these
+ * answers says (R1/BR1/BR2/BR10).
  */
 
-import { CircleSlash, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, CircleSlash, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -60,6 +99,18 @@ import { FileStatusBadge } from '@/components/files/FileStatusBadge';
 import { ImportPreview } from '@/components/files/ImportPreview';
 import { RejectedRows } from '@/components/files/RejectedRows';
 import { SubmittedFileActions } from '@/components/files/SubmittedFileActions';
+import {
+  FIGURE_CLASS,
+  FULL_BLEED_CLASS,
+  LISTING_LABEL_CLASS,
+  NOTATION_CELL_CLASS,
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,8 +215,15 @@ const fileIn = (
     (file) => String(file.Id) === requestedLogId,
   );
 
-/** One of the file's own values, printed exactly as the service reported it. */
-function DetailField({
+/**
+ * One field of the slip: the tracked label that names it, over the value the service
+ * reported — one block per pair, so the label and its value stay together however the
+ * line wraps. Each block is sized by what it holds and does not grow, so on a wide screen
+ * the slip stays a slip rather than stretching five fields across the whole page; the
+ * minimum is what stops a field being squeezed narrower than its own label, and wrapping
+ * (never sideways scrolling) is what holds this at 360px (R3).
+ */
+function SlipField({
   label,
   children,
 }: {
@@ -173,22 +231,37 @@ function DetailField({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-1">
-      <dt className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {label}
-      </dt>
+    <div className="grid min-w-32 gap-1.5">
+      <dt className={LISTING_LABEL_CLASS}>{label}</dt>
       <dd className="text-sm break-words">{children}</dd>
     </div>
   );
 }
 
-/** The way back to the list this file was opened from. */
+/**
+ * The way back to the list this file was opened from: a tracked label on a rule, in the
+ * same notation every other control across these two screens wears — a boxed button is
+ * the last thing a page with no boxes left on it should carry. Its wording and its
+ * destination are unchanged.
+ */
 function BackToFilesLink() {
   return (
-    <Button asChild variant="outline" size="sm">
-      <Link href={UPLOAD_PATH}>{BACK_LABEL}</Link>
+    <Button asChild variant="ghost" className={RULED_ACTION_WITH_ICON_CLASS}>
+      <Link href={UPLOAD_PATH}>
+        <ArrowLeft aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+        {BACK_LABEL}
+      </Link>
     </Button>
   );
+}
+
+/**
+ * The screen's own name, for the three answers that have no file to name it with. In the
+ * tracked micro-label notation, like every other heading across these two screens: a
+ * printed document labels itself in the notation it is set in.
+ */
+function FallbackTitle() {
+  return <h1 className={LISTING_LABEL_CLASS}>{FALLBACK_TITLE}</h1>;
 }
 
 export function SubmittedFileDetail({
@@ -338,16 +411,20 @@ export function SubmittedFileDetail({
 
   if (state.phase === 'loading') {
     return (
-      <section className="grid gap-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {FALLBACK_TITLE}
-        </h1>
-        <div role="status" className="grid gap-2">
+      <section className="grid gap-4">
+        <FallbackTitle />
+        {/* The wait is a place that is not the file, so it is the shared ruled band —
+            the hairlines the slip will carry are already there when the values land,
+            rather than the page jumping from floating shapes into a ruled slip. */}
+        <div role="status" className={`${RULED_BAND_CLASS} py-4`}>
           <span className="sr-only">{LOADING_MESSAGE}</span>
           {/* Placeholders stand in for the values on their way; the sentence above
-              is what a screen reader is given, since a shape says nothing. */}
-          <Skeleton aria-hidden="true" className="h-6 w-64" />
-          <Skeleton aria-hidden="true" className="h-24 w-full" />
+              is what a screen reader is given, since a shape says nothing. Square —
+              nothing in this world has a radius. */}
+          <div aria-hidden="true" className="grid gap-3">
+            <Skeleton className="h-4 w-64 rounded-none" />
+            <Skeleton className="h-4 w-full rounded-none" />
+          </div>
         </div>
       </section>
     );
@@ -355,48 +432,59 @@ export function SubmittedFileDetail({
 
   if (state.phase === 'unavailable') {
     return (
-      <section className="grid max-w-prose gap-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {FALLBACK_TITLE}
-        </h1>
-        <Alert>
-          <CircleSlash aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {UNAVAILABLE_TITLE}
-          </AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{UNAVAILABLE_MESSAGE}</p>
-            <BackToFilesLink />
-          </AlertDescription>
-        </Alert>
+      <section className="grid gap-4">
+        <FallbackTitle />
+        {/* Nothing went wrong, but there is no file to draw a slip from — so this band
+            stands where the slip would be, ruled and full-bleed like it. The `alert` is
+            stripped of the primitive's card and the band's hairlines frame it; the
+            wording, the role and the one way on are unchanged. */}
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className={RULED_ALERT_CLASS}>
+            <CircleSlash aria-hidden="true" />
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {UNAVAILABLE_TITLE}
+            </AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p className="max-w-prose">{UNAVAILABLE_MESSAGE}</p>
+              <BackToFilesLink />
+            </AlertDescription>
+          </Alert>
+        </div>
       </section>
     );
   }
 
   if (state.phase === 'failed') {
     return (
-      <section className="grid max-w-prose gap-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {FALLBACK_TITLE}
-        </h1>
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{state.message}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={readAgain}
-              >
-                {READ_AGAIN_LABEL}
-              </Button>
-              <BackToFilesLink />
-            </div>
-          </AlertDescription>
-        </Alert>
+      <section className="grid gap-4">
+        <FallbackTitle />
+        {/* A read that failed is the separate answer, in the same band: the service's own
+            wording, its own way to ask again — worded `Load this file again`, never the
+            `Try again` the processing history owns on this screen — and the way back. */}
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className={RULED_ALERT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {FAILED_TITLE}
+            </AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p className="max-w-prose">{state.message}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {/* The bare notation, without the gap a glyph needs: this control is
+                    words alone, exactly as the register's own retry is. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={RULED_ACTION_CLASS}
+                  onClick={readAgain}
+                >
+                  {READ_AGAIN_LABEL}
+                </Button>
+                <BackToFilesLink />
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       </section>
     );
   }
@@ -407,32 +495,46 @@ export function SubmittedFileDetail({
     <div className="grid gap-8">
       <div className="grid justify-items-start gap-3">
         <BackToFilesLink />
-        {/* The file names the screen it is about. Every value below it is the
-            service's own, printed as it arrived (brief BR5). */}
-        <h1 className="text-2xl font-semibold tracking-tight break-words">
+        {/* The batch's real name, and the name of the screen it is about: an identifier,
+            so it is set in the fixed-field face at no added weight — the same face the
+            register line this page was opened from prints it in. Every value below it is
+            the service's own, printed as it arrived (brief BR5). */}
+        <h1 className={`${NOTATION_CELL_CLASS} text-xl break-words`}>
           {file.CurrentFileName}
         </h1>
       </div>
 
-      <section aria-labelledby={SUMMARY_HEADING_ID} className="grid gap-4">
-        <h2
-          id={SUMMARY_HEADING_ID}
-          className="text-lg font-semibold tracking-tight"
-        >
+      <section aria-labelledby={SUMMARY_HEADING_ID} className="grid gap-3">
+        {/* The slip names itself in the same tracked micro-label its own fields wear. */}
+        <h2 id={SUMMARY_HEADING_ID} className={LISTING_LABEL_CLASS}>
           {SUMMARY_HEADING}
         </h2>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <DetailField label={FIELD.setting}>{file.SettingName}</DetailField>
-          <DetailField label={FIELD.processed}>{file.ProcessDate}</DetailField>
-          <DetailField label={FIELD.status}>
+        {/* The five fields as one ruled strip: full-bleed to the page padding and closed
+            by a single hairline at its foot, so the slip reads as the head of the same
+            document the sections below continue. It WRAPS at narrow widths rather than
+            scrolling sideways (R3), and each field keeps its own label with its own
+            value (R17). */}
+        <dl
+          className={`${FULL_BLEED_CLASS} border-input flex flex-wrap items-start gap-x-10 gap-y-5 border-b pb-5`}
+        >
+          <SlipField label={FIELD.setting}>
+            <span className={NOTATION_CELL_CLASS}>{file.SettingName}</span>
+          </SlipField>
+          <SlipField label={FIELD.processed}>
+            <span className={NOTATION_CELL_CLASS}>{file.ProcessDate}</span>
+          </SlipField>
+          <SlipField label={FIELD.status}>
             <FileStatusBadge status={file.CurrentStatus} />
-          </DetailField>
-          <DetailField label={FIELD.records}>
-            <span className="tabular-nums">{file.RecordCount}</span>
-          </DetailField>
-          <DetailField label={FIELD.activity}>
+          </SlipField>
+          {/* This file's own control total, mono and tabular — its own, and the only
+              figure of its kind on the screen (BR5). */}
+          <SlipField label={FIELD.records}>
+            <span className={FIGURE_CLASS}>{file.RecordCount}</span>
+          </SlipField>
+          {/* Prose, so it stays in the text face. */}
+          <SlipField label={FIELD.activity}>
             {file.LastExecutedActivityName}
-          </DetailField>
+          </SlipField>
         </dl>
       </section>
 

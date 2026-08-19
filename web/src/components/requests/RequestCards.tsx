@@ -80,7 +80,11 @@
 
 import { memo } from 'react';
 
-import { FIELD_LABEL_CLASS } from '@/components/requests/fieldNotation';
+import {
+  FIELD_LABEL_CLASS,
+  NARROW_RECORD_CLASS,
+  PAGE_BLEED_CLASS,
+} from '@/components/requests/fieldNotation';
 import { NotYetConfirmedMark } from '@/components/requests/NotYetConfirmedMark';
 import { PossibleDuplicateMark } from '@/components/requests/PossibleDuplicateMark';
 import { RequestActions } from '@/components/requests/RequestActions';
@@ -119,22 +123,18 @@ const AMOUNT_LABEL = labelOfColumn('amount');
 const TRANSACTION_DATE_LABEL = labelOfColumn('transactionDate');
 
 /**
- * Full-bleed to the page padding (R13 — the same convention the control block, the
- * narrowing strip and the wide listing use): the box is widened past `<main>`'s `px-4` so
- * every hairline reaches the edge of the page, and each group puts that padding back
- * inside.
- */
-const PAGE_BLEED_CLASS = '-mx-4';
-
-/**
  * One request's group of ruled lines. The hairline beneath it is the whole treatment —
  * no card, no panel, no surface — and there is no gap above or below it, so consecutive
  * groups touch and the listing reads as one ruled sequence.
  *
  * The left rule is always drawn, transparent unless the request is an exception, so a
  * marked group and an ordinary one line up to the pixel down the page.
+ *
+ * The box itself is the shared narrow-record notation (`NARROW_RECORD_CLASS`), which every
+ * narrow listing in the app wears; this group adds only the reserved left rule the request
+ * list's own exception mark needs.
  */
-const GROUP_CLASS = 'border-b border-l-2 border-l-transparent px-4 py-3';
+const GROUP_CLASS = `${NARROW_RECORD_CLASS} border-l-2 border-l-transparent`;
 
 /**
  * A request that needs attention, marked as a rule down the group's outer edge — the

@@ -53,8 +53,8 @@ import { Check, PanelRightOpen, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 import {
-  RULED_ACTION_CLASS,
   RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
 } from '@/components/requests/fieldNotation';
 import { Button } from '@/components/ui/button';
 import { DECISION_APPROVE } from '@/lib/api/decisions';
@@ -70,12 +70,13 @@ import type { DecisionOutcome } from '@/lib/api/decisions';
 const OPEN_LABEL = 'Open';
 
 /**
- * How every control on a request is drawn (see this file's header): the screen's one ruled
- * action notation (`fieldNotation.ts`), plus the gap a control with a glyph beside its words
- * needs — so these three can never drift from the export, `Clear all` or the page controls,
- * which are the same object.
+ * How every control on a request is drawn (see this file's header): the app's one ruled
+ * action notation with the gap a glyph beside the words needs — stated in
+ * `fieldNotation.ts` rather than here, so these three can never drift from the export,
+ * `Clear all`, the page controls or a register row's own Open and Delete, which are all the
+ * same object.
  */
-const REQUEST_ACTION_CLASS = `${RULED_ACTION_CLASS} gap-1.5`;
+const REQUEST_ACTION_CLASS = RULED_ACTION_WITH_ICON_CLASS;
 
 /** How each control names itself and the request it acts on (R15). */
 const openRequestName = (reference: string): string =>

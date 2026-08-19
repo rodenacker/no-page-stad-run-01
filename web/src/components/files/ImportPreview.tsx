@@ -5,8 +5,9 @@
  * FR1–FR5, FR8, BR2, BR3, BR8, BR9, NFR-3, NFR-4).
  *
  * The section downloads the file the user actually submitted, reads it as CSV in the
- * browser, overlays the rows the service rejected, and lists the result — one row per
- * line of the file, in the order the file put them in.
+ * browser, overlays the rows the service rejected, and lists the result — every row that
+ * will import first, then every rejected row appended at the back as its own headed
+ * block.
  *
  * Eight things here are deliberate and easy to break:
  *
@@ -14,11 +15,18 @@
  *   has run** (`Imported` or `Validation failed`, FR1). A file still being processed has
  *   nothing to preview, and downloading a whole file the user is shown nothing of is a
  *   cost paid for no answer.
- * - **ONE ORDERED LIST, NOT TWO STACKED HALVES.** The brief's "two halves" language is
- *   about the two per-row DISPLAY conventions below, not about splitting the rows into
- *   two tables: a will-import row and a rejected row sit next to each other in the
- *   positions their file gave them. Grouping by verdict would destroy file order, which
- *   is the whole point of a preview the user compares against their own file.
+ * - **ONE LISTING, WITH THE REJECT LISTING APPENDED AT THE BACK** (`files-view-redesign`
+ *   R14/R15, design brief §3 Cross-surface reach — "the reject listing appended at the
+ *   back exactly as the document does it"). Every row that will import is listed first,
+ *   in the file's own relative order among themselves; every rejected row follows at the
+ *   close, in the file's own relative order among themselves, under its own tracked
+ *   micro-label heading with a hairline above it. The two are never interleaved.
+ *   **THE REORDER HAPPENS HERE, AT RENDER, AND NOWHERE ELSE** — see
+ *   {@link arrangedRowsOf}. `lib/files/importPreviewRows.ts` still emits one row per line
+ *   in FILE order, because `lib/files/correctionCsv.ts` derives the correction download
+ *   from exactly that array and the download's row scope and order are protected
+ *   behaviour (BR2). Pushing the arrangement down into the parse layer would silently
+ *   re-order the file a user downloads to correct.
  * - **THE VERDICT IS "Will import", NEVER "Imported"** (BR2, the epic's honesty rule).
  *   These verdicts are the app's OWN determination — the file, plus the service's own
  *   validation errors — not a claim that the backend has imported anything. It has not.
@@ -55,12 +63,98 @@
  *   interval and hands `refreshSignal` down, and a new value means "ask again". This
  *   section grows no timer of its own, and takes no session or role prop — both roles
  *   see everything here (FR8, §Access control).
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRAWN — one ruled listing, in the register's own grammar
+ * (`files-view-redesign` R15, design brief §3)
+ * ---------------------------------------------------------------------------
+ * Every piece of the notation is IMPORTED from `components/requests/fieldNotation.ts` and
+ * never restated here (BR6). This is the pre-commit artifact the design calls its
+ * strongest fit, so it is drawn as the source document it is:
+ *
+ * - **Restyled THROUGH the Shadcn table primitive**, never replaced: real `<table>`
+ *   semantics, `<th scope="col">`, the caption and the header row all stay, because a
+ *   screen reader navigates this preview by its nine named columns.
+ * - **ONE table with ONE header row and TWO row groups** — not two differently-styled
+ *   tables (R15). The rejected block is the second `<tbody>`, named by its own heading
+ *   through `aria-labelledby`, so the boundary that keeps a rejected row from being taken
+ *   for a will-import one exists in the accessibility tree and not only in ink.
+ * - **Full-bleed to the page padding** (`PAGE_BLEED_CLASS`) so every hairline row rule
+ *   reaches the edge of the page, with that padding put back on the outer cells
+ *   (`LISTING_EDGE_PADDING_CLASS`) so the values stay lined up with the slip's labels
+ *   above them. The closing hairline is drawn on that box: the primitive deliberately
+ *   leaves the last row of each row group unruled.
+ * - **No card and no striped row.** The rules are the whole treatment, and the
+ *   primitive's per-row hover fill and colour transition are cancelled at the row
+ *   (`LISTING_ROW_CLASS`) — a row that tints under the pointer is the stripe arriving one
+ *   row at a time (BR9).
+ * - **The column heads, this section's heading and the rejected block's heading are the
+ *   same object**: the tracked 11px mono micro-label at the muted ink
+ *   (`LISTING_LABEL_CLASS`). The capitals are `text-transform`, so every head's wording —
+ *   and the accessible name built from it — is exactly the word the app wrote. R15
+ *   restyles these heads; it renames none of them.
+ * - **Reference, transaction date and account number are set in the fixed-field face**
+ *   (`NOTATION_CELL_CLASS`): each is an identifier rather than a figure to be added up,
+ *   and the mono face is what makes one row scannable against the next. The amount is the
+ *   row's own figure, so it is right-aligned and tabular (`FIGURE_CELL_CLASS`) even where
+ *   the file held something that is not a number — which is exactly what a reader has to
+ *   see to correct it. Description, transaction type and the defect are prose and stay in
+ *   the text face, at no added weight.
+ * - **Each answer that is not a row is a full-bleed ruled band** (`RULED_BAND_CLASS`) —
+ *   the wait and every problem, the latter carrying the `alert` with the card the
+ *   primitive ships with stripped off it (`RULED_ALERT_CLASS`). The wording, the roles and
+ *   the one `Load the preview again` are unchanged.
+ *
+ * AND ON A PHONE, THE SAME LISTING TIGHTENED (R3, source UI-23): below the one crossover
+ * `lib/layout/viewport.ts` states, each row becomes a group of ruled lines — its verdict and
+ * reference, its amount and date, its account number, and for a rejected row what is wrong
+ * with it — through the shared `components/files/NarrowListing` composition every listing on
+ * these two screens wears. Four things about that switch are load-bearing:
+ *
+ * - **One presentation or the other, never both.** Nine columns inside the primitive's own
+ *   `overflow-x-auto` wrapper is exactly the contained sideways scroll R3 refuses.
+ * - **THE ARRANGEMENT IS THE SAME ARRANGEMENT** (R14/R15): one list, the will-import rows
+ *   first, then the reject listing appended at the back under its own heading — which is an
+ *   ITEM of that same list, exactly as the wide presentation's heading is a row of the same
+ *   table. A heading standing between two lists would leave a visible gutter between the
+ *   last row above it and the first below, and a gutter between records is what tells a card
+ *   stack apart from a ruled listing (BR9).
+ * - **The two per-row conventions are unchanged** (BR3): a will-import row's account number
+ *   is masked with no way to unmask it; a rejected row's carries the same per-row reveal,
+ *   still a DIRECT control (R4). Both come from one piece of markup
+ *   ({@link PreviewAccountNumber}), so masking cannot differ by width.
+ * - **A rejected row's reasons are NOT a nested list at this width.** The group is itself a
+ *   list item, and the list semantics are what tell a reader how many rows there are; a list
+ *   inside one of them would announce the listing as longer than it is. Several reasons read
+ *   as several sentences instead — see {@link NarrowDefectReasons}.
  */
 
 import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { CorrectionRowsDownload } from '@/components/files/CorrectionRowsDownload';
+import {
+  NarrowBlockHeading,
+  NarrowField,
+  NarrowListing,
+  NarrowRecord,
+  NarrowRecordLine,
+} from '@/components/files/NarrowListing';
+import {
+  FIGURE_CELL_CLASS,
+  FIGURE_CLASS,
+  LISTING_EDGE_PADDING_CLASS,
+  LISTING_LABEL_CLASS,
+  LISTING_ROW_CLASS,
+  NOTATION_CELL_CLASS,
+  PAGE_BLEED_CLASS,
+  RULED_ACTION_CLASS,
+  RULED_ACTION_ICON_CLASS,
+  RULED_ACTION_WITH_ICON_CLASS,
+  RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
+  RULED_BAND_CLASS,
+} from '@/components/requests/fieldNotation';
 import { MaskedAccountNumber } from '@/components/requests/MaskedAccountNumber';
 import { StatusBadge } from '@/components/status/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -90,6 +184,7 @@ import {
   parseSubmittedFileCsv,
 } from '@/lib/files/parseSubmittedFileCsv';
 import { readBlobText } from '@/lib/files/readBlobText';
+import { useNarrowViewport } from '@/lib/layout/useNarrowViewport';
 import { transactionTypeLabel } from '@/lib/transactions/display';
 import {
   FILE_STATUS_IMPORTED,
@@ -148,9 +243,41 @@ const COLUMN = {
   defect: 'What is wrong',
 } as const;
 
-/** What the table is, for a reader who meets it without seeing its shape. */
+/**
+ * What the table is, for a reader who meets it without seeing its shape.
+ *
+ * IT DESCRIBES THE ARRANGEMENT, because for this reader it is the only account of it
+ * there is. R14 stopped the listing being in the file's own order, so a caption still
+ * claiming it was would be a quiet lie to precisely the person who cannot see the two
+ * blocks drawn apart. What the file's order still governs is the order WITHIN each
+ * block, and that is what this says.
+ */
 const TABLE_CAPTION =
-  'Every row of the file you submitted, in the order the file holds them, with what will happen to each one. Account numbers show their last four digits; a rejected row can be unmasked one row at a time.';
+  'Every row of the file you submitted, with what will happen to each one: first every row that will import, then every rejected row together in its own section at the end. Within each of the two, the rows stay in the order the file put them in. Account numbers show their last four digits; a rejected row can be unmasked one row at a time.';
+
+/**
+ * The appended reject listing's own heading, and what ties it to the block it heads.
+ *
+ * IT IS DELIBERATELY NOT "Rejected rows": the `RejectedRows` section on this same page is
+ * called exactly that, and two things with one name on one screen cannot be told apart —
+ * by a reader or by a test — which is the same rule the ask-again controls here follow.
+ * It still BEGINS with the word rejected, because that is the word a reader scanning for
+ * the block is looking for, and it says what the block means rather than only naming it.
+ */
+const REJECTED_BLOCK_HEADING_ID = 'import-preview-rejected-block-heading';
+const REJECTED_BLOCK_HEADING = 'Rejected — will not import';
+
+/**
+ * What the listing IS, for a phone-width reader who meets it without seeing its shape — the
+ * same account {@link TABLE_CAPTION} gives a reader of the wide presentation, since at this
+ * width there is no caption and the arrangement (R14) is the one thing a reader cannot see.
+ */
+const NARROW_LISTING_LABEL = TABLE_CAPTION;
+
+/** How many columns the listing has, so the rejected block's heading spans all of them.
+ * Derived from {@link COLUMN} rather than counted by hand, so a column added or removed
+ * cannot leave the heading short. */
+const COLUMN_COUNT = Object.keys(COLUMN).length;
 
 /** Said in a cell whose value the source file did not hold at all. */
 const NOT_RECORDED = 'Not recorded';
@@ -257,6 +384,28 @@ const reconcilesWithRecordCount = (
 const rowLabelOf = (row: ImportPreviewRow): string | undefined =>
   [row.values.Description, row.values.Reference].find((value) => value !== '');
 
+/**
+ * THE ARRANGEMENT (R14/R15) — and the whole of the reorder this story is.
+ *
+ * A stable partition by verdict over the rows the preview ALREADY holds: every row that
+ * will import, then every rejected one. Because `importPreviewRows` hands them over in
+ * file order — the file's own lines first, then any rejection matching no line of its own
+ * (BR9) — filtering preserves that order inside each block for free, which is exactly
+ * what the two blocks have to keep: the file's own relative order among their own rows,
+ * with a rejection that has no line at the very back of the reject listing.
+ *
+ * IT IS A PRESENTATION DECISION, MADE HERE. The rows it reads are not re-ordered:
+ * `lib/files/correctionCsv.ts` builds the file a user downloads to correct from that same
+ * array, and its row scope and order are protected behaviour (BR2). Nothing below writes
+ * back to it.
+ */
+const arrangedRowsOf = (
+  rows: readonly ImportPreviewRow[],
+): { willImport: ImportPreviewRow[]; rejected: ImportPreviewRow[] } => ({
+  willImport: rows.filter((row) => row.verdict !== 'rejected'),
+  rejected: rows.filter((row) => row.verdict === 'rejected'),
+});
+
 /** Where the preview is: being read, read, unreadable, or unreachable. */
 type PreviewState =
   | { phase: 'loading' }
@@ -340,6 +489,32 @@ function DefectReasons({ reasons }: { reasons: string[] }) {
   );
 }
 
+/**
+ * A rejected row's reasons at PHONE WIDTH, where the group is itself an item of the listing's
+ * one list (`components/files/NarrowListing`).
+ *
+ * Same wording, same source, same "several reasons are all said" rule as
+ * {@link DefectReasons} — but as several sentences rather than as a nested list: a list
+ * inside a list item would announce the listing as longer than it is, and at this width the
+ * list semantics are the only thing telling a reader how many rows there are (R3).
+ */
+function NarrowDefectReasons({ reasons }: { reasons: string[] }) {
+  if (reasons.length === 0) {
+    // The service gave no defect signal for this row. Say so; never invent one.
+    return <span className="text-muted-foreground">{NO_REASON_GIVEN}</span>;
+  }
+  if (reasons.length === 1) {
+    return <>{reasons[0]}</>;
+  }
+  return (
+    <span className="grid gap-1">
+      {reasons.map((reason) => (
+        <span key={reason}>{reason}</span>
+      ))}
+    </span>
+  );
+}
+
 /** What will happen to this row, as words paired with an intent colour and an icon. */
 function VerdictBadge({ verdict }: { verdict: ImportPreviewVerdict }) {
   return (
@@ -347,6 +522,224 @@ function VerdictBadge({ verdict }: { verdict: ImportPreviewVerdict }) {
       status={VERDICT_LABEL[verdict]}
       presentation={VERDICT_PRESENTATION[verdict]}
     />
+  );
+}
+
+/**
+ * THIS ROW'S ACCOUNT NUMBER, under whichever of the two per-row conventions its own verdict
+ * puts it (BR3) — and ONE piece of markup for both presentations, so the masking, the
+ * reveal's wording and the row it acts on cannot differ by viewport width.
+ *
+ * - A row that WILL IMPORT is a listed expense payment request, and the list convention
+ *   offers no way to unmask one.
+ * - A REJECTED row is one the user has to go and correct, so the full number is reachable —
+ *   for that ONE row, and only while this answer is on screen. The reveal wears the shared
+ *   ruled action notation rather than a boxed button (there are no boxes left on this page for
+ *   one to match) and stays a DIRECT control at every width, because a menu in front of the
+ *   number is one more gesture between a keyboard user and it (R4).
+ */
+function PreviewAccountNumber({
+  row,
+  isRevealed,
+  onReveal,
+  onHide,
+}: {
+  row: ImportPreviewRow;
+  isRevealed: boolean;
+  onReveal: (key: string) => void;
+  onHide: (key: string) => void;
+}) {
+  const accountNumber = row.values.AccountNumber;
+  const rowLabel = rowLabelOf(row);
+
+  if (accountNumber === '') {
+    return <RecordedValue value={accountNumber} />;
+  }
+  if (row.verdict !== 'rejected') {
+    return <MaskedAccountNumber accountNumber={accountNumber} />;
+  }
+
+  return (
+    <span className="flex min-w-0 flex-wrap items-center gap-2">
+      {isRevealed ? (
+        <span className="tabular-nums">{accountNumber}</span>
+      ) : (
+        <MaskedAccountNumber accountNumber={accountNumber} />
+      )}
+      {/* Its wording, and the row it names, are unchanged: the capitals are
+          `text-transform`. */}
+      <Button
+        type="button"
+        variant="ghost"
+        className={RULED_ACTION_WITH_ICON_CLASS}
+        onClick={() => {
+          if (isRevealed) {
+            onHide(row.key);
+          } else {
+            onReveal(row.key);
+          }
+        }}
+      >
+        {isRevealed ? (
+          <EyeOff aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+        ) : (
+          <Eye aria-hidden="true" className={RULED_ACTION_ICON_CLASS} />
+        )}
+        {isRevealed ? HIDE_ACCOUNT_NUMBER : REVEAL_ACCOUNT_NUMBER}
+        <span className="sr-only">
+          {rowLabel === undefined
+            ? ` ${IN_THIS_PREVIEW}`
+            : ` for ${rowLabel} ${IN_THIS_PREVIEW}`}
+        </span>
+      </Button>
+    </span>
+  );
+}
+
+/**
+ * ONE ROW OF THE LISTING AS A PHONE-WIDTH READER RECEIVES IT (R3, source UI-23): a group of
+ * ruled lines carrying its verdict and its reference — what it is and what will happen to it
+ * — then the amount and date it recorded, its account number under its own verdict's
+ * convention, and, for a rejected row, what is wrong with it.
+ *
+ * Drawn identically wherever the arrangement puts it, for the same reason the wide row is one
+ * component (R15): what differs between the two halves is what a row SAYS about itself, and
+ * that is decided from the row's own verdict, never from which block it landed in. The
+ * description, transaction type and currency the wide listing also prints are left for that
+ * width — UI-23 asks for the identifier and two to three key values, not for nine columns
+ * folded into a box.
+ */
+function PreviewRecord({
+  row,
+  isRevealed,
+  onReveal,
+  onHide,
+}: {
+  row: ImportPreviewRow;
+  isRevealed: boolean;
+  onReveal: (key: string) => void;
+  onHide: (key: string) => void;
+}) {
+  const isRejected = row.verdict === 'rejected';
+
+  return (
+    <NarrowRecord>
+      <NarrowRecordLine>
+        <VerdictBadge verdict={row.verdict} />
+        <span className={`${NOTATION_CELL_CLASS} break-all`}>
+          <RecordedValue value={row.values.Reference} />
+        </span>
+      </NarrowRecordLine>
+
+      <NarrowRecordLine>
+        <NarrowField label={COLUMN.amount}>
+          <span className={FIGURE_CLASS}>
+            <RecordedValue value={row.values.Amount} />
+          </span>
+        </NarrowField>
+        <NarrowField label={COLUMN.transactionDate}>
+          <span className={NOTATION_CELL_CLASS}>
+            <RecordedValue value={row.values.TransactionDate} />
+          </span>
+        </NarrowField>
+      </NarrowRecordLine>
+
+      <NarrowRecordLine>
+        <NarrowField label={COLUMN.accountNumber}>
+          <span className={NOTATION_CELL_CLASS}>
+            <PreviewAccountNumber
+              row={row}
+              isRevealed={isRevealed}
+              onReveal={onReveal}
+              onHide={onHide}
+            />
+          </span>
+        </NarrowField>
+      </NarrowRecordLine>
+
+      {/* Nothing is said about a row that will import: there is nothing wrong with it. */}
+      {isRejected && (
+        <NarrowRecordLine>
+          <NarrowField label={COLUMN.defect}>
+            <NarrowDefectReasons reasons={row.reasons} />
+          </NarrowField>
+        </NarrowRecordLine>
+      )}
+    </NarrowRecord>
+  );
+}
+
+/**
+ * ONE ROW OF THE LISTING, drawn identically wherever the arrangement puts it.
+ *
+ * It is one component rather than one per block precisely BECAUSE the two blocks are one
+ * listing (R15): a second copy for the reject listing is how a rule weight, a face or a
+ * defect's wording would quietly stop matching the rows above it. What differs between
+ * the two halves is what a row SAYS about itself (the two per-row conventions, BR3), and
+ * that is decided from the row's own verdict here — never from which block it landed in.
+ */
+function PreviewRow({
+  row,
+  isRevealed,
+  onReveal,
+  onHide,
+}: {
+  row: ImportPreviewRow;
+  isRevealed: boolean;
+  onReveal: (key: string) => void;
+  onHide: (key: string) => void;
+}) {
+  const isRejected = row.verdict === 'rejected';
+
+  return (
+    <TableRow className={LISTING_ROW_CLASS}>
+      <TableCell>
+        <VerdictBadge verdict={row.verdict} />
+      </TableCell>
+      {/* The reference is this row's identifier, so it is set in the fixed-field face —
+          and at no added weight, a `font-medium` down a ruled column being the card
+          era's hierarchy rather than this one. */}
+      <TableCell className={NOTATION_CELL_CLASS}>
+        <RecordedValue value={row.values.Reference} />
+      </TableCell>
+      <TableCell className={NOTATION_CELL_CLASS}>
+        <RecordedValue value={row.values.TransactionDate} />
+      </TableCell>
+      <TableCell className={NOTATION_CELL_CLASS}>
+        <PreviewAccountNumber
+          row={row}
+          isRevealed={isRevealed}
+          onReveal={onReveal}
+          onHide={onHide}
+        />
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        <RecordedValue value={row.values.Description} />
+      </TableCell>
+      {/* The row's own figure: right-aligned and tabular down the column, so the digits
+          line up — including where the file held something that is not a number at all,
+          which is exactly what the reader has to see to correct it. */}
+      <TableCell className={FIGURE_CELL_CLASS}>
+        <RecordedValue value={row.values.Amount} />
+      </TableCell>
+      <TableCell>
+        {isRejected ? (
+          // The type as the file recorded it. NOT translated — the point is to show the
+          // user what their own file contains (BR3, FR3).
+          <RecordedValue value={row.values.TransactionType} />
+        ) : (
+          transactionTypeLabel(row.values.TransactionType)
+        )}
+      </TableCell>
+      <TableCell>
+        <RecordedValue value={row.values.Currency} />
+      </TableCell>
+      <TableCell className="max-w-prose whitespace-normal">
+        {/* Nothing is said about a row that will import: there is nothing wrong with
+            it. */}
+        {isRejected ? <DefectReasons reasons={row.reasons} /> : null}
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -536,172 +929,255 @@ function ImportPreviewSection({
 
   return (
     <section aria-labelledby={HEADING_ID} className="grid gap-4">
-      <h2 id={HEADING_ID} className="text-lg font-semibold tracking-tight">
+      {/* The section names itself in the same tracked micro-label the column heads below
+          it wear — a printed listing labels itself in the notation it is set in, and a
+          bold sentence-case title here would be the last of the card era's hierarchy left
+          above a ruled page. The capitals are `text-transform`, so the heading a screen
+          reader is given (and the name this whole region is addressed by) is still the
+          words the app wrote. */}
+      <h2 id={HEADING_ID} className={LISTING_LABEL_CLASS}>
         {HEADING}
       </h2>
 
       {state.phase === 'loading' && (
-        <div role="status" className="grid gap-2">
+        /* The wait is a place that is not a row, so it is the shared ruled band — the
+           rules the rows will carry are already there when the answer lands, rather than
+           the section jumping from floating shapes into a ruled page. */
+        <div role="status" className={`${RULED_BAND_CLASS} py-4`}>
           <span className="sr-only">{LOADING_MESSAGE}</span>
           {/* Placeholders stand in for the rows on their way; the sentence above is
-              what a screen reader is given, since a shape says nothing. */}
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
-          <Skeleton aria-hidden="true" className="h-10 w-full" />
+              what a screen reader is given, since a shape says nothing. Square —
+              nothing in this world has a radius. */}
+          <div aria-hidden="true" className="grid gap-3">
+            <Skeleton className="h-4 w-full rounded-none" />
+            <Skeleton className="h-4 w-2/3 rounded-none" />
+          </div>
         </div>
       )}
 
       {(state.phase === 'cannot-read' || state.phase === 'failed') && (
-        <Alert>
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {state.phase === 'failed' ? FAILED_TITLE : UNREADABLE_TITLE}
-          </AlertTitle>
-          <AlertDescription className="text-foreground gap-3">
-            <p>{state.message}</p>
-            {state.phase === 'failed' && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={readAgain}
-              >
-                {LOAD_AGAIN_LABEL}
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
+        /* Nothing honest can be listed, so this band stands where the listing would be,
+           ruled and full-bleed like it. The `alert` is stripped of the primitive's card
+           and the band's own hairlines frame it; its wording, its role and its one
+           `Load the preview again` are unchanged, the control now wearing the same ruled
+           notation as every other one on this page. */
+        <div className={`${RULED_BAND_CLASS} py-6`}>
+          <Alert className={RULED_ALERT_CLASS}>
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {state.phase === 'failed' ? FAILED_TITLE : UNREADABLE_TITLE}
+            </AlertTitle>
+            <AlertDescription className="text-foreground gap-3">
+              <p>{state.message}</p>
+              {state.phase === 'failed' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={RULED_ACTION_CLASS}
+                  onClick={readAgain}
+                >
+                  {LOAD_AGAIN_LABEL}
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {state.phase === 'loaded' && (
-        <>
-          {/* What the file adds up to, in plain language and in the app's own honest
-              terms: rows that WILL import, and rows the service rejected (FR5, BR2). */}
-          <div className="grid gap-1">
-            <p>{willImportStatement(state.preview.counts.willImport)}</p>
-            <p>{rejectedStatement(state.preview.counts.rejected)}</p>
-          </div>
-
-          {/* The rejected rows as a file to correct offline and send back in (FR6).
-              It lives HERE, beside the rows it is built from, rather than in the
-              Downloads section, which keeps the service's own diagnostic error file
-              (FR7, BR6) — and it is absent entirely when nothing was rejected. */}
-          <CorrectionRowsDownload rejectedRows={rowsToFixIn(state.preview)} />
-
-          <Table>
-            <TableCaption className="sr-only">{TABLE_CAPTION}</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">{COLUMN.verdict}</TableHead>
-                <TableHead scope="col">{COLUMN.reference}</TableHead>
-                <TableHead scope="col">{COLUMN.transactionDate}</TableHead>
-                <TableHead scope="col">{COLUMN.accountNumber}</TableHead>
-                <TableHead scope="col">{COLUMN.description}</TableHead>
-                <TableHead scope="col">{COLUMN.amount}</TableHead>
-                <TableHead scope="col">{COLUMN.transactionType}</TableHead>
-                <TableHead scope="col">{COLUMN.currency}</TableHead>
-                <TableHead scope="col">{COLUMN.defect}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {state.preview.rows.map((row) => {
-                const isRejected = row.verdict === 'rejected';
-                const accountNumber = row.values.AccountNumber;
-                const isRevealed = state.revealed.has(row.key);
-                const rowLabel = rowLabelOf(row);
-
-                return (
-                  <TableRow key={row.key}>
-                    <TableCell>
-                      <VerdictBadge verdict={row.verdict} />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <RecordedValue value={row.values.Reference} />
-                    </TableCell>
-                    <TableCell>
-                      <RecordedValue value={row.values.TransactionDate} />
-                    </TableCell>
-                    <TableCell>
-                      {accountNumber === '' ? (
-                        <RecordedValue value={accountNumber} />
-                      ) : isRejected ? (
-                        // A rejected row is one the user has to go and correct, so the
-                        // full number is reachable — for that ONE row, and only while
-                        // this answer is on screen.
-                        <span className="flex flex-wrap items-center gap-2">
-                          {isRevealed ? (
-                            <span className="tabular-nums">
-                              {accountNumber}
-                            </span>
-                          ) : (
-                            <MaskedAccountNumber
-                              accountNumber={accountNumber}
-                            />
-                          )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (isRevealed) {
-                                hideAccountNumber(row.key);
-                              } else {
-                                revealAccountNumber(row.key);
-                              }
-                            }}
-                          >
-                            {isRevealed ? (
-                              <EyeOff aria-hidden="true" />
-                            ) : (
-                              <Eye aria-hidden="true" />
-                            )}
-                            {isRevealed
-                              ? HIDE_ACCOUNT_NUMBER
-                              : REVEAL_ACCOUNT_NUMBER}
-                            <span className="sr-only">
-                              {rowLabel === undefined
-                                ? ` ${IN_THIS_PREVIEW}`
-                                : ` for ${rowLabel} ${IN_THIS_PREVIEW}`}
-                            </span>
-                          </Button>
-                        </span>
-                      ) : (
-                        // A row that will import is a listed expense payment request,
-                        // and the list convention offers no way to unmask one (BR3).
-                        <MaskedAccountNumber accountNumber={accountNumber} />
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-normal">
-                      <RecordedValue value={row.values.Description} />
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      <RecordedValue value={row.values.Amount} />
-                    </TableCell>
-                    <TableCell>
-                      {isRejected ? (
-                        // The type as the file recorded it. NOT translated — the point
-                        // is to show the user what their own file contains (BR3, FR3).
-                        <RecordedValue value={row.values.TransactionType} />
-                      ) : (
-                        transactionTypeLabel(row.values.TransactionType)
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <RecordedValue value={row.values.Currency} />
-                    </TableCell>
-                    <TableCell className="max-w-prose whitespace-normal">
-                      {/* Nothing is said about a row that will import: there is
-                          nothing wrong with it. */}
-                      {isRejected ? (
-                        <DefectReasons reasons={row.reasons} />
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </>
+        <LoadedPreview
+          preview={state.preview}
+          revealed={state.revealed}
+          onReveal={revealAccountNumber}
+          onHide={hideAccountNumber}
+        />
       )}
     </section>
+  );
+}
+
+/**
+ * THE ANSWER: what the file adds up to, the file to correct offline, and the listing
+ * itself with the reject listing appended at the back.
+ *
+ * It is its own component so the arrangement (R14) can be derived once, by name, from the
+ * rows the loaded state holds — a `filter` buried in a JSX expression is how the one
+ * genuine change this epic makes to what a person sees would become hard to find again.
+ */
+function LoadedPreview({
+  preview,
+  revealed,
+  onReveal,
+  onHide,
+}: {
+  preview: ImportPreviewRows;
+  /** Which rejected rows the reader has asked to see the full account number of, by
+   * their key in THIS answer (POPIA — see {@link PreviewState}). */
+  revealed: ReadonlySet<string>;
+  onReveal: (key: string) => void;
+  onHide: (key: string) => void;
+}) {
+  const arranged = arrangedRowsOf(preview.rows);
+  /**
+   * Whether the reader is at phone width, which decides which of the two presentations of
+   * this listing is in the markup at all (R3). One crossover, read through the one hook every
+   * listing in the app asks with — never a second breakpoint of this section's own.
+   */
+  const narrowViewport = useNarrowViewport();
+
+  return (
+    <>
+      {/* What the file adds up to, in plain language and in the app's own honest
+          terms: rows that WILL import, and rows the service rejected (FR5, BR2). */}
+      <div className="grid gap-1">
+        <p>{willImportStatement(preview.counts.willImport)}</p>
+        <p>{rejectedStatement(preview.counts.rejected)}</p>
+      </div>
+
+      {/* The rejected rows as a file to correct offline and send back in (FR6). It lives
+          HERE, beside the rows it is built from, rather than in the Downloads section,
+          which keeps the service's own diagnostic error file (FR7, BR6) — and it is absent
+          entirely when nothing was rejected. */}
+      <CorrectionRowsDownload rejectedRows={rowsToFixIn(preview)} />
+
+      {narrowViewport ? (
+        /* THE SAME LISTING ON A PHONE (R3, source UI-23), in the same arrangement
+           (R14/R15): ONE list, every row that will import first, then the reject listing
+           appended at the back under its own heading — which is an ITEM of this same list,
+           so no gutter opens between the last row above it and the first below and the
+           whole thing reads as one ruled sequence rather than as two stacks of boxes
+           (BR9). The wide table is not rendered at all here: nine columns inside the
+           primitive's `overflow-x-auto` wrapper is precisely the contained sideways scroll
+           R3 refuses. */
+        <NarrowListing label={NARROW_LISTING_LABEL}>
+          {arranged.willImport.map((row) => (
+            <PreviewRecord
+              key={row.key}
+              row={row}
+              isRevealed={revealed.has(row.key)}
+              onReveal={onReveal}
+              onHide={onHide}
+            />
+          ))}
+
+          {/* Absent entirely when the service rejected nothing — there is no empty block
+              to explain. */}
+          {arranged.rejected.length > 0 && (
+            <>
+              <NarrowBlockHeading id={REJECTED_BLOCK_HEADING_ID}>
+                {REJECTED_BLOCK_HEADING}
+              </NarrowBlockHeading>
+              {arranged.rejected.map((row) => (
+                <PreviewRecord
+                  key={row.key}
+                  row={row}
+                  isRevealed={revealed.has(row.key)}
+                  onReveal={onReveal}
+                  onHide={onHide}
+                />
+              ))}
+            </>
+          )}
+        </NarrowListing>
+      ) : (
+        /* ONE LISTING, IN TWO ROW GROUPS. It runs full-bleed to the page padding so every
+           hairline row rule reaches the edge of the page, with that padding put back on the
+           outer cells; the closing hairline is drawn here rather than on the last row,
+           which the primitive deliberately leaves unruled. No card, no panel, no striped
+           rows: what frames the preview is the ruling. */
+        <div className={`${PAGE_BLEED_CLASS} border-b`}>
+          <Table className={LISTING_EDGE_PADDING_CLASS}>
+            <TableCaption className="sr-only">{TABLE_CAPTION}</TableCaption>
+            {/* ONE header row for both blocks — the rejected rows are a section of this
+              listing, not a second table with heads of its own (R15). */}
+            <TableHeader>
+              <TableRow className={LISTING_ROW_CLASS}>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.verdict}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.reference}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.transactionDate}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.accountNumber}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.description}
+                </TableHead>
+                {/* The figure column names itself over the digits it heads. */}
+                <TableHead
+                  scope="col"
+                  className={`${LISTING_LABEL_CLASS} text-right`}
+                >
+                  {COLUMN.amount}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.transactionType}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.currency}
+                </TableHead>
+                <TableHead scope="col" className={LISTING_LABEL_CLASS}>
+                  {COLUMN.defect}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+
+            {/* THE LISTING: every row that will import, in the file's own relative order
+              among themselves. */}
+            <TableBody>
+              {arranged.willImport.map((row) => (
+                <PreviewRow
+                  key={row.key}
+                  row={row}
+                  isRevealed={revealed.has(row.key)}
+                  onReveal={onReveal}
+                  onHide={onHide}
+                />
+              ))}
+            </TableBody>
+
+            {/* THE REJECT LISTING, APPENDED AT THE BACK (R14/R15): its own row group, named
+              by its own heading so the boundary is in the accessibility tree and not only
+              in ink, opened by a hairline above the tracked micro-label that heads it. It
+              spans the whole listing, so the block reads as a section of it rather than as
+              a value in a column. Absent entirely when the service rejected nothing —
+              there is no empty block to explain.
+
+              Its scope is `rowgroup`, because what it heads IS the row group it opens —
+              every remaining row of this `tbody`. `colgroup` would tell a screen reader
+              the heading applies to a group of COLUMNS, which this listing has none of,
+              and a heading pointed at a group that does not exist is the boundary going
+              missing from the accessibility tree that this block exists to put in it. */}
+            {arranged.rejected.length > 0 && (
+              <TableBody aria-labelledby={REJECTED_BLOCK_HEADING_ID}>
+                <TableRow className={`${LISTING_ROW_CLASS} border-t`}>
+                  <TableHead
+                    scope="rowgroup"
+                    colSpan={COLUMN_COUNT}
+                    id={REJECTED_BLOCK_HEADING_ID}
+                    className={`${LISTING_LABEL_CLASS} h-auto pt-8 pb-2`}
+                  >
+                    {REJECTED_BLOCK_HEADING}
+                  </TableHead>
+                </TableRow>
+                {arranged.rejected.map((row) => (
+                  <PreviewRow
+                    key={row.key}
+                    row={row}
+                    isRevealed={revealed.has(row.key)}
+                    onReveal={onReveal}
+                    onHide={onHide}
+                  />
+                ))}
+              </TableBody>
+            )}
+          </Table>
+        </div>
+      )}
+    </>
   );
 }
