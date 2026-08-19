@@ -170,8 +170,15 @@ export function CorrectionRowsDownload({
         /* A refusal is a place on the page that is not a control, so it stands in the
            shared full-bleed ruled band with the card the `alert` primitive ships with
            stripped off it: the band's own hairlines are what frame it. Its title and its
-           wording are unchanged. */
-        <div className={`${RULED_BAND_CLASS} py-6`}>
+           wording are unchanged.
+
+           `justify-self-stretch` is what makes the bleed real HERE: this container is
+           `justify-items-start` so the control beside it takes its own width, and a
+           start-aligned grid item is sized to its content — which would leave the band's
+           hairlines stopping short of the right-hand edge of the page while hanging into
+           the left gutter. The band has to fill the column before `-mx-4` can carry it
+           out to both edges. */
+        <div className={`${RULED_BAND_CLASS} justify-self-stretch py-6`}>
           <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
             <AlertTitle className={RULED_ALERT_TITLE_CLASS}>

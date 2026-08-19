@@ -395,10 +395,14 @@ function RejectedRecord({
 
       <NarrowRecordLine>
         <NarrowField label={COLUMN.accountNumber}>
-          {accountNumber === undefined || accountNumber === '' ? (
-            <RecordedValue value={accountNumber} />
-          ) : (
-            <span className={NOTATION_CELL_CLASS}>
+          {/* The fixed-field face wraps BOTH answers, exactly as the wide row's cell
+              does: a number the file did not hold is still read in this column's own
+              notation, and setting only one of the two would be the two presentations
+              drifting apart on the value this listing is most careful with. */}
+          <span className={NOTATION_CELL_CLASS}>
+            {accountNumber === undefined || accountNumber === '' ? (
+              <RecordedValue value={accountNumber} />
+            ) : (
               <RejectedAccountNumber
                 accountNumber={accountNumber}
                 rowLabel={rowLabelOf(row)}
@@ -407,8 +411,8 @@ function RejectedRecord({
                 onReveal={onReveal}
                 onHide={onHide}
               />
-            </span>
-          )}
+            )}
+          </span>
         </NarrowField>
       </NarrowRecordLine>
 

@@ -183,6 +183,7 @@ import {
   RULED_ACTION_ICON_CLASS,
   RULED_ACTION_WITH_ICON_CLASS,
   RULED_ALERT_CLASS,
+  RULED_ALERT_TITLE_CLASS,
   RULED_BAND_CLASS,
 } from '@/components/requests/fieldNotation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -232,18 +233,6 @@ const LOADING_MESSAGE = 'Loading the submitted files…';
  * is {@link LOADING_MESSAGE}, because a shape says nothing.
  */
 const PLACEHOLDER_LINES = [1, 2, 3];
-
-/**
- * A control a register row offers: the app's one ruled action notation, imported whole.
- *
- * Named here only so the two controls in a row cannot be given different ones by accident.
- * It is deliberately the SAME value the expense request's controls wear rather than a
- * files-only variant of it (`files-view-redesign` R12/BR6) — including its ink: the delete
- * carried `text-destructive` in the card era, and a single red control repeated once per
- * row is the loudest thing on a screen whose colour budget is ground, ink, hairline and the
- * four status tokens.
- */
-const ROW_ACTION_CLASS = RULED_ACTION_WITH_ICON_CLASS;
 
 /** Nothing has been submitted yet — an empty list is an answer, not a failure. */
 const EMPTY_MESSAGE = 'No files have been submitted yet.';
@@ -373,6 +362,13 @@ const NARROW_LISTING_LABEL = 'Submitted expense files';
  * story 3 AC-6): a session the server did not name gets no markup for it at all, and there
  * is no status condition on it — a file may be deleted whatever its status, an `Imported`
  * one included (R3/BR1).
+ *
+ * BOTH wear the app's one ruled action notation, imported whole
+ * (`RULED_ACTION_WITH_ICON_CLASS`) rather than restated as a files-only variant of it
+ * (R12/BR6) — including its ink: the delete carried `text-destructive` in the card era, and
+ * a single red control repeated once per row is the loudest thing on a screen whose colour
+ * budget is ground, ink, hairline and the four status tokens. Their being one piece of
+ * markup is what stops the two of them drifting onto different notations.
  */
 function FileRowControls({
   file,
@@ -387,7 +383,7 @@ function FileRowControls({
 }) {
   return (
     <>
-      <Button asChild variant="ghost" className={ROW_ACTION_CLASS}>
+      <Button asChild variant="ghost" className={RULED_ACTION_WITH_ICON_CLASS}>
         <Link href={submittedFileAddress(file)}>
           <PanelRightOpen
             aria-hidden="true"
@@ -401,7 +397,7 @@ function FileRowControls({
         <Button
           type="button"
           variant="ghost"
-          className={ROW_ACTION_CLASS}
+          className={RULED_ACTION_WITH_ICON_CLASS}
           onClick={() => {
             // Asking is the event that both opens the confirmation and starts reading what
             // this file would destroy — never a render reacting to the dialog.
@@ -908,7 +904,7 @@ export function SubmittedFilesList({
         <div key={refused.file.Id} className={`${RULED_BAND_CLASS} py-4`}>
           <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
-            <AlertTitle className="line-clamp-none">
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
               {deleteRefusedTitleFor(refused.file)}
             </AlertTitle>
             <AlertDescription className="text-foreground">
@@ -959,7 +955,9 @@ export function SubmittedFilesList({
         <div className={`${RULED_BAND_CLASS} py-6`}>
           <Alert className={RULED_ALERT_CLASS}>
             <TriangleAlert aria-hidden="true" />
-            <AlertTitle className="line-clamp-none">{FAILED_TITLE}</AlertTitle>
+            <AlertTitle className={RULED_ALERT_TITLE_CLASS}>
+              {FAILED_TITLE}
+            </AlertTitle>
             <AlertDescription className="text-foreground gap-3">
               <p>{state.message}</p>
               {/* The bare notation, without the gap a glyph needs: this control is

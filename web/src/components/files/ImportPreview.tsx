@@ -1145,12 +1145,18 @@ function LoadedPreview({
               in ink, opened by a hairline above the tracked micro-label that heads it. It
               spans the whole listing, so the block reads as a section of it rather than as
               a value in a column. Absent entirely when the service rejected nothing —
-              there is no empty block to explain. */}
+              there is no empty block to explain.
+
+              Its scope is `rowgroup`, because what it heads IS the row group it opens —
+              every remaining row of this `tbody`. `colgroup` would tell a screen reader
+              the heading applies to a group of COLUMNS, which this listing has none of,
+              and a heading pointed at a group that does not exist is the boundary going
+              missing from the accessibility tree that this block exists to put in it. */}
             {arranged.rejected.length > 0 && (
               <TableBody aria-labelledby={REJECTED_BLOCK_HEADING_ID}>
                 <TableRow className={`${LISTING_ROW_CLASS} border-t`}>
                   <TableHead
-                    scope="colgroup"
+                    scope="rowgroup"
                     colSpan={COLUMN_COUNT}
                     id={REJECTED_BLOCK_HEADING_ID}
                     className={`${LISTING_LABEL_CLASS} h-auto pt-8 pb-2`}
