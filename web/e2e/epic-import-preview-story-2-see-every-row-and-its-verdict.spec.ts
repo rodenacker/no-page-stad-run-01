@@ -10,9 +10,12 @@
  * ---------------------------------------------------------------------------
  * Coverage split (feature-planner tags — one tag, one test, one layer)
  * ---------------------------------------------------------------------------
- * - AC-1 (every row of the file, in file order, each carrying a "Will import" or
- *   "Rejected" text label — never colour alone, never the word "Imported") → test 1
- *   below, the story's ONLY `playwright`-tagged criterion.
+ * - AC-1 (every row of the file, in the order the preview arranges them, each carrying a
+ *   "Will import" or "Rejected" text label — never colour alone, never the word
+ *   "Imported") → test 1 below, the story's ONLY `playwright`-tagged criterion. Its
+ *   ARRANGEMENT half is re-pointed to `files-view-redesign` R14's (will-import rows first,
+ *   the rejected ones appended at the back, each in the file's own relative order among
+ *   themselves) under that epic's BR3 — same strength, new arrangement.
  * - AC-2 (no preview before validation has run), AC-3 (a will-import row's masked
  *   account number and plain-language transaction type), AC-4 (a rejected row's
  *   untranslated values, per-row reveal and defect wording), AC-5 (BR9's unmatchable
@@ -40,8 +43,8 @@
  * decide each row's verdict. Two independent reads, both over the real wire, agreeing
  * about the same file. Only a browser runs that chain end to end.
  *
- * It is also the only place "in file order" means anything: order is a property of the
- * DELIVERED document, and this spec reads it back out of the rendered page.
+ * It is also the only place the ORDER of the rows means anything: order is a property of
+ * the DELIVERED document, and this spec reads it back out of the rendered page.
  *
  * ---------------------------------------------------------------------------
  * Mocking strategy — the backend is ALWAYS mocked, never live
@@ -107,12 +110,16 @@
  *   cannot intercept a read issued by the Next.js server or a Server Action, so a
  *   server-side download would bypass these mocks and leave for the real transactions
  *   service.
- * - THE PREVIEW IS ONE ORDERED LIST, NOT TWO STACKED HALVES. AC-1 says "every row of
- *   the file, IN FILE ORDER", so a will-import row and a rejected row sit next to each
- *   other in the positions their file gave them. The story's "two halves" language
- *   (BR3) is about the two per-row DISPLAY conventions — masking, reveal, translated
- *   vs. untranslated type — not about splitting the rows into two tables. Grouping the
- *   rows by verdict would destroy file order and fail test 1.
+ * - THE PREVIEW IS ONE LISTING WITH THE REJECT LISTING APPENDED AT THE BACK
+ *   (`files-view-redesign` R14/R15, which superseded this story's original "in file order"
+ *   arrangement; the re-point is sanctioned by that epic's BR3 and is applied to `LINES`
+ *   below). Every row that will import comes first, in the file's own relative order among
+ *   themselves; every rejected row follows at the close, in theirs. It is still ONE table
+ *   with one header row — the rejected rows are a named row group of it, not a second
+ *   table — so the locators below are unchanged.
+ * - The two per-row DISPLAY conventions (BR3 of THIS story — masking, reveal, translated
+ *   vs. untranslated type) are a separate matter from that arrangement and are unchanged
+ *   by it: a row still says exactly what it always said, wherever it now sits.
  * - It renders as a TABLE (the Shadcn `table` primitive, as `SubmittedFilesList`, the
  *   expense request list and `RejectedRows` already do), one `row` per file line. The
  *   table is located here by CONTENT it holds, never by position or a test id, so it
@@ -226,7 +233,7 @@ const IMPORTED_CLAIM = /\bimported\b/i;
 
 /** One file line, and the verdict the preview must show against it. */
 interface PreviewLineFixture {
-  /** 1-based position in the file's data lines — the order AC-1 is about. */
+  /** 1-based position in the file's data lines. */
   readonly line: number;
   /** How the line is addressed on screen: its own reference. */
   readonly reference: string;
@@ -237,8 +244,10 @@ interface PreviewLineFixture {
   readonly forbiddenLabel: RegExp;
 }
 
-const LINES: readonly PreviewLineFixture[] = PREVIEW.rows.map((row, index) => {
-  const line = index + 1;
+const lineFixtureFor = (
+  row: (typeof PREVIEW.rows)[number],
+): PreviewLineFixture => {
+  const line = PREVIEW.rows.indexOf(row) + 1;
   const rejected = PREVIEW.rejectedLineNumbers.includes(line);
   return {
     line,
@@ -247,7 +256,30 @@ const LINES: readonly PreviewLineFixture[] = PREVIEW.rows.map((row, index) => {
     expectedLabel: rejected ? REJECTED_LABEL : WILL_IMPORT_LABEL,
     forbiddenLabel: rejected ? WILL_IMPORT_LABEL : REJECTED_LABEL,
   };
-});
+};
+
+/**
+ * THE ORDER THE PREVIEW MUST RENDER THE FILE'S LINES IN, and the verdict each must carry.
+ *
+ * RE-POINTED, not loosened (`files-view-redesign` BR3). AC-1's own words are "every row of
+ * the file, in file order", and that arrangement was superseded by
+ * `files-view-redesign` R14: every row that WILL IMPORT is listed first, in the file's own
+ * relative order among themselves, then every REJECTED row appended at the back, in the
+ * file's own relative order among themselves. The claim below is exactly as strong as it
+ * was — the row in position N is a NAMED line of the file and no other — over the
+ * arrangement the app now serves. Everything AC-1 says about what a row SAYS (its verdict
+ * in words, never colour alone; never the word "Imported") is untouched.
+ *
+ * Derived from the fixture's own pre-computed partition, so it can never drift from the
+ * file it describes.
+ */
+const LINES: readonly PreviewLineFixture[] = [
+  ...PREVIEW.willImportRows,
+  ...PREVIEW.rejectedRows,
+].map(lineFixtureFor);
+
+/** Where the appended reject listing starts — the boundary the two blocks meet at. */
+const FIRST_REJECTED_POSITION = PREVIEW.willImportRows.length;
 
 /* -------------------------------------------------------------------------- */
 /* Fixture integrity — AC-1 is only tested if these hold                       */
@@ -276,6 +308,18 @@ if (PREVIEW.counts.willImport === 0) {
 }
 
 const REFERENCES = LINES.map((fixture) => fixture.reference);
+
+if (
+  REFERENCES.join('|') === PREVIEW.rows.map((row) => row.Reference).join('|')
+) {
+  throw new Error(
+    'previewWithRejectedRows() now rejects a trailing run of lines, so the arrangement ' +
+      '`files-view-redesign` R14 requires happens to equal the file’s own order — the ' +
+      'order assertion below would pass against the interleaved preview this epic ' +
+      'shipped. Use a fixture that rejects a line with a will-import line after it ' +
+      '(today: lines 3 and 5 of 5).',
+  );
+}
 
 for (const fixture of LINES) {
   if (!fixture.reference) {
@@ -529,10 +573,12 @@ test.describe('Epic import-preview, Story 2: every row of the file, and what wil
 
   // AC-1
   // Three claims in one journey, because they are one behaviour: the preview holds the
-  // WHOLE file (not the rows some other endpoint knows about), in the order the file
-  // put them in, each row saying in words what will happen to it — and never claiming
-  // an import the backend has not performed (BR2).
-  test('the preview lists every row of the submitted file, in file order, each labelled "Will import" or "Rejected" — and no row claims it was imported', async ({
+  // WHOLE file (not the rows some other endpoint knows about), arranged as the app now
+  // serves it (`files-view-redesign` R14 — the rows that will import, then the rejected
+  // ones appended at the back, each in the file's own relative order among themselves),
+  // each row saying in words what will happen to it — and never claiming an import the
+  // backend has not performed (BR2).
+  test('the preview lists every row of the submitted file, the rows that will import first and the rejected ones appended at the back, each labelled "Will import" or "Rejected" — and no row claims it was imported', async ({
     page,
     context,
   }) => {
@@ -568,17 +614,33 @@ test.describe('Epic import-preview, Story 2: every row of the file, and what wil
     for (const [position, fixture] of LINES.entries()) {
       const rendered = renderedRows[position];
 
-      // IN FILE ORDER. Position is asserted deliberately — the order of the rows IS
-      // the criterion, so the row in position N must be the file's line N and no
-      // other. (Everywhere else in this suite a row is addressed by its content;
-      // here content is checked AGAINST a position.)
+      // IN THE ORDER THE PREVIEW ARRANGES THEM. Position is asserted deliberately — the
+      // order of the rows IS the criterion, so the row in position N must be the named
+      // line of the file that belongs there and no other. (Everywhere else in this suite
+      // a row is addressed by its content; here content is checked AGAINST a position.)
       expect(
         rendered,
         `the preview’s row ${String(position + 1)} is not line ` +
-          `${String(fixture.line)} of the file. Every row of the file appears in FILE ` +
-          `ORDER (AC-1), so this row must be the one recorded as ` +
-          `"${fixture.reference}". The preview reads:\n${renderedRows.join('\n---\n')}`,
+          `${String(fixture.line)} of the file. Every row that will import is listed ` +
+          'first and every rejected row is appended at the back, each keeping the file’s ' +
+          `own relative order among its own rows (files-view-redesign R14), so this row ` +
+          `must be the one recorded as "${fixture.reference}". The preview reads:\n` +
+          `${renderedRows.join('\n---\n')}`,
       ).toContain(fixture.reference);
+
+      // THE BOUNDARY BETWEEN THE TWO BLOCKS, said the other way round: no rejected row
+      // sits among the rows that will import, and no will-import row sits among the
+      // rejected ones. This is what "never interleaved" means as a property of a
+      // position rather than of a sequence.
+      expect(
+        fixture.rejected,
+        `line ${String(fixture.line)} ("${fixture.reference}") is rendered in position ` +
+          `${String(position + 1)}, on the ` +
+          `${position < FIRST_REJECTED_POSITION ? 'will-import' : 'rejected'} side of ` +
+          `the boundary, but the service ` +
+          `${fixture.rejected ? 'rejected' : 'did not reject'} it. The preview reads:\n` +
+          `${renderedRows.join('\n---\n')}`,
+      ).toBe(position >= FIRST_REJECTED_POSITION);
 
       // A TEXT LABEL, NEVER COLOUR ALONE. The verdict is spelled out on the row.
       expect(

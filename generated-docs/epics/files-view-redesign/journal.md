@@ -50,3 +50,24 @@
   words beside it.
 - **"Back to Expense files" and "Load this file again" are no longer boxed buttons** — they are
   small capitalised labels on a rule, like every other control on these two screens.
+
+## Story 4 — The import preview, with the rejects appended at the back
+
+- **The import preview now shows every row that will import first, then all the rejected rows
+  together in one clearly-headed block at the end.** The rows never mix any more. Inside each of
+  the two, the rows are still in the order your file had them.
+- **The re-arrangement only changes what you see on screen.** The file you download to correct and
+  re-upload still holds the rejected rows in your file's own order — that was the one thing this
+  change could quietly have broken, so it was kept deliberately separate.
+- **The listing's hidden description** (what a screen-reader reads before the rows) used to say the
+  rows were "in the order the file holds them". That stopped being true, so it now describes the
+  new arrangement instead — for someone who cannot see the two blocks drawn apart, it is the only
+  account of the arrangement there is.
+- **Two tests from the earlier import-preview work were pinning the old mixed-together order.**
+  They were re-pointed to the new arrangement rather than removed or softened: every check about
+  what a row SAYS — its verdict, its values, its reason for rejection, its masked account number —
+  is still exactly as strict as it was, and the browser test now also checks that no rejected row
+  sits among the rows that will import.
+- **The preview is now drawn as the same ruled listing as the rest of the app** — full width, thin
+  lines between rows, small capitalised column headings, and the reference, date, account number
+  and amount in the typewriter face.
